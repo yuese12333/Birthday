@@ -1,0 +1,39 @@
+{
+  "chinesePoemFill": [
+    {"question": "山有木兮木有枝，_____", "answer": "心悦君兮君不知", "encourageCorrect":"古风直击心巴，你绝对是懂浪漫的那个人。", "encourageWrong":"这一句在很多表白摘录里出现，再回想下～"},
+    {"question": "愿得一心人，_____", "answer": "白首不相离", "encourageCorrect":"白首不相离，被你填出来就像一个小小誓言。", "encourageWrong":"提示：四字，表达相守不分开。"},
+    {"question": "此情可待成追忆，_____", "answer": "只是当时已惘然", "encourageCorrect":"你连惆怅都写得这么好看。", "encourageWrong":"尾句有点小遗憾意味，再想想。"},
+    {"question": "两情若是久长时，_____", "answer": "又岂在朝朝暮暮", "encourageCorrect":"答对！我们不只是朝朝暮暮，是更久的久。", "encourageWrong":"这句强调‘久长’不在表面陪伴频率～"},
+    {"question": "执子之手，_____", "answer": "与子偕老", "encourageCorrect":"经典成对句，牵手→偕老，完美。", "encourageWrong":"后半句和‘执子之手’一样常被婚礼引用。"},
+    {"question": "春风十里不如你（补一句自创甜句）_____", "answer": "满天星光不及你回头一笑", "encourageCorrect":"原创加成！我会把这句收藏在心里。", "encourageWrong":"随便写一段甜的也行，勇敢输出！"},
+    {"question": "我见青山多妩媚，（仿写）_____", "answer": "料青山见我应如是", "encourageCorrect":"青山应如你所见，你也被喜欢着。", "encourageWrong":"仿写强调‘青山见我’，试着对称一下。"}
+  ],
+  "mathPuzzles": [
+    {"question": "你=1，她=1，我们=?", "answer": "2", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "心跳每分钟≈70 次，我们约会 2 小时心跳大概多少次?", "answer": "8400", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "如果想你指数每天*2，第一天1次，第7天=?", "answer": "64", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "(520 + 1314) ÷ 2 = ? （象征平均甜度）", "answer": "917", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "一个拥抱消耗 5 卡路里，抱 20 次消耗?", "answer": "100", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "月亮=1 颗心=1 '你'+我= ? (写数字)", "answer": "2", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "密码：我们认识年份 * 喜欢她年份差 + 1，如果随便写就=？(彩蛋写 0)", "answer": "0", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
+  ],
+  "englishMatch": [
+    {"word": "forever", "match": "永远", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "destiny", "match": "命运", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "serendipity", "match": "意外的美好", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "galaxy", "match": "星系", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "heartbeat", "match": "心跳", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "cuddle", "match": "拥抱", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "spark", "match": "火花", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "init", "match": "初始化（程序员小梗）", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
+  ],
+  "scienceQuiz": [
+    {"question": "水沸腾形成小水珠附着锅盖内侧主要因为?", "options": ["蒸发与冷凝", "升华", "分解"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "银河看起来像一条光带主要因为?", "options": ["恒星密度高", "月亮反光", "空气散射"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "夜空看不到全部星星的原因不包括?", "options": ["光污染", "大气散射", "星星忽然熄灭"], "answer": 2, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "以下哪个行为最可能让心情变好?", "options": ["跟你聊天", "一天不睡", "疯狂背单词"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "人体最‘忠诚’持续跳动的器官?", "options": ["心脏", "胃", "嗓子"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "以下哪种力与‘我被你吸引’最接近比喻?", "options": ["引力", "摩擦力", "浮力"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "彩虹出现需要：阳光 + 空气中?", "options": ["水滴", "灰尘", "臭氧"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
+  ]
+}
