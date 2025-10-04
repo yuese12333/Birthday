@@ -1,9 +1,42 @@
+/**
+ * 场景2：高考四科小游戏（语/数/英/理综）
+ * 设计理念：
+ *  - 零挫败：答错也给满分（标记 _pamperedWrong），跳过也给分（_skipped），第三次提示直接送答案。
+ *  - 情感陪伴：所有“失败路径”都会输出宠溺 / 鼓励话语，维持轻松甜蜜氛围。
+ *  - 数据驱动：题库优先从 external JSON (questions.json) 替换加载；失败则使用内置 fallback。
+ *  - 防并发/稳态：通过场景管理器 + 本地 DOM 清理，避免重复渲染；按钮加 _locked 防连击。
+ *  - 可扩展：score 公式集中、题目对象字段统一，可后续添加科目、题型或成就统计。
+ *
+ * 主要机制概览：
+ *  1. 得分：正确 = 2 * 难度权重；跳过 = 同上；错误 = 同上（满分宠溺）；提示不扣分。
+ *  2. 提示：一题可按下至多 3 次（hintCount）。前两次显示提示文本，第 3 次直接自动判定正确 + 给答案 + 给分。
+ *  3. 彩蛋：全跳过 / 全错误宠溺 / ≥50% 跳过（互斥优先级：全跳过 > 全错误宠溺 > 半数跳过）。
+ *  4. 计时：5 分钟循环倒计时；结束重置并投放随机宠溺提醒，不影响得分或题目。
+ *
+ * 关键字段：
+ *   question: {
+ *     type: 'fill' | 'select', difficulty: 'easy' | 'medium' | 'hard',
+ *     prompt, answer / answerIndex, options?, placeholder?, hint,
+ *     solved (是否完成), hintCount (提示次数), _skipped, _pamperedWrong
+ *   }
+ *
+ * 可扩展建议：
+ *  - seriousMode: 切换关闭跳过加分 / 错误满分。
+ *  - achievements: 根据 _skipped/_pamperedWrong/hintsUsed 派生成就称号。
+ *  - 题目类型扩展：拖拽 / 配对，可在 renderSubject 内按 type 分支拆分组件化。
+ */
 import { BaseScene } from '../core/baseScene.js';
 
-// 帮助：难度定义影响得分/提示次数
+// 难度权重：影响统一得分（当前统一公式：2 * weight）
 const DIFFICULTY_WEIGHT = { easy: 1, medium: 2, hard: 3 };
 
 export class Scene2Exam extends BaseScene {
+  /**
+   * 初始化：
+   *  - 设定默认内置题库（四科），结构与外部 JSON 兼容。
+   *  - 尝试加载 external questions.json（替换模式：成功后完全覆盖默认）。
+   *  - 初始化计分与统计字段。
+   */
   async init(){
     await super.init();
     // 默认内置题库（仅在外部加载失败或为空时使用）
@@ -26,7 +59,7 @@ export class Scene2Exam extends BaseScene {
       ], done:false }
     ];
 
-    // 先假定使用默认，若外部加载成功则完全替换
+  // 先假定使用默认，若外部加载成功则完全替换（替换模式：不是追加）
     this.subjects = defaultSubjects;
     // 尝试加载外部题库 JSON；成功则“替换”默认题库
     try {
@@ -49,6 +82,11 @@ export class Scene2Exam extends BaseScene {
     this.skippedQuestions = 0; // 统计宠溺跳过次数
     this.totalQuestionsCount = () => this.subjects.reduce((a,s)=> a + s.questions.length,0);
   }
+  /**
+   * 将 external JSON 数据转换为内部统一结构。
+   * @param {Object} data questions.json 解析结果
+   * @returns {Array} subjects 数组
+   */
   buildSubjectsFromExternal(data){
     const subjects = [];
     if(Array.isArray(data.chinesePoemFill) && data.chinesePoemFill.length){
@@ -91,6 +129,13 @@ export class Scene2Exam extends BaseScene {
     }
     return subjects;
   }
+  /**
+   * 场景进入：
+   *  - 清理潜在残留 DOM（防极端并发 go 导致的多副本）。
+   *  - 构建主 UI：标签栏 / 分数 / 计时器 / 题目面板 / 状态 / 总结卡片。
+   *  - 启动 5 分钟循环倒计时；到 0 重置并输出宠溺信息。
+   *  - 渲染第一个科目。
+   */
   async enter(){
     // 保险：若极端情况下多次并发 go 造成重复残留，这里主动清理已有 exam 场景节点
     const existing = this.ctx.rootEl.querySelectorAll('.scene-exam');
@@ -101,7 +146,7 @@ export class Scene2Exam extends BaseScene {
       <h1>场景2：高考小考站</h1>
       <div class='exam-top'>
         <div class='tabs'></div>
-        <div class='meta'>分数 <span class='score'>0</span></div>
+        <div class='meta'>分数 <span class='score'>0</span> | 计时 <span class='timer'>05:00</span></div>
       </div>
       <div class='board'></div>
       <div class='status'></div>
@@ -113,9 +158,41 @@ export class Scene2Exam extends BaseScene {
     const status = el.querySelector('.status');
     const finishBtn = el.querySelector('.finish');
     const scoreEl = el.querySelector('.score');
+    const timerEl = el.querySelector('.timer');
     const summaryEl = el.querySelector('.summary');
+    // 计时器：5分钟循环倒计时
+    this._remainingSeconds = 300; // 5 * 60
+    const formatTime = (s)=>{
+      const m = Math.floor(s/60).toString().padStart(2,'0');
+      const sec = (s%60).toString().padStart(2,'0');
+      return `${m}:${sec}`;
+    };
+    timerEl.textContent = formatTime(this._remainingSeconds);
+    const cyclePamperLines = [
+      '时间到~ 说明你已经很认真啦，抱一下继续！',
+      '5分钟小提醒：别紧张，我永远在你身边～',
+      '学习计时器叮——喝口水，继续收下我的宠溺。',
+      '滴！可爱度续费成功，再战五分钟！',
+      '休息一瞬再冲刺，我们并肩最甜～'
+    ];
+    this._timerInterval = setInterval(()=>{
+      this._remainingSeconds--;
+      if(this._remainingSeconds <= 0){
+        // 重置
+        this._remainingSeconds = 300;
+        const line = cyclePamperLines[Math.floor(Math.random()*cyclePamperLines.length)];
+        // 不打断正在进行的题目结构，只更新状态区域
+        if(status){
+          status.innerHTML = `<span class='ok'>${line} (计时已重置 05:00)</span>`;
+        }
+      }
+      if(timerEl){ timerEl.textContent = formatTime(this._remainingSeconds); }
+    }, 1000);
 
-    const renderTabs = ()=>{
+  /**
+   * 渲染顶部科目标签；点击切换当前主科目。
+   */
+  const renderTabs = ()=>{
       tabsBox.innerHTML = this.subjects.map(s=>`<button class='tab' data-sub='${s.key}'>${s.title}${s.done?'✔':''}</button>`).join('');
       tabsBox.querySelectorAll('.tab').forEach(tb=> tb.addEventListener('click',()=>{
         const s = this.subjects.find(x=>x.key===tb.dataset.sub);
@@ -123,7 +200,11 @@ export class Scene2Exam extends BaseScene {
       }));
     };
 
-    const renderSubject = (subject)=>{
+  /**
+   * 渲染某科目的下一题；若该科全部完成则显示完成提示。
+   * @param {Object} subject 当前学科对象
+   */
+  const renderSubject = (subject)=>{
       // 找到第一道未完成的题
       const nextQ = subject.questions.find(q=>!q.solved);
       if(!nextQ){
@@ -135,7 +216,7 @@ export class Scene2Exam extends BaseScene {
         return;
       }
       board.innerHTML = '';
-      const wrapper = document.createElement('div');
+  const wrapper = document.createElement('div'); // 单题容器（动态重建）
       wrapper.className='paper';
       const diffTag = `<span class='diff diff-${nextQ.difficulty}'>${nextQ.difficulty}</span>`;
       let inputHtml='';
@@ -162,15 +243,35 @@ export class Scene2Exam extends BaseScene {
       const skipBtn = wrapper.querySelector('.skip-love-btn');
       const hintArea = wrapper.querySelector('.hint-area');
 
-      hintBtn.addEventListener('click',()=>{
-        if(nextQ.hinted) return; // 一题一次
-        hintArea.textContent = '提示：' + (nextQ.hint || '暂无');
-        nextQ.hinted = true; this.hintsUsed++;
-        this.score = Math.max(0, this.score - 1); // 使用提示扣 1 分
-        updateHUD();
+  // 提示按钮逻辑：累计 3 次，第三次直接完成题目
+  hintBtn.addEventListener('click',()=>{
+        // 多次提示：前两次显示提示文本，第三次直接给出答案并判定通过
+        if(nextQ.solved) return; // 已完成无需提示
+        nextQ.hintCount = (nextQ.hintCount||0) + 1;
+        this.hintsUsed++;
+        if(nextQ.hintCount < 3){
+          const label = nextQ.hintCount === 1 ? '提示' : `再次提示(${nextQ.hintCount}/3)`;
+          hintArea.textContent = label + '：' + (nextQ.hint || '暂无');
+        } else {
+          // 第三次：自动判定正确，显示答案并给分（不扣分）
+          nextQ.solved = true;
+          const base = 2;
+          const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
+          const gained = base * weight; 
+          this.score += gained;
+          const answerReveal = nextQ.type==='fill' ? nextQ.answer : (nextQ.options?.[nextQ.answerIndex] || '');
+          hintArea.innerHTML = `<span class='auto-answer'>直接送你答案：<strong>${answerReveal}</strong></span>`;
+          status.innerHTML = `<span class='ok'>第三次提示触发宠溺：答案我直接告诉你~</span> <em>+${gained} 分</em>`;
+          updateHUD();
+          wrapper._locked = true;
+          hintBtn.disabled = true; submitBtn.disabled = true; skipBtn.disabled = true;
+          setTimeout(()=> renderSubject(subject), 600);
+        }
       });
 
-      submitBtn.addEventListener('click',()=>{
+  // 提交按钮：判断正误；正确=加分；错误=宠溺满分 + 答案展示
+  submitBtn.addEventListener('click',()=>{
+        if(wrapper._locked) return; // 操作锁
         let userAns='';
         if(nextQ.type==='fill') userAns = wrapper.querySelector('.q-input').value.trim();
         if(nextQ.type==='select') userAns = wrapper.querySelector('.q-select').value;
@@ -179,11 +280,12 @@ export class Scene2Exam extends BaseScene {
           nextQ.solved = true;
           const base = 2; // 基础分
           const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
-          const gained = base*weight - (nextQ.hinted?1:0);
-          const finalGain = Math.max(1,gained);
-          this.score += finalGain;
-          status.innerHTML = `<span class='ok'>${nextQ.correctMsg || '太棒啦！'}</span> <em>+${finalGain} 分</em>`;
+          const gained = base*weight; // 不再因提示扣分
+          this.score += gained;
+          status.innerHTML = `<span class='ok'>${nextQ.correctMsg || '太棒啦！'}</span> <em>+${gained} 分</em>`;
           updateHUD();
+          wrapper._locked = true;
+          submitBtn.disabled = true; skipBtn.disabled = true; hintBtn.disabled = true;
           setTimeout(()=> renderSubject(subject), 400);
         } else {
           // 宠溺错误模式：也判定通过，并给予“完整得分”且展示正确答案
@@ -205,20 +307,24 @@ export class Scene2Exam extends BaseScene {
             status.innerHTML = `<span class='ok'>${line} 正确答案：<strong>${answerReveal}</strong></span> <em>+${gained} 分 (宠溺错误满分)</em>`;
             updateHUD();
             wrapper.classList.add('shake-mini');
+            wrapper._locked = true;
+            submitBtn.disabled = true; skipBtn.disabled = true; hintBtn.disabled = true;
             setTimeout(()=> wrapper.classList.remove('shake-mini'),400);
             setTimeout(()=> renderSubject(subject), 600);
         }
       });
 
-      // 宠溺跳过：不给连击加成，重置连击，给基础分*权重（不受提示惩罚），显示暖心话
-      skipBtn.addEventListener('click',()=>{
+      // 宠溺跳过，给分，显示暖心话
+  // 跳过按钮：视为“宠溺跳过”满分通过
+  skipBtn.addEventListener('click',()=>{
+        if(wrapper._locked) return; // 操作锁
         if(nextQ.solved) return;
         nextQ.solved = true;
         nextQ._skipped = true; // 标记此题由跳过获得
-  // 跳过不算正确答题
+  // 跳过算正确答题
         const base = 2;
         const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
-        const gained = base * weight; // 不减提示，不加连击
+        const gained = base * weight; 
         this.score += gained;
         this.skippedQuestions++;
         const pamperLines = [
@@ -230,22 +336,31 @@ export class Scene2Exam extends BaseScene {
         const line = pamperLines[Math.floor(Math.random()*pamperLines.length)];
         status.innerHTML = `<span class='ok'>${line}</span> <em>+${gained} 分 (宠溺跳过)</em>`;
         updateHUD();
+        wrapper._locked = true;
+        submitBtn.disabled = true; skipBtn.disabled = true; hintBtn.disabled = true;
         setTimeout(()=> renderSubject(subject), 500);
       });
     };
 
-    const updateHUD = ()=>{
+  /** 更新 HUD（目前只有分数，可扩展显示提示次数等） */
+  const updateHUD = ()=>{
       scoreEl.textContent = this.score;
     };
 
-    const checkAll = ()=>{
+  /** 检查所有科目是否完成，用于激活 “进入下一阶段” 按钮 */
+  const checkAll = ()=>{
       if(this.subjects.every(s=>s.done)){
         finishBtn.disabled = false;
         renderSummary();
       }
     };
 
-    const renderSummary = ()=>{
+  /**
+   * 渲染总结：
+   *  - 统计总题数 / 得分 / 动态评价。
+   *  - 计算彩蛋（互斥优先级）。
+   */
+  const renderSummary = ()=>{
       const totalQuestions = this.subjects.reduce((a,s)=> a + s.questions.length,0);
       summaryEl.classList.remove('hidden');
       const allSkipped = this.skippedQuestions === totalQuestions;
@@ -279,5 +394,15 @@ export class Scene2Exam extends BaseScene {
 
     finishBtn.addEventListener('click',()=> this.ctx.go('timeline'));
     this.ctx.rootEl.appendChild(el);
+  }
+  /**
+   * 场景退出：清理倒计时 interval，防止脱离场景仍继续执行。
+   */
+  async exit(){
+    // 清理循环计时器，避免场景切换后仍然运行
+    if(this._timerInterval){
+      clearInterval(this._timerInterval);
+      this._timerInterval = null;
+    }
   }
 }
