@@ -92,6 +92,9 @@ export class Scene2Exam extends BaseScene {
     return subjects;
   }
   async enter(){
+    // 保险：若极端情况下多次并发 go 造成重复残留，这里主动清理已有 exam 场景节点
+    const existing = this.ctx.rootEl.querySelectorAll('.scene-exam');
+    if(existing.length){ existing.forEach(node=> node.remove()); }
     const el = document.createElement('div');
     el.className='scene scene-exam';
     el.innerHTML = `

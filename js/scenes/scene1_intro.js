@@ -30,7 +30,12 @@ export class Scene1Intro extends BaseScene {
           setTimeout(()=>btn.classList.remove('shake'),500);
         }
         if(this.mood >= this.target){
-          setTimeout(()=> this.ctx.go('exam'), 600);
+          // 防抖保护：只触发一次场景切换，避免多次 go 导致并发创建 Scene2
+          if(this._toExam) return;
+          this._toExam = true;
+          // 可选：立即禁用按钮，避免用户继续点
+          el.querySelectorAll('button').forEach(b=> b.disabled = true);
+          setTimeout(()=> this.ctx.go('exam'), 400);
         }
       });
     });
