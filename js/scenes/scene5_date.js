@@ -50,7 +50,7 @@ export class Scene5Date extends BaseScene {
       <h1>场景5：第一次正式约会 · 卡牌组合</h1>
       <div style="display:flex; gap:.8rem; align-items:center; flex-wrap:wrap; margin:.3rem 0 .4rem;">
         <div class='level-info'></div>
-        <button class='bgm-btn date-bgm' title='音乐开关' data-debounce style='margin-left:auto;'>♪</button>
+        <button class='bgm-btn date-bgm' title='好听的音乐' data-debounce style='margin-left:auto;'>♪</button>
       </div>
       <div class='card-grid'></div>
       <div class='chosen-panel'>

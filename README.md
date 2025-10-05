@@ -250,37 +250,118 @@ scarf -> future      ⏳ 待接入
 ```
 
 ---
-## 📜 Scene1 外部脚本结构 (`data/scene1_script.json`)
-示例：
+## 📜 Scene1 分支脚本 JSON Schema (`data/scene1_script.json`)
+场景 1（穿越自证 + 安抚）现在完全由外部 JSON 驱动：阶段 → 台词逐句 →（可选）分支按钮 → 跳转下一阶段或自动跳转 / 结束转场。
+
+### 最小示例
 ```jsonc
 {
-  "meta": { "version": 1, "desc": "Scene1 穿越自证 & 安抚外部脚本" },
+  "meta": { "version": 2, "desc": "Scene1 branching script" },
   "stages": [
-    { "id": "intro", "lines": [
+    {
+      "id": "intro",
+      "lines": [
         { "speaker": "me", "text": "为了给你准备一个最特别的生日礼物，我竟然……时空裂开了！" },
-        { "speaker": "her", "text": "……（警惕又紧张）你是谁？" },
-        { "speaker": "system", "text": "（提示：先用真实记忆建立‘可信度’）" }
-    ]},
-    { "id": "afterTrust", "condition": { "trustReached": true }, "lines": [
-        { "speaker": "her", "text": "好……如果你真是未来的他，那现在我很慌，你别走。" }
-    ]}
+        { "speaker": "her", "text": "……你是谁？" },
+        { "speaker": "system", "text": "（先用真实共同记忆建立‘可信度’）" }
+      ],
+      "choices": [
+        { "text": "提她笔上的裂纹", "trustDelta": 12, "goto": "trust_build_1" },
+        { "text": "乱开玩笑（失败）", "trustDelta": -4, "goto": "intro_fail" }
+      ]
+    },
+    {
+      "id": "intro_fail",
+      "lines": [ { "speaker": "her", "text": "别乱说…我不信。" } ],
+      "choices": [ { "text": "认真一点重新来", "goto": "intro" } ]
+    },
+    {
+      "id": "trust_build_1",
+      "lines": [ { "speaker": "her", "text": "……这些细节，确实只有他才知道。" } ],
+      "auto": { "requireTrust": 60, "goto": "comfort_intro" }
+    },
+    {
+      "id": "comfort_intro",
+      "lines": [
+        { "speaker": "system", "text": "她已基本信任你，试着安抚情绪。" }
+      ],
+      "choices": [
+        { "text": "轻声引导呼吸", "moodDelta": 18, "tagsAdd": ["breath"] },
+        { "text": "递水", "moodDelta": 12, "tagsAdd": ["care"] },
+        { "text": "讲一个只有你们懂的梗", "moodDelta": 15, "tagsAdd": ["memory"], "requireTrust": 40 }
+      ],
+      "auto": { "requireMood": 100, "goto": "end_transition" }
+    },
+    {
+      "id": "end_transition",
+      "lines": [ { "speaker": "system", "text": "（她渐渐平静，你们将一起面对下一段记忆……）" } ],
+      "end": { "next": "exam" }
+    }
   ]
 }
 ```
-字段说明：
-- stages[].id：阶段标识。
-- stages[].condition：出现条件（当前支持 trustReached）。
-- stages[].lines：台词数组。
-- line.speaker：`me` | `her` | `system`（系统提示/引导）。
-- line.text：无需带“我：/她：”前缀，渲染时自动添加。
 
-扩展指引：
-1. 新增阶段：向数组 push，保持唯一 id。
-2. 条件扩展：后续可在代码里加入 moodReached、combo≥2 等。
-3. 分批展示：未来可加入逐行延迟或打字机动画。
-4. 分支化：添加自定义字段（如 branchKey）并在 JS 里筛选渲染。
+### 字段定义
+| 层级 | 字段 | 类型 | 说明 |
+|------|------|------|------|
+| 根 | meta | object? | 元信息（可忽略）。|
+| 根 | stages | Stage[] | 阶段数组，按需引用，不要求顺序线性。|
+| Stage | id | string | 阶段唯一标识。|
+| Stage | lines | Line[] | 进入阶段后按顺序逐句播放。|
+| Stage | choices | Choice[]? | 所有台词播完后显示的分支按钮；缺省表示无按钮。|
+| Stage | auto | AutoRule? | 达成条件自动跳转（在 choices 渲染前/后都会检测）。|
+| Stage | end | { next: string }? | 阶段结束后触发场景转场：`next` 为目标场景 ID（例：`exam`）。|
 
-失败兜底：加载失败时回退到内置最小 intro 文案，不影响玩法继续。
+#### Line
+| 字段 | 说明 |
+|------|------|
+| speaker | `me` | `her` | `system`，决定对话框上方说话人徽标颜色与位置。|
+| text | 文本（支持换行 \n；无需添加“我：”前缀）。|
+
+#### Choice
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| text | string | 按钮文案。|
+| trustDelta | number? | 选后对信任值的增减（内部仍计数，即便 UI 已隐藏）。自动截断 0~目标。|
+| moodDelta | number? | 选后对安抚值增减。|
+| tagsAdd | string[]? | 增加多样陪伴标签（用于组合成就/后续条件）。|
+| goto | string? | 跳转到的下一个阶段 ID；缺失则留在当前（通常应指定）。|
+| requireTrust | number? | 按钮解锁所需最低信任值，未达成按钮置灰。|
+| requireMood | number? | 按钮解锁所需最低安抚值。|
+
+#### AutoRule
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| requireTrust | number? | 满足该信任阈值（且其他条件满足）触发。|
+| requireMood | number? | 满足该安抚阈值触发。|
+| goto | string | 自动跳转阶段 ID。|
+
+#### End
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| next | string | 结束后跳转的“后续场景”ID（非阶段；用于 `this.ctx.go('transition', { next })`）。|
+
+### 行为流程
+1. 进入阶段 → lines 按顺序逐句（空格 / 点击空白 / 触摸推进）。
+2. lines 播完：
+   - 若存在 `end`：延时触发场景转场（心形过渡）。
+   - 否则检查 `auto` 条件；满足则延时跳转。
+   - 否则渲染 `choices`（如果有）。
+3. 选择按钮：应用 trust/mood 变化 → 添加标签 → 跳转 `goto` 阶段。
+4. 每次变化后再次检测 `auto` 条件（允许“升满即跳”体验）。
+
+### 失败兜底 & 容错
+- 若网络或解析失败，代码会回退到一个仅含 intro 的最小脚本，避免卡死。
+- 未找到 `goto` 的阶段会被忽略（安全失败：无跳转）。
+- 数值自动钳制在 0 ~ 目标上限；负值不会抛异常。
+
+### 可扩展建议（尚未内置）
+- requireTags / excludeTags：基于多样陪伴标签锁定分支。
+- typingSpeed：行级局部打字机速度覆盖全局。
+- moodDecay：阶段级别情绪随时间衰减（倒逼及时选择）。
+- branchKey + 回溯：记录路径用于终章统计。
+
+> 当前 UI 已隐藏信任/安抚进度条，但所有逻辑仍生效；只需重新移除 `hidden` 类即可恢复可视化。
 
 ---
 ## 🪄 未来路线（Roadmap）

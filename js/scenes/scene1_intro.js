@@ -8,8 +8,15 @@ export class Scene1Intro extends BaseScene {
     el.className='scene scene-intro';
     el.innerHTML=`
       <h1 class='intro-title'>穿越回高中</h1>
-      <div class='dialogue-box'></div>
-      <div class='bars'>
+      <div class='vn-wrapper'>
+        <div class='vn-box'>
+          <div class='vn-speaker left hidden'></div>
+          <div class='vn-speaker right hidden'></div>
+          <div class='vn-text'></div>
+        </div>
+        <div class='choices dynamic-choices'></div>
+      </div>
+      <div class='bars hidden'>
         <div class='bar-block trust-block'>
           <div class='label'>信任值 <span class='trust-val'>0</span>/<span class='trust-tar'>60</span></div>
           <div class='trust-bar'><span class='trust-fill'></span></div>
@@ -21,9 +28,8 @@ export class Scene1Intro extends BaseScene {
       </div>
       <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap; margin-top:.5rem;">
         <div class='phase-msg' data-phase='start'>回忆缓冲中...</div>
-        <button class='bgm-btn intro-bgm' title='音乐开关' style='margin-left:auto;'>♪</button>
+        <button class='bgm-btn intro-bgm' title='好听的音乐' style='margin-left:auto;'>♪</button>
       </div>
-      <div class='choices dynamic-choices'></div>
       <div class='title-egg hidden'></div>
     `;
 
@@ -34,8 +40,11 @@ export class Scene1Intro extends BaseScene {
     this.titleClicks=0; this._titleBonusGiven=false;
 
     // 引用
-    const dialogueBox=el.querySelector('.dialogue-box');
-    const choicesBox=el.querySelector('.dynamic-choices');
+  const vnBox=el.querySelector('.vn-box');
+  const vnText=el.querySelector('.vn-text');
+  const speakerLeft=el.querySelector('.vn-speaker.left');
+  const speakerRight=el.querySelector('.vn-speaker.right');
+  const choicesBox=el.querySelector('.dynamic-choices');
     const trustFill=el.querySelector('.trust-fill');
     const trustValEl=el.querySelector('.trust-val');
     const moodFill=el.querySelector('.mood-bar .fill');
@@ -79,15 +88,60 @@ export class Scene1Intro extends BaseScene {
     if(!script || !Array.isArray(script.stages)) script={stages:[{id:'intro',lines:[{speaker:'system',text:'脚本加载失败，使用兜底。'}]}]};
 
     const findStage=id=>script.stages.find(s=>s.id===id);
-    const appendLines=stage=>{ if(!stage||!stage.lines) return; stage.lines.forEach(l=>{ const div=document.createElement('div'); div.className='line '+(l.speaker==='me'?'mine':l.speaker==='her'?'her':'system'); if(l.speaker==='system'||l.speaker==='narration') div.classList.add('hint'); div.textContent=(l.speaker==='me'?'我：':l.speaker==='her'?'她：':'')+l.text; dialogueBox.appendChild(div); }); dialogueBox.scrollTop=dialogueBox.scrollHeight; };
+    let lineQueue=[]; let lineIndex=0; let stageDoneCallback=null; let awaitingLine=false;
+    const updateSpeaker=(speaker)=>{
+      const map={me:'我',her:'她',system:'系统'}; const label=map[speaker]??speaker;
+      // 先清除颜色类
+      [speakerLeft,speakerRight].forEach(el=>{ el.classList.remove('speaker-me','speaker-her','speaker-system'); });
+      if(speaker==='me'){
+        speakerLeft.textContent=label; speakerLeft.classList.remove('hidden'); speakerLeft.classList.add('speaker-me');
+        speakerRight.classList.add('hidden');
+      } else if(speaker==='her'){
+        speakerRight.textContent=label; speakerRight.classList.remove('hidden'); speakerRight.classList.add('speaker-her');
+        speakerLeft.classList.add('hidden');
+      } else if(speaker==='system'){
+        speakerRight.textContent=label; speakerRight.classList.remove('hidden'); speakerRight.classList.add('speaker-system');
+        speakerLeft.classList.add('hidden');
+      } 
+    };
+    const renderNextLine=()=>{
+      if(awaitingLine) return;
+      if(lineIndex>=lineQueue.length){
+        speakerLeft.classList.add('hidden');
+        speakerRight.classList.add('hidden');
+        if(stageDoneCallback) stageDoneCallback();
+        return;
+      }
+      awaitingLine=true;
+      const l=lineQueue[lineIndex++];
+      updateSpeaker(l.speaker);
+      vnText.classList.remove('flash-line');
+      void vnText.offsetWidth; // 强制重排以便重新触发动画
+      vnText.textContent = l.text;
+      vnText.classList.add('flash-line');
+      awaitingLine=false;
+    };
+    const appendLinesProgressively=(stage,done)=>{ lineQueue=(stage&&stage.lines)?[...stage.lines]:[]; lineIndex=0; stageDoneCallback=done; awaitingLine=false; vnText.textContent=''; renderNextLine(); };
 
     const evaluateAuto=()=>{ if(!this.currentStage) return; const auto=this.currentStage.auto; if(!auto) return; const needT=auto.requireTrust; const needM=auto.requireMood; if((needT==null||this.trust>=needT)&&(needM==null||this.mood>=needM)){ const gotoId=auto.goto; if(gotoId && !this._pendingAuto){ this._pendingAuto=true; setTimeout(()=>{ this._pendingAuto=false; goStage(gotoId); },400); } } };
 
     const endStage=stage=>{ if(stage.end){ const nextScene=stage.end.next||'exam'; phaseMsg.textContent='……'; setTimeout(()=>this.ctx.go('transition',{next:nextScene,style:'heart'}),700); return true; } return false; };
 
-    const renderChoices=stage=>{ choicesBox.innerHTML=''; if(!stage.choices||!stage.choices.length){ refreshChoiceLockStates(); return; } stage.choices.forEach(choice=>{ const btn=document.createElement('button'); btn.textContent=choice.text||'...'; if(choice.requireMood!=null) btn.dataset.requireMood=choice.requireMood; if(choice.requireTrust!=null) btn.dataset.requireTrust=choice.requireTrust; btn.addEventListener('click',()=>{ if(btn.disabled) return; if(typeof choice.trustDelta==='number'){ const before=this.trust; this.trust+=choice.trustDelta; if(this.trust<0) this.trust=0; if(this.trust>this.trustTarget) this.trust=this.trustTarget; const diff=this.trust-before; if(diff!==0) spawnBubble(btn,(diff>0?'+':'')+diff,'trust'); updateTrust(); } if(typeof choice.moodDelta==='number'){ const beforeM=this.mood; this.mood+=choice.moodDelta; if(this.mood<0) this.mood=0; if(this.mood>this.moodTarget) this.mood=this.moodTarget; const diffM=this.mood-beforeM; if(diffM!==0) spawnBubble(btn,(diffM>0?'+':'')+diffM,(diffM>=0?'pos':'neg')); updateMood(); } if(Array.isArray(choice.tagsAdd)){ const prev=this.tags.size; choice.tagsAdd.forEach(t=>this.tags.add(t)); if(this.tags.size>prev){ const level=this.tags.size; comboBadge.textContent='多样陪伴 x'+level; comboBadge.classList.remove('hidden'); comboBadge.classList.add('flash'); setTimeout(()=>comboBadge.classList.remove('flash'),500); } } if(choice.goto){ goStage(choice.goto); return; } }); choicesBox.appendChild(btn); }); refreshChoiceLockStates(); };
+  const renderChoices=stage=>{ choicesBox.innerHTML=''; if(!stage.choices||!stage.choices.length){ refreshChoiceLockStates(); return; } stage.choices.forEach(choice=>{ const btn=document.createElement('button'); btn.textContent=choice.text||'...'; if(choice.requireMood!=null) btn.dataset.requireMood=choice.requireMood; if(choice.requireTrust!=null) btn.dataset.requireTrust=choice.requireTrust; btn.addEventListener('click',()=>{ if(btn.disabled) return; if(typeof choice.trustDelta==='number'){ const before=this.trust; this.trust+=choice.trustDelta; if(this.trust<0) this.trust=0; if(this.trust>this.trustTarget) this.trust=this.trustTarget; const diff=this.trust-before; if(diff!==0) spawnBubble(btn,(diff>0?'+':'')+diff,'trust'); updateTrust(); } if(typeof choice.moodDelta==='number'){ const beforeM=this.mood; this.mood+=choice.moodDelta; if(this.mood<0) this.mood=0; if(this.mood>this.moodTarget) this.mood=this.moodTarget; const diffM=this.mood-beforeM; if(diffM!==0) spawnBubble(btn,(diffM>0?'+':'')+diffM,(diffM>=0?'pos':'neg')); updateMood(); } if(Array.isArray(choice.tagsAdd)){ const prev=this.tags.size; choice.tagsAdd.forEach(t=>this.tags.add(t)); if(this.tags.size>prev){ const level=this.tags.size; comboBadge.textContent='多样陪伴 x'+level; comboBadge.classList.remove('hidden'); comboBadge.classList.add('flash'); setTimeout(()=>comboBadge.classList.remove('flash'),500); } } if(choice.goto){ goStage(choice.goto); return; } }); choicesBox.appendChild(btn); }); refreshChoiceLockStates(); };
 
-    const goStage=id=>{ const st=findStage(id); if(!st) return; this.currentStage=st; appendLines(st); if(endStage(st)) return; renderChoices(st); evaluateAuto(); };
+  const goStage=id=>{ const st=findStage(id); if(!st) return; this.currentStage=st; appendLinesProgressively(st,()=>{ if(endStage(st)) return; renderChoices(st); evaluateAuto(); }); };
+
+    // 推进事件：空格或点击空白区域
+    const advanceHandler=(e)=>{
+      // 若当前阶段还在逐句且未显示选项，推进下一句
+      if(choicesBox.children.length===0 || lineIndex<lineQueue.length){
+        // 避免按钮点击重复推进（按钮自身点击由按钮逻辑处理）
+        if(e.target.tagName==='BUTTON' && e.target.closest('.dynamic-choices')) return;
+        renderNextLine();
+      }
+    };
+    window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); advanceHandler(e); } });
+    el.addEventListener('click', advanceHandler);
 
     // 标题彩蛋
     title.addEventListener('click',()=>{ this.titleClicks++; if(this.titleClicks===6){ titleEgg.textContent='（再点几下也许会有点什么~）'; titleEgg.classList.remove('hidden'); } if(this.titleClicks===10 && !this._titleBonusGiven){ this._titleBonusGiven=true; this.mood=Math.min(this.moodTarget,this.mood+5); spawnBubble(title,'+5','egg'); updateMood(); }});

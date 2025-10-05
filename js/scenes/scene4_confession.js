@@ -1,4 +1,5 @@
 import { BaseScene } from '../core/baseScene.js';
+import { audioManager } from '../core/audioManager.js';
 
 export class Scene4Confession extends BaseScene {
   async enter(){
@@ -6,6 +7,9 @@ export class Scene4Confession extends BaseScene {
     el.className = 'scene scene-confession';
     el.innerHTML = `
       <h1>场景4：那天我鼓起勇气</h1>
+      <div style='display:flex;align-items:center;gap:.6rem;margin:.2rem 0 .7rem;'>
+        <button class='bgm-btn confession-bgm' title='好听的音乐' style='width:44px;height:34px;font-size:.9rem;'>♪</button>
+      </div>
       <div class='dialogue'>
         <p class='line'>我：其实有件事憋在心里很久了……</p>
         <p class='line hidden'>我：和你在一起的每个瞬间都让我想更靠近。</p>
@@ -23,7 +27,8 @@ export class Scene4Confession extends BaseScene {
       <button class='toNext hidden'>一起向下一个记忆 →</button>
     `;
 
-    const lines = [...el.querySelectorAll('.line')];
+  const lines = [...el.querySelectorAll('.line')];
+  const bgmBtn = el.querySelector('.confession-bgm');
     let idx = 0;
     const nextBtn = el.querySelector('.next-btn');
     const choices = el.querySelector('.choices');
@@ -73,6 +78,22 @@ export class Scene4Confession extends BaseScene {
       }
     });
 
+    // BGM 播放（若用户首次交互前浏览器阻止，将在点击按钮时恢复）
+    const bgmAudio = audioManager.playBGM('scene4','./assets/audio/scene_4.mp3',{ loop:true, volume:0.55, fadeIn:800 });
+    if(bgmAudio && bgmAudio.paused){
+      // 尝试自动播放，若失败则静音等待一次手势解除
+      bgmAudio.play().catch(()=>{/* ignore */});
+    }
+    bgmBtn.addEventListener('click',()=>{
+      if(!bgmAudio) return;
+      if(bgmAudio.paused){ bgmAudio.play().catch(()=>{}); bgmBtn.classList.remove('muted'); }
+      else { bgmAudio.pause(); bgmBtn.classList.add('muted'); }
+    });
+
     this.ctx.rootEl.appendChild(el);
+  }
+
+  async exit(){
+    audioManager.stopBGM('scene4',{ fadeOut:600 });
   }
 }

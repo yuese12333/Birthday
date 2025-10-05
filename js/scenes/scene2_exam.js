@@ -147,7 +147,7 @@ export class Scene2Exam extends BaseScene {
       <h1>场景2：高考小考站</h1>
       <div class='exam-top'>
         <div class='tabs'></div>
-        <div class='meta'>分数 <span class='score'>0</span> | 计时 <span class='timer'>05:00</span> | <button class='bgm-btn' data-debounce title='音乐开关'>♪</button></div>
+        <div class='meta'>分数 <span class='score'>0</span> | 计时 <span class='timer'>05:00</span> | <button class='bgm-btn' data-debounce title='好听的音乐'>♪</button></div>
       </div>
       <div class='board'></div>
       <div class='status'></div>
