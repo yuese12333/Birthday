@@ -1,0 +1,97 @@
+{
+  "meta": {
+    "version": 1,
+    "desc": "Scene1 穿越自证 & 安抚外部脚本 (可增删台词/阶段)"
+  },
+  "stages": [
+    {
+      "id": "intro",
+      "lines": [
+        { "speaker": "her", "text": "（她正翻着练习册抬头）这道题你会不会？" },
+        { "speaker": "me", "text": "（你突然被拉回高中，条件反射轻轻握住她的手——她猛地一缩）" },
+        { "speaker": "her", "text": "你干嘛？！" },
+        { "speaker": "me", "text": "溜溜？这是哪啊？" },
+        { "speaker": "her", "text": "陈柯，你怎么啦，谁是溜溜啊？这题你不会我问别人了。" }, 
+        { "speaker": "me", "text": "我……诶？"},
+        { "speaker": "system", "text": "(OK!恭喜你成功穿越回高中时代，你不是一直想着如果回到高中会怎么样吗？让你体验一下。）" },
+        { "speaker": "me", "text": "（什么鬼啊？！还真穿越了！还有，话说你是谁？我难不成穿越还有个系统？）" },
+        { "speaker": "system", "text": "（先别管我是不是系统了，你的小女朋友要被你吓跑了哦~)" },
+        { "speaker": "me ", "text": "（啊啊？）溜……吴彤，我会我会，你给我看看。" },
+        { "speaker": "her", "text": "还……还是算了吧，感觉你最近压力挺大的，就不给你添乱了。" }
+
+        
+      ],
+      "choices": [
+        { "text": "提起练习册遗失细节", "trustDelta": 15, "goto": "trust_build_1" },
+        { "text": "说出她的昵称", "trustDelta": 12, "goto": "trust_build_1" },
+        { "text": "描述那支裂壳的笔", "trustDelta": 10, "goto": "trust_build_1" },
+        { "text": "含糊敷衍", "trustDelta": -8, "goto": "intro_fail" }
+      ]
+    },
+    {
+      "id": "intro_fail",
+      "lines": [
+        { "speaker": "her", "text": "……你根本不是我认识的人。" },
+        { "speaker": "system", "text": "（再试一次，用更具体的记忆）" }
+      ],
+      "choices": [
+        { "text": "补救：练习册细节", "trustDelta": 15, "goto": "trust_build_1" },
+        { "text": "补救：裂开的笔", "trustDelta": 10, "goto": "trust_build_1" }
+      ]
+    },
+    {
+      "id": "trust_build_1",
+      "lines": [
+        { "speaker": "her", "text": "……这些你怎么会知道？" },
+        { "speaker": "system", "text": "（再给一个专属记忆，她就差不多信了）" }
+      ],
+      "choices": [
+        { "text": "她午休趴桌子会在指尖画圈", "trustDelta": 18, "goto": "trust_check" },
+        { "text": "她体育课后会把额前碎发撩三下", "trustDelta": 16, "goto": "trust_check" },
+        { "text": "瞎编一个细节", "trustDelta": -10, "goto": "trust_build_1" }
+      ]
+    },
+    {
+      "id": "trust_check",
+      "lines": [
+        { "speaker": "me", "text": "（她盯着你几秒，呼吸慢慢放缓）" },
+        { "speaker": "her", "text": "……好，如果你真是未来的他，那现在我很慌。" }
+      ],
+      "auto": { "requireTrust": 60, "goto": "comfort_intro" },
+      "choices": [
+        { "text": "再说一条记忆巩固", "trustDelta": 8, "goto": "trust_check" },
+        { "text": "我先安抚你，别怕", "goto": "comfort_intro" }
+      ]
+    },
+    {
+      "id": "comfort_intro",
+      "lines": [
+        { "speaker": "system", "text": "（现在开始安抚，提升安抚值）" },
+        { "speaker": "her", "text": "我脑子好乱…考试要完了。" }
+      ],
+      "choices": [
+        { "text": "陪伴：先一起深呼吸", "moodDelta": 12, "goto": "comfort_loop" },
+        { "text": "鼓励：你已经准备得很好", "moodDelta": 15, "goto": "comfort_loop", "tagsAdd": ["encourage"] },
+        { "text": "温柔：给你一个拥抱（想象）", "moodDelta": 18, "goto": "comfort_loop", "tagsAdd": ["comfort"] }
+      ]
+    },
+    {
+      "id": "comfort_loop",
+      "lines": [
+        { "speaker": "me", "text": "（她的肩膀逐渐放松了一点）" }
+      ],
+      "choices": [
+        { "text": "继续：我们把今天拆成小块", "moodDelta": 14, "goto": "comfort_loop" },
+        { "text": "继续：考试只是一个节点", "moodDelta": 10, "goto": "comfort_loop" },
+        { "text": "她已经稳定了，进入下一幕", "requireMood": 100, "goto": "end_transition" }
+      ]
+    },
+    {
+      "id": "end_transition",
+      "lines": [
+        { "speaker": "her", "text": "谢谢……那我们去面对它吧。" }
+      ],
+      "end": { "next": "exam" }
+    }
+  ]
+}
