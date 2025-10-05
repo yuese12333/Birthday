@@ -1,4 +1,5 @@
 import { BaseScene } from '../core/baseScene.js';
+import { audioManager } from '../core/audioManager.js';
 
 /**
  * 场景5 重构：卡牌多关组合系统
@@ -47,7 +48,10 @@ export class Scene5Date extends BaseScene {
     el.className='scene scene-date';
     el.innerHTML = `
       <h1>场景5：第一次正式约会 · 卡牌组合</h1>
-      <div class='level-info'></div>
+      <div style="display:flex; gap:.8rem; align-items:center; flex-wrap:wrap; margin:.3rem 0 .4rem;">
+        <div class='level-info'></div>
+        <button class='bgm-btn date-bgm' title='音乐开关' data-debounce style='margin-left:auto;'>♪</button>
+      </div>
       <div class='card-grid'></div>
       <div class='chosen-panel'>
         <div>已选卡牌：<span class='count'>0</span></div>
@@ -65,7 +69,7 @@ export class Scene5Date extends BaseScene {
       <div class='synergy-pop'></div>
     `;
 
-    const levelInfo = el.querySelector('.level-info');
+  const levelInfo = el.querySelector('.level-info');
     const grid = el.querySelector('.card-grid');
     const chosenList = el.querySelector('.chosen-panel .list');
     const countEl = el.querySelector('.chosen-panel .count');
@@ -77,6 +81,18 @@ export class Scene5Date extends BaseScene {
     const finalBtn = el.querySelector('.final-btn');
     const synergyPop = el.querySelector('.synergy-pop');
     const summaryContainer = el.querySelector('.summary-container');
+    const bgmBtn = el.querySelector('.date-bgm');
+
+    // 自动播放约会场景 BGM
+    const bgmAudio = audioManager.playBGM('scene5','./assets/audio/scene_5.mp3',{ loop:true, volume:0.6, fadeIn:900 });
+    bgmBtn.addEventListener('click',()=>{
+      if(bgmAudio && bgmAudio.paused){
+        const p = bgmAudio.play(); if(p) p.catch(()=>{});
+        audioManager.globalMuted = false; bgmAudio.muted=false; bgmBtn.classList.remove('muted'); return;
+      }
+      const muted = audioManager.toggleMute();
+      bgmBtn.classList.toggle('muted', muted);
+    });
 
     const currentLevel = () => this.levels[this.currentLevelIndex];
 
@@ -225,5 +241,8 @@ export class Scene5Date extends BaseScene {
     // 初始渲染
     renderCards(); updateLevelInfo(); refreshSelectionUI();
     this.ctx.rootEl.appendChild(el);
+  }
+  async exit(){
+    audioManager.stopBGM('scene5',{ fadeOut:650 });
   }
 }

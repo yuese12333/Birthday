@@ -1,4 +1,5 @@
 import { BaseScene } from '../core/baseScene.js';
+import { audioManager } from '../core/audioManager.js';
 
 /**
  * 场景1：高中安抚扩展玩法
@@ -19,7 +20,10 @@ export class Scene1Intro extends BaseScene {
       <h1 class='intro-title'>穿越回高中</h1>
       <p>我：为了给你准备一个最特别的生日礼物，我竟然……时空裂开了！</p>
       <p>她（过去）：……（看起来有点紧张）</p>
+      <div style="display:flex; gap:.75rem; align-items:center; flex-wrap:wrap;">
       <div class="phase-msg" data-phase="start">回忆缓冲中...</div>
+      <button class='bgm-btn intro-bgm' title='音乐开关' data-debounce style="margin-left:auto;">♪</button>
+      </div>
       <div class="choices disabled">
         <button data-mood="+15" data-cat="comfort">“别怕，我来陪你，一切都会好的。”</button>
         <button data-mood="+10" data-cat="encourage">“你已经很棒了，现在我在。”</button>
@@ -48,6 +52,19 @@ export class Scene1Intro extends BaseScene {
     const fastNext = el.querySelector('.fast-next');
     const titleEgg = el.querySelector('.title-egg');
     const choicesBox = el.querySelector('.choices');
+    const bgmBtn = el.querySelector('.intro-bgm');
+
+    // 自动尝试播放场景1 BGM（若被浏览器策略阻止，首次点击按钮会重试）
+    const bgmAudio = audioManager.playBGM('scene1','./assets/audio/scene_1.mp3',{ loop:true, volume:0.55, fadeIn:900 });
+    bgmBtn.addEventListener('click',()=>{
+      if(bgmAudio && bgmAudio.paused){
+        const p = bgmAudio.play();
+        if(p) p.catch(()=>{});
+        audioManager.globalMuted = false; bgmAudio.muted=false; bgmBtn.classList.remove('muted'); return;
+      }
+      const muted = audioManager.toggleMute();
+      bgmBtn.classList.toggle('muted', muted);
+    });
 
     // 冷启动 2 秒
     const unlockAt = Date.now() + 2000;
@@ -192,5 +209,9 @@ export class Scene1Intro extends BaseScene {
 
     updateProgress();
     this.ctx.rootEl.appendChild(el);
+  }
+  async exit(){
+    // 离开场景时淡出停止 BGM
+    audioManager.stopBGM('scene1',{ fadeOut:600 });
   }
 }

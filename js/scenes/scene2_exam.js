@@ -314,6 +314,7 @@ export class Scene2Exam extends BaseScene {
         } else {
           // 第三次：自动判定正确，显示答案并给分（不扣分）
           nextQ.solved = true;
+          nextQ._autoHint = true; // 记录此题通过第三次提示自动完成
           const base = 2;
           const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
           const gained = base * weight; 
@@ -435,10 +436,15 @@ export class Scene2Exam extends BaseScene {
       // 统计错误宠溺通过数量（既标记 _pamperedWrong 且未 _skipped）
       const pamperedWrongCount = this.subjects.reduce((acc,s)=> acc + s.questions.filter(q=> q._pamperedWrong).length,0);
       const allPamperedWrong = pamperedWrongCount === totalQuestions && totalQuestions>0; // 全部题都是错误宠溺
-      // 彩蛋互斥优先级：全跳过 > 全错误宠溺 > 高跳过率
+      // 统计自动提示完成
+      const autoHintCount = this.subjects.reduce((acc,s)=> acc + s.questions.filter(q=> q._autoHint).length,0);
+      const allAutoHint = autoHintCount === totalQuestions && totalQuestions>0;
+      // 彩蛋互斥优先级：全跳过 > 全自动提示 > 全错误宠溺 > 高跳过率
       let easterHTML = '';
       if(allSkipped){
         easterHTML = `<div class='easter-skip'>你怎么全跳过了呀？罚你亲我一口，小笨蛋 ❤</div>`;
+      } else if(allAutoHint){
+        easterHTML = `<div class='easter-pampered-wrong'>全部靠第三次提示解锁？说明你超会『撒娇请求帮助』，判你享受终身答题代写权益 ❤</div>`;
       } else if(allPamperedWrong){
         easterHTML = `<div class='easter-pampered-wrong'>居然所有题都靠“答错被宠”过关？证明你超会撒娇——判处终身被我保护 ❤</div>`;
       } else if(partialHighSkip){
