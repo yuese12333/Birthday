@@ -26,6 +26,7 @@
  *  - 题目类型扩展：拖拽 / 配对，可在 renderSubject 内按 type 分支拆分组件化。
  */
 import { BaseScene } from '../core/baseScene.js';
+import { audioManager } from '../core/audioManager.js';
 
 // 难度权重：影响统一得分（当前统一公式：2 * weight）
 const DIFFICULTY_WEIGHT = { easy: 1, medium: 2, hard: 3 };
@@ -146,7 +147,7 @@ export class Scene2Exam extends BaseScene {
       <h1>场景2：高考小考站</h1>
       <div class='exam-top'>
         <div class='tabs'></div>
-        <div class='meta'>分数 <span class='score'>0</span> | 计时 <span class='timer'>05:00</span></div>
+        <div class='meta'>分数 <span class='score'>0</span> | 计时 <span class='timer'>05:00</span> | <button class='bgm-btn' data-debounce title='音乐开关'>♪</button></div>
       </div>
       <div class='board'></div>
       <div class='status'></div>
@@ -160,6 +161,22 @@ export class Scene2Exam extends BaseScene {
     const scoreEl = el.querySelector('.score');
     const timerEl = el.querySelector('.timer');
     const summaryEl = el.querySelector('.summary');
+    const bgmBtn = el.querySelector('.bgm-btn');
+    // 默认进入即尝试播放（可能被浏览器策略阻止；若阻止则第一次点击会重新尝试）
+    const bgmAudio = audioManager.playBGM('scene2','./assets/audio/scene_2.mp3',{ loop:true, volume:0.6, fadeIn:800 });
+    bgmBtn.addEventListener('click',()=>{
+      // 若因自动播放策略被拦截，click 时再尝试播放
+      if(bgmAudio && bgmAudio.paused){
+        const p = bgmAudio.play();
+        if(p) p.catch(()=>{/* 仍失败则静默 */});
+        audioManager.globalMuted = false;
+        bgmAudio.muted = false;
+        bgmBtn.classList.remove('muted');
+        return;
+      }
+      const muted = audioManager.toggleMute();
+      bgmBtn.classList.toggle('muted', muted);
+    });
     // 计时器：5分钟循环倒计时
     // 新：单科计时控制变量
     this._subjectTimer = null;          // 当前科目倒计时 interval
@@ -453,5 +470,7 @@ export class Scene2Exam extends BaseScene {
     // 清理所有计时器
     if(this._subjectTimer){ clearInterval(this._subjectTimer); this._subjectTimer=null; }
     if(this._betweenTimer){ clearInterval(this._betweenTimer); this._betweenTimer=null; }
+    // 淡出停止本场景 BGM
+    audioManager.stopBGM('scene2',{ fadeOut:700 });
   }
 }

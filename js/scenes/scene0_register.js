@@ -5,7 +5,6 @@
  *  - 用户名任意（可为空）
  *  - 密码必须为 20241007 （在一起的日子）
  *  - 成功后写入 localStorage.hasRegistered = '1' 并跳转 intro 场景
- *  - 若已经注册过直接提示并允许进入
  */
 import { BaseScene } from '../core/baseScene.js';
 
@@ -26,7 +25,6 @@ export class Scene0Register extends BaseScene {
       </form>
       <div class='tips'>
         <p>提示：密码是我们在一起的日子，格式：YYYYMMDD。</p>
-        ${has ? `<p class='already'>检测到你已验证过，可直接再次进入 ❤</p>`:''}
         <div class='clues hidden'>
           <p class='clue-line base'>线索一：年份是在 <strong>2024</strong> 年。</p>
           <p class='clue-line mid hidden'>线索二：月份是我们一起吃好吃的纪念那月（10月）。</p>
@@ -52,7 +50,7 @@ export class Scene0Register extends BaseScene {
       </details>
       <!-- DEBUG PANEL END -->
     `;
-    
+
     const form = el.querySelector('.reg-form');
     const msg = el.querySelector('.msg');
     const forgotBtn = form.querySelector('.forgot-btn');
