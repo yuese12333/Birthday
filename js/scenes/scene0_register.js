@@ -33,7 +33,26 @@ export class Scene0Register extends BaseScene {
           <p class='clue-line full hidden'>线索三：那天日期是 07（日）。合起来就是：<em>YYYYMMDD</em> → 20241007 ❤</p>
         </div>
       </div>
+
+      <!-- DEBUG PANEL START (开发期跳场景，成品可整块删除) -->
+      <details class='debug-panel' style="margin-top:1rem; font-size:.7rem; opacity:.75;">
+        <summary style="cursor:pointer;">⚙ 开发调试：快速跳转场景 (上线前删除)</summary>
+        <div style="display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.6rem;">
+          <button type='button' data-jump='intro' style='background:#bbb;'>Intro</button>
+          <button type='button' data-jump='exam' style='background:#bbb;'>Exam</button>
+          <button type='button' data-jump='timeline' style='background:#bbb;'>Timeline</button>
+          <button type='button' data-jump='confession' style='background:#bbb;'>Confession</button>
+          <button type='button' data-jump='date' style='background:#bbb;'>Date</button>
+          <button type='button' data-jump='scarf' style='background:#bbb;'>Scarf</button>
+          <button type='button' data-jump='future' style='background:#bbb;'>Future</button>
+          <button type='button' data-jump='resetReg' style='background:#e8a;'>清除注册标记</button>
+        </div>
+        <p style='margin:.6rem 0 0; line-height:1.4;'>说明：
+          1) 按钮直接调用 sceneManager.go；2) 不做状态校验；3) 若需完全移除，删除本 details 块与下方相关监听即可。</p>
+      </details>
+      <!-- DEBUG PANEL END -->
     `;
+    
     const form = el.querySelector('.reg-form');
     const msg = el.querySelector('.msg');
     const forgotBtn = form.querySelector('.forgot-btn');
@@ -84,5 +103,25 @@ export class Scene0Register extends BaseScene {
       }
     });
     this.ctx.rootEl.appendChild(el);
+
+    // DEBUG: 场景跳转按钮绑定（开发期使用）
+    const debugPanel = el.querySelector('.debug-panel');
+    if(debugPanel){
+      debugPanel.querySelectorAll('button[data-jump]').forEach(btn=>{
+        btn.addEventListener('click',()=>{
+          const target = btn.getAttribute('data-jump');
+          if(target === 'resetReg'){
+            localStorage.removeItem('hasRegistered');
+            msg.innerHTML = `<span class='ok'>已清除标记，可再次体验注册。</span>`;
+            return;
+          }
+          // 跳场景前可选择是否写入注册标记，确保后续流程不被卡住
+          if(target !== 'intro' && target !== 'resetReg'){
+            localStorage.setItem('hasRegistered','1');
+          }
+            this.ctx.go(target);
+        });
+      });
+    }
   }
 }

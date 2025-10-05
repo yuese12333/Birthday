@@ -28,14 +28,14 @@ export class Scene1Intro extends BaseScene {
         <button data-mood="-5" data-cat="awkward">“要不我们先写作业？”</button>
       </div>
       <div class="mood-wrapper">
-        <div class="progress-line">安抚值 <span class='val'>0</span> / <span class='tar'>30</span> <span class='combo-badge hidden'></span></div>
+        <div class="progress-line">安抚值 <span class='val'>0</span> / <span class='tar'>100</span> <span class='combo-badge hidden'></span></div>
         <div class="mood-bar"><span class="fill"></span></div>
       </div>
   <div class='fast-next hidden' data-debounce='800'>“我现在就抱紧你”</div>
       <div class='title-egg hidden'></div>
     `;
     this.mood = 0;
-    this.target = 30;
+    this.target = 100;
     this.comboSet = new Set();
     this.consecutiveNegative = 0;
     this.highestCombo = 1;
