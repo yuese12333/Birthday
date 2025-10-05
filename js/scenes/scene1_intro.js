@@ -160,7 +160,8 @@ export class Scene1Intro extends BaseScene {
         this._toExam = true;
         choicesBox.querySelectorAll('button').forEach(b=> b.disabled = true);
         phaseMsg.textContent = '她安心地点了点头...';
-        setTimeout(()=> this.ctx.go('exam'), 500);
+  // 使用转场：心跳+粒子动画后进入考试
+  setTimeout(()=> this.ctx.go('transition', { next:'exam', style:'heart' }), 500);
       }
     };
 
@@ -187,7 +188,7 @@ export class Scene1Intro extends BaseScene {
       spawnBubble(fastNext, '+抱紧', 'fast');
       if(!this._toExam){
         this._toExam = true;
-        setTimeout(()=> this.ctx.go('exam'), 600);
+  setTimeout(()=> this.ctx.go('transition', { next:'exam', style:'heart' }), 600);
       }
     });
 

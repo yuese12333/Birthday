@@ -184,3 +184,17 @@ button.shake{ animation:shake .5s; }
 .scene-intro .phase-msg{ font-size:.8rem; opacity:.85; background:rgba(255,255,255,.4); padding:.4rem .7rem; border-radius:12px; display:inline-block; }
 .scene-intro .title-egg{ margin-top:.4rem; font-size:.7rem; opacity:.8; color:#a22d52; }
 .scene-intro .title-egg.hidden{ display:none; }
+
+/* Transition Scene */
+.transition-wrapper{ position:relative; flex:1; min-height:300px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; animation:transFadeIn .4s ease; }
+@keyframes transFadeIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
+.pulse-heart{ width:120px; height:120px; background:radial-gradient(circle at 30% 30%, #ff89a3, #ff5f7f); position:relative; clip-path:path('M60 110 C-20 50 20 -10 60 20 C100 -10 140 50 60 110 Z'); filter:drop-shadow(0 6px 14px rgba(255,80,120,.45)); animation:heartPulse 1.4s ease-in-out infinite; }
+@keyframes heartPulse{0%{transform:scale(.8);}35%{transform:scale(1);}60%{transform:scale(.9);}100%{transform:scale(.8);} }
+.particles{ position:absolute; inset:0; pointer-events:none; }
+.particle{ position:absolute; left:50%; top:50%; width:10px; height:10px; background:radial-gradient(circle,#fff,#ffd3de); border-radius:50%; transform:translate(-50%,-50%) scale(.4); animation:particleFly .9s cubic-bezier(.25,.8,.3,1) forwards; box-shadow:0 0 6px -1px rgba(255,255,255,.85); }
+@keyframes particleFly{0%{opacity:.9;}70%{opacity:1; transform:translate(calc(-50% + var(--tx)), calc(-50% + var(--ty))) scale(1);}100%{opacity:0; transform:translate(calc(-50% + var(--tx)*1.4), calc(-50% + var(--ty)*1.4)) scale(.2);} }
+.transition-tip{ font-size:.85rem; letter-spacing:.5px; background:rgba(255,255,255,.55); padding:.6rem 1.1rem; border-radius:999px; box-shadow:0 4px 14px -4px rgba(0,0,0,.15); animation:tipFloat 3s ease-in-out infinite; }
+@keyframes tipFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);} }
+/* style 可扩展：不同 data-style 可自定义心样式或替换图形 */
+/* heart 样式当前使用默认心跳，无额外覆盖 */
+

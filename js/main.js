@@ -8,6 +8,7 @@ import { Scene4Confession } from './scenes/scene4_confession.js';
 import { Scene5Date } from './scenes/scene5_date.js';
 import { Scene6Scarf } from './scenes/scene6_scarf.js';
 import { Scene7Future } from './scenes/scene7_future.js';
+import { TransitionScene } from './scenes/scene_transition.js';
 // (后续场景将在实现后追加 import)
 
 const bus = new EventBus();
@@ -29,6 +30,8 @@ sceneManager.register('confession', ()=> new Scene4Confession(context()));
 sceneManager.register('date', ()=> new Scene5Date(context()));
 sceneManager.register('scarf', ()=> new Scene6Scarf(context()));
 sceneManager.register('future', ()=> new Scene7Future(context()));
+// 新增：转场中介场景（用于动画 & BGM 交叉淡出缓冲）
+sceneManager.register('transition', ()=> new TransitionScene(context()));
 
 window.addEventListener('DOMContentLoaded', ()=>{
   // 若已注册过直接进入 intro，否则进入 register 仪式页

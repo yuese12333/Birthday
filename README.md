@@ -195,6 +195,7 @@ README.md
 | 机制 | 描述 |
 |------|------|
 | 场景管理 | `SceneManager` 控制生命周期 enter/exit，防并发切换锁。|
+| 转场场景 (NEW) | `TransitionScene` 作为中介：播放 1.4s 情绪动画 + 粒子，期间旧 BGM 淡出，下一场景自行淡入新 BGM。当前仅 demo: intro → exam。|
 | 事件总线 | `EventBus`（当前轻量，预留解耦扩展）。|
 | 全局防抖 | 任意元素加 `data-debounce` 即可，捕获阶段阻断重复点击。|
 | 本地持久 | `localStorage.hasRegistered` 标记注册通过一次即可跳过。|
@@ -224,6 +225,17 @@ README.md
 - 修改菜单：`scene5_date.js` 的 `this.menu`。
 - 围巾尺寸：`scene6_scarf.js` 中网格行列参数。
 - 愿望阈值：`scene7_future.js` 中 `this.required`。
+- 转场动画：`scene_transition.js` 可扩展 `style` 分支（目前仅 `heart`）。
+
+TODO（后续将逐步用转场包装的跳转示例）：
+```
+intro -> exam        ✅ 已接入
+exam -> timeline     ⏳ 待接入
+timeline -> confession ⏳ 待接入
+confession -> date   ⏳ 待接入
+date -> scarf        ⏳ 待接入
+scarf -> future      ⏳ 待接入
+```
 
 ---
 ## 🪄 未来路线（Roadmap）
@@ -233,6 +245,7 @@ README.md
 | 成就 | 全对 / 无提示 / 零跳过 / 彩蛋收集 | 待实现 |
 | 统计 | 组合最高值 / 错误来源分析 | 待实现 |
 | 音频 | BGM + 微动效音效 | 待添加 |
+| 转场 | 多款主题：heart / petal / memory fade / star tunnel | 进行中 (已上线 heart demo) |
 | 彩蛋 | 统一 registry + 条件 DSL | 规划中 |
 | 个性化 | 终章引用前面统计（例如你“××题都跳过”） | 规划中 |
 | UI | 主题切换（粉 / 暖白 / 星空） | 规划中 |
