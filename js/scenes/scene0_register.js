@@ -27,7 +27,6 @@ export class Scene0Register extends BaseScene {
   </div>
         <div class='msg'></div>
       </form>
-      <!-- 已按需求移除所有“忘记密码”线索提示。-->
 
       <!-- DEBUG PANEL START (开发期跳场景，成品可整块删除) -->
       <details class='debug-panel' style="margin-top:1rem; font-size:.7rem; opacity:.75;">
@@ -52,55 +51,67 @@ export class Scene0Register extends BaseScene {
     const msg = el.querySelector('.msg');
     const forgotBtn = form.querySelector('.forgot-btn');
     const bgmBtn = form.querySelector('.reg-bgm');
+
+    // ---- BGM 自动播放逻辑 ----
     let bgmKilled = false;
-    // 播放注册场景 BGM：尝试立即播放；若被策略阻止则静音播放并等待第一次交互恢复音量
     const bgmAudio = audioManager.playBGM('scene0','./assets/audio/scene_0.mp3',{ loop:true, volume:0.5, fadeIn:700 });
     let awaitingUnlock = false;
-    if(bgmAudio){
-      // 某些浏览器（移动端）会阻止自动播放，这里检测 play 状态
-      if(bgmAudio.paused){
-        // 再尝试一次
-        bgmAudio.play().catch(()=>{
-          // 静音强制播放占位，待手势恢复
-          bgmAudio.muted = true;
-          awaitingUnlock = true;
-          const trySilent = bgmAudio.play();
-          if(trySilent){ trySilent.catch(()=>{}); }
-          // 首次用户手势（pointerdown）恢复
-          const unlock = ()=>{
-            if(!awaitingUnlock) return;
-            awaitingUnlock = false;
-            bgmAudio.muted = false;
-            window.removeEventListener('pointerdown', unlock);
-          };
-            window.addEventListener('pointerdown', unlock, { once:true });
-        });
-      }
+    if(bgmAudio && bgmAudio.paused){
+      bgmAudio.play().catch(()=>{
+        bgmAudio.muted = true; awaitingUnlock = true;
+        const silent = bgmAudio.play(); if(silent) silent.catch(()=>{});
+        const unlock = ()=>{ if(!awaitingUnlock) return; awaitingUnlock=false; bgmAudio.muted=false; window.removeEventListener('pointerdown', unlock); };
+        window.addEventListener('pointerdown', unlock, { once:true });
+      });
     }
+
     bgmBtn.addEventListener('click',()=>{
       if(bgmKilled){
-        // 不替换现有表情，追加提示（若未追加过）
         if(!msg.querySelector('.no-music-tip')){
           msg.insertAdjacentHTML('beforeend', `<div class='err no-music-tip' style='margin-top:.35rem;animation:pwdShake .5s;'>我生气了，不给你放歌！</div>`);
         } else {
-          // 再次点击触发轻微抖动反馈
           const tip = msg.querySelector('.no-music-tip');
-          tip.style.animation='none';
-          requestAnimationFrame(()=>{ tip.style.animation='pwdShake .5s'; });
+          tip.style.animation='none'; requestAnimationFrame(()=> tip.style.animation='pwdShake .5s');
         }
         return;
       }
-      if(bgmAudio.paused){
-        bgmAudio.play().catch(()=>{});
-        bgmBtn.classList.remove('muted');
-      } else {
-        bgmAudio.pause();
-        bgmBtn.classList.add('muted');
-      }
+      if(bgmAudio.paused){ bgmAudio.play().catch(()=>{}); bgmBtn.classList.remove('muted'); }
+      else { bgmAudio.pause(); bgmBtn.classList.add('muted'); }
     });
-  // 已去除线索相关节点与逻辑
-    let wrongTimes = 0; // 密码错误次数
-    form.addEventListener('submit', (e)=>{
+
+    // ---- 错误与提示统一区域结构 ----
+    function ensureErrorStructure(){
+      let wrap = msg.querySelector('.err-wrap');
+      if(!wrap){
+        msg.innerHTML='';
+        wrap = document.createElement('div');
+        wrap.className='err-wrap';
+        wrap.style.cssText='display:flex;flex-direction:column;gap:.35rem;';
+        msg.appendChild(wrap);
+      }
+      let imgRow = wrap.querySelector('.err-img-row');
+      if(!imgRow){
+        imgRow = document.createElement('div');
+        imgRow.className='err-img-row';
+        imgRow.style.cssText='display:flex;align-items:center;gap:.25rem;';
+        wrap.appendChild(imgRow);
+      }
+      let lines = wrap.querySelector('.err-lines');
+      if(!lines){
+        lines = document.createElement('div');
+        lines.className='err-lines';
+        lines.style.cssText='display:flex;flex-direction:column;gap:.25rem;font-size:.8rem;color:#b3002c;';
+        wrap.appendChild(lines);
+      }
+      return { wrap, imgRow, lines };
+    }
+
+    if(!document.getElementById('pwd-error-anim')){
+      const s=document.createElement('style'); s.id='pwd-error-anim'; s.textContent='@keyframes pwdShake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(3px);}30%,50%,70%{transform:translateX(-5px);}40%,60%{transform:translateX(5px);} }'; document.head.appendChild(s);
+    }
+
+    let wrongTimes = 0;
+    form.addEventListener('submit',(e)=>{
       e.preventDefault();
       const data = new FormData(form);
       const pass = (data.get('pass')||'').trim();
@@ -111,21 +122,25 @@ export class Scene0Register extends BaseScene {
       } else {
         wrongTimes++;
         if(!bgmKilled){ audioManager.stopBGM('scene0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
-        // 生气语句轮播（四条循环）
-        const angryLines = [
-          '不是你干什么呢？！',
-          '好好填！不许乱填！',
-          '溜溜！不许这样！',
-          '最后警告：再填错我真生气了！'
-        ];
-        const line = angryLines[(wrongTimes-1) % angryLines.length];
-        msg.innerHTML = `<span class='err' style="display:inline-block;animation:pwdShake .5s;">${line}</span>`;
-        // 注入一次摇动动画
-        if(!document.getElementById('pwd-error-anim')){
-          const s = document.createElement('style');
-          s.id = 'pwd-error-anim';
-          s.textContent = '@keyframes pwdShake{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(3px);}30%,50%,70%{transform:translateX(-5px);}40%,60%{transform:translateX(5px);} }';
-          document.head.appendChild(s);
+        const { imgRow, lines } = ensureErrorStructure();
+        if(wrongTimes < 5){
+          const angryLines = [ 
+            '不是你干什么呢？！',
+            '好好填！不许乱填！',
+            '溜溜！不许这样！',
+            '再填错我真生气了！' ];
+          // 轮播：每次只显示当前这一条，替换上一条
+          lines.innerHTML = '';
+          const span=document.createElement('span');
+          span.textContent=angryLines[(wrongTimes-1)%angryLines.length];
+          span.style.cssText='animation:pwdShake .5s;';
+          lines.appendChild(span);
+        } else if(wrongTimes === 5){
+          if(!imgRow.querySelector('.wrong-cry')){
+            const cry=document.createElement('img'); cry.src='./assets/images/cry.png'; cry.alt='cry'; cry.className='wrong-cry'; cry.style.cssText='width:70px;height:70px;animation:shakeCry .6s ease;'; imgRow.appendChild(cry);
+          }
+        } else if(wrongTimes >= 6){
+          const bye=document.createElement('span'); bye.textContent='……我不跟你玩了，退出！'; lines.appendChild(bye); setTimeout(()=>{ try{ window.close(); }catch(e){} location.href='about:blank'; }, 800);
         }
       }
     });
@@ -135,29 +150,44 @@ export class Scene0Register extends BaseScene {
       if(forgotBtn.disabled) return;
       this._forgotClicks++;
       if(!bgmKilled){ audioManager.stopBGM('scene0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
+      // 使用统一结构，避免后续密码错误覆盖表情
+      const { imgRow } = ensureErrorStructure();
+      // 查找或创建忘记表情容器
+      let faceGroup = imgRow.querySelector('.forgot-faces');
+      if(!faceGroup){
+        faceGroup = document.createElement('div');
+        faceGroup.className = 'forgot-faces';
+        faceGroup.style.cssText = 'display:flex;align-items:center;gap:4px;flex-wrap:wrap;';
+        imgRow.appendChild(faceGroup);
+      }
       if(this._forgotClicks < 5){
-        // 生成 N 个 angry 图标
-        const count = this._forgotClicks; // 1..4
-        let imgs = '';
-        for(let i=0;i<count;i++){
-          imgs += `<img src='./assets/images/angry.png' alt='angry' style='width:48px;height:48px;margin:2px;animation:pop .4s ease;'>`;
+        // 1~4 次：用 N 个 angry 图，先清空再生成，保持数量与点击次数一致
+        faceGroup.innerHTML = '';
+        for(let i=0;i<this._forgotClicks;i++){
+          const im = document.createElement('img');
+          im.src = './assets/images/angry.png';
+          im.alt = 'angry';
+          im.style.cssText = 'width:48px;height:48px;margin:2px;animation:pop .4s ease;';
+          faceGroup.appendChild(im);
         }
-        msg.innerHTML = `<div class='err' style='display:flex;flex-wrap:wrap;align-items:center;'>${imgs}</div>`;
       } else {
-  msg.innerHTML = `<div class='err' style="display:flex;justify-content:flex-end;"><img src='./assets/images/cry.png' alt='cry' style='width:70px;height:70px;animation:shakeCry .6s ease;'></div>`;
-  forgotBtn.disabled = true;
-  forgotBtn.classList.add('disabled');
-  forgotBtn.textContent = '不许忘！！！';
-        // 添加一次抖动 & 闪烁红边动画类
+        // 第5次：移除 angry 组，添加哭脸（靠右不会影响密码错误时的行）
+        faceGroup.remove();
+        if(!imgRow.querySelector('.forgot-cry')){
+          const cry = document.createElement('img');
+          cry.src='./assets/images/cry.png';
+          cry.alt='cry';
+          cry.className='forgot-cry';
+          cry.style.cssText='width:70px;height:70px;animation:shakeCry .6s ease;margin-left:auto;';
+          imgRow.appendChild(cry);
+        }
+        forgotBtn.disabled = true;
+        forgotBtn.classList.add('disabled');
+        forgotBtn.textContent = '不许忘！！！';
         forgotBtn.classList.add('shake-once','flash-red');
         setTimeout(()=> forgotBtn.classList.remove('shake-once'), 600);
-        // 2 秒后若密码仍为空 -> 修改输入框 placeholder 为 “快输入！”
         const passInput = form.querySelector('input[name="pass"]');
-        setTimeout(()=>{
-          if(!passInput.value.trim()){
-            passInput.placeholder = '快输入！';
-          }
-        },2000);
+        setTimeout(()=>{ if(!passInput.value.trim()) passInput.placeholder='快输入！'; },2000);
       }
     });
     // 简单弹出/哭泣动画（内联追加一次）
