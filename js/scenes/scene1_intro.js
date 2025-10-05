@@ -151,5 +151,7 @@ export class Scene1Intro extends BaseScene {
     this.ctx.rootEl.appendChild(el);
   }
 
-  async exit(){ audioManager.stopBGM('scene1',{fadeOut:600}); }
+  async exit(){ 
+    audioManager.stopBGM('scene1',{fadeOut:600}); 
+  }
 }
