@@ -11,7 +11,7 @@
  *  1. 得分：正确 = 2 * 难度权重；跳过 = 同上；错误 = 同上（满分宠溺）；提示不扣分。
  *  2. 提示：一题可按下至多 3 次（hintCount）。前两次显示提示文本，第 3 次直接自动判定正确 + 给答案 + 给分。
  *  3. 彩蛋：全跳过 / 全错误宠溺 / ≥50% 跳过（互斥优先级：全跳过 > 全错误宠溺 > 半数跳过）。
- *  4. 计时：5 分钟循环倒计时；结束重置并投放随机宠溺提醒，不影响得分或题目。
+ *  4. 计时：改为“单科独立计时”——进入科目启动 5 分钟倒计时；该科完成即停止；30 秒内未开始下一科触发彩蛋提醒。
  *
  * 关键字段：
  *   question: {
@@ -161,42 +161,71 @@ export class Scene2Exam extends BaseScene {
     const timerEl = el.querySelector('.timer');
     const summaryEl = el.querySelector('.summary');
     // 计时器：5分钟循环倒计时
-    this._remainingSeconds = 300; // 5 * 60
-    const formatTime = (s)=>{
-      const m = Math.floor(s/60).toString().padStart(2,'0');
-      const sec = (s%60).toString().padStart(2,'0');
-      return `${m}:${sec}`;
-    };
-    timerEl.textContent = formatTime(this._remainingSeconds);
-    const cyclePamperLines = [
-      '时间到~ 说明你已经很认真啦，抱一下继续！',
-      '5分钟小提醒：别紧张，我永远在你身边～',
-      '学习计时器叮——喝口水，继续收下我的宠溺。',
-      '滴！可爱度续费成功，再战五分钟！',
-      '休息一瞬再冲刺，我们并肩最甜～'
-    ];
-    this._timerInterval = setInterval(()=>{
-      this._remainingSeconds--;
-      if(this._remainingSeconds <= 0){
-        // 重置
-        this._remainingSeconds = 300;
-        const line = cyclePamperLines[Math.floor(Math.random()*cyclePamperLines.length)];
-        // 不打断正在进行的题目结构，只更新状态区域
-        if(status){
-          status.innerHTML = `<span class='ok'>${line} (计时已重置 05:00)</span>`;
+    // 新：单科计时控制变量
+    this._subjectTimer = null;          // 当前科目倒计时 interval
+    this._subjectRemain = 0;            // 剩余秒数（该科）
+    this._betweenTimer = null;          // 科目间30秒等待彩蛋计时器
+    const formatTime = (s)=>{ const m=Math.floor(s/60).toString().padStart(2,'0'); const sec=(s%60).toString().padStart(2,'0'); return `${m}:${sec}`; };
+    const startSubjectTimer = ()=>{
+      stopSubjectTimer();
+      this._subjectRemain = 300; // 5分钟
+      timerEl.textContent = formatTime(this._subjectRemain);
+      this._subjectTimer = setInterval(()=>{
+        this._subjectRemain--;
+        if(this._subjectRemain <= 0){
+          stopSubjectTimer();
+          status.innerHTML = `<span class='ok'>这一科时间到啦~ 不着急，我陪你慢慢来 (可继续做完剩余题目)</span>`;
         }
-      }
-      if(timerEl){ timerEl.textContent = formatTime(this._remainingSeconds); }
-    }, 1000);
+        if(timerEl) timerEl.textContent = formatTime(Math.max(0,this._subjectRemain));
+      },1000);
+    };
+    const stopSubjectTimer = ()=>{ if(this._subjectTimer){ clearInterval(this._subjectTimer); this._subjectTimer=null; } };
+    const startBetweenTimer = (nextSubject)=>{
+      stopBetweenTimer();
+      let wait = 30; // 30 秒未进入下一科彩蛋
+      this._betweenTimer = setInterval(()=>{
+        wait--;
+        if(wait<=0){
+          stopBetweenTimer();
+          // 只有在下一科还没开始且未全部完成时提示
+          if(!nextSubject.done){
+            const lines=[
+              `要不要我们一起开始 ${nextSubject.title} ？我已经把桌子擦好啦~`,
+              `下一科 ${nextSubject.title} 在等你，我先偷偷给你加好运。`,
+              `休息够了吗？${nextSubject.title} 说：点我点我！`,
+              `拖延症不用怕，我陪你，一起打开 ${nextSubject.title} ~`
+            ];
+            status.innerHTML = `<span class='ok between-hint'>${lines[Math.floor(Math.random()*lines.length)]}</span>`;
+          }
+        }
+      },1000);
+    };
+    const stopBetweenTimer = ()=>{ if(this._betweenTimer){ clearInterval(this._betweenTimer); this._betweenTimer=null; } };
 
   /**
    * 渲染顶部科目标签；点击切换当前主科目。
    */
   const renderTabs = ()=>{
-      tabsBox.innerHTML = this.subjects.map(s=>`<button class='tab' data-sub='${s.key}'>${s.title}${s.done?'✔':''}</button>`).join('');
+      // 顺序锁：只有第一个未完成科目可以点击；已完成的仍可回顾但不再计时（此处阻止回顾刷时间）
+      const firstUnfinished = this.subjects.find(s=>!s.done);
+      tabsBox.innerHTML = this.subjects.map(s=>{
+        const locked = firstUnfinished && s.key !== firstUnfinished.key && !s.done;
+        return `<button class='tab ${locked?'locked':''}' data-sub='${s.key}' ${locked?'disabled':''}>${s.title}${s.done?'✔':''}</button>`;
+      }).join('');
       tabsBox.querySelectorAll('.tab').forEach(tb=> tb.addEventListener('click',()=>{
         const s = this.subjects.find(x=>x.key===tb.dataset.sub);
-        renderSubject(s);
+        // 只允许点击当前待完成科目；已完成科目点击仅展示完成信息不重启计时
+        const first = this.subjects.find(ss=>!ss.done);
+        if(s.done){ // 查看完成状态（不重启计时）
+          stopSubjectTimer();
+          stopBetweenTimer();
+          board.innerHTML = `<div class='paper'><p>${s.title} 已完成 ✔</p></div>`;
+          status.textContent = `${s.title} 已完成，可以继续下一科~`;
+          return;
+        }
+        if(first && s.key !== first.key) return; // 保护性判定
+        stopBetweenTimer();
+        renderSubject(s, true);
       }));
     };
 
@@ -204,7 +233,7 @@ export class Scene2Exam extends BaseScene {
    * 渲染某科目的下一题；若该科全部完成则显示完成提示。
    * @param {Object} subject 当前学科对象
    */
-  const renderSubject = (subject)=>{
+  const renderSubject = (subject, startTimer=false)=>{
       // 找到第一道未完成的题
       const nextQ = subject.questions.find(q=>!q.solved);
       if(!nextQ){
@@ -213,6 +242,13 @@ export class Scene2Exam extends BaseScene {
         status.textContent = subject.title + ' 已全部完成！';
         checkAll();
         board.innerHTML = `<div class='paper'><p>${subject.title} 全部题目完成 ✔</p></div>`;
+        // 停止当前科目计时，启动科目间等待计时（若还有下一科）
+        stopSubjectTimer();
+        const idx = this.subjects.findIndex(s=> s.key===subject.key);
+        const nextSubject = this.subjects[idx+1];
+        if(nextSubject){
+          startBetweenTimer(nextSubject);
+        }
         return;
       }
       board.innerHTML = '';
@@ -236,7 +272,13 @@ export class Scene2Exam extends BaseScene {
         <div class='hint-area'></div>
         <div class='progress-mini'>本科进度：${subject.questions.filter(q=>q.solved).length}/${subject.questions.length}</div>
       `;
-      board.appendChild(wrapper);
+  board.appendChild(wrapper);
+      if(startTimer){
+        // 进入新科目：清理可能残留的懒散彩蛋提示
+        const bh = status.querySelector('.between-hint');
+        if(bh) bh.remove();
+        startSubjectTimer();
+      }
 
       const hintBtn = wrapper.querySelector('.hint-btn');
       const submitBtn = wrapper.querySelector('.submit-btn');
@@ -275,6 +317,14 @@ export class Scene2Exam extends BaseScene {
         let userAns='';
         if(nextQ.type==='fill') userAns = wrapper.querySelector('.q-input').value.trim();
         if(nextQ.type==='select') userAns = wrapper.querySelector('.q-select').value;
+        // 空输入/未选择：不给分也不判错，给予轻提示
+        const isEmpty = (nextQ.type==='fill' && userAns==='') || (nextQ.type==='select' && userAns==='');
+        if(isEmpty){
+          status.innerHTML = `<span class='err'>先填写/选择一个答案再提交哦~</span>`;
+          wrapper.classList.add('shake-mini');
+          setTimeout(()=> wrapper.classList.remove('shake-mini'),400);
+          return;
+        }
         const correct = nextQ.type==='fill' ? (userAns === nextQ.answer) : (parseInt(userAns,10) === nextQ.answerIndex);
         if(correct){
           nextQ.solved = true;
@@ -388,9 +438,9 @@ export class Scene2Exam extends BaseScene {
       `;
     };
 
-    renderTabs();
-    // 默认打开第一科
-    renderSubject(this.subjects[0]);
+  renderTabs();
+  // 自动进入第一科并启动计时
+  renderSubject(this.subjects[0], true);
 
     finishBtn.addEventListener('click',()=> this.ctx.go('timeline'));
     this.ctx.rootEl.appendChild(el);
@@ -400,9 +450,8 @@ export class Scene2Exam extends BaseScene {
    */
   async exit(){
     // 清理循环计时器，避免场景切换后仍然运行
-    if(this._timerInterval){
-      clearInterval(this._timerInterval);
-      this._timerInterval = null;
-    }
+    // 清理所有计时器
+    if(this._subjectTimer){ clearInterval(this._subjectTimer); this._subjectTimer=null; }
+    if(this._betweenTimer){ clearInterval(this._betweenTimer); this._betweenTimer=null; }
   }
 }
