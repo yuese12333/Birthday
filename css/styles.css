@@ -48,6 +48,9 @@ button.shake{ animation:shake .5s; }
 .scene-timeline ul{ list-style:none; padding:0; margin:0 0 1rem; display:flex; flex-direction:column; gap:.6rem; }
 .scene-timeline li{ background:rgba(255,255,255,.5); padding:.8rem 1rem; border-radius:14px; box-shadow:0 2px 6px rgba(0,0,0,.08); }
 .scene-timeline li[draggable='true']{ cursor:grab; }
+.scene-timeline ul.touch-mode li{ position:relative; }
+.scene-timeline ul.touch-mode li.pending{ outline:2px dashed #ff6f90; background:rgba(255,255,255,.9); }
+.scene-timeline ul.touch-mode li:active{ transform:scale(.97); }
 .result{ font-weight:600; margin-top:.4rem; }
 /* Confession Scene */
 .scene-confession .dialogue{ position:relative; background:rgba(255,255,255,.45); padding:1rem 1.2rem; border-radius:18px; box-shadow:0 4px 12px rgba(0,0,0,.08); }
@@ -114,6 +117,20 @@ button.shake{ animation:shake .5s; }
 .scene-future .celebrate{ margin:.6rem 0; display:flex; justify-content:center; }
 .scene-future .reality-note{ font-size:.85rem; opacity:.8; margin-top:.4rem; }
 .scene-future .final h2{ margin-top:0; font-size:2rem; background:linear-gradient(90deg,#ff6f90,#ffd36f); -webkit-background-clip:text; background-clip:text; color:transparent; }
+
+/* 通用移动端优化 */
+@media (hover:none){
+	button{ padding:.75rem 1.15rem; font-size:1.05rem; }
+	.scene-date .card{ padding:.85rem .85rem 1rem; }
+	.scene-scarf .grid{ touch-action:none; }
+	.scene-scarf .stitch{ width:20px; height:20px; }
+}
+@media (max-width:600px){
+	body{ font-size:15px; }
+	.scene h1{ font-size: clamp(1.4rem,7vw,2.1rem); }
+	.scene-date .card-grid{ grid-template-columns:repeat(auto-fill,minmax(130px,1fr)); }
+	.scene-date .card .title{ font-size:.8rem; }
+}
 
 @media (min-width:800px){ #app{ max-width:900px; margin:0 auto; } }
 

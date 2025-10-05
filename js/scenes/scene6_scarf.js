@@ -29,6 +29,24 @@ export class Scene6Scarf extends BaseScene {
         grid.appendChild(cell);
       }
     }
+    // 触摸 / 移动端连续绘制支持：按下后滑动自动点亮
+    let painting = false;
+    grid.addEventListener('pointerdown',e=>{
+      painting = true;
+      const cell = e.target.closest('.stitch');
+      if(cell) this.toggle(cell,true);
+      // 避免触摸滚动页面
+      e.preventDefault();
+    });
+    grid.addEventListener('pointermove',e=>{
+      if(!painting) return;
+      const elAt = document.elementFromPoint(e.clientX,e.clientY);
+      const cell = elAt && elAt.closest('.stitch');
+      if(cell) this.toggle(cell,true);
+    });
+    const stopPaint = ()=> { painting=false; };
+    window.addEventListener('pointerup', stopPaint);
+    window.addEventListener('pointercancel', stopPaint);
     this.toggle = (cell,force)=>{
       if(cell.classList.contains('on') && !force) return; // pointerenter only lights new
       if(!cell.classList.contains('on')){
