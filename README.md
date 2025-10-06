@@ -424,7 +424,7 @@ this.ctx.go('transition', {
 | 类型 | 命名模式 | 示例 | 说明 |
 |------|----------|------|------|
 | 场景 BGM | `scene_<x>.mp3` | `scene_1.mp3`, `scene_5.mp3` | 每个主要场景一个主 BGM（使用 mp3；若需无损可并行放 wav）。|
-| 转场一次性音效 | `scene_<from><to>.(mp3|wav|ogg)` | `scene_12.mp3`, `scene_45.wav` | 表示从场景 `<from>` 跳到 `<to>` 的独特过渡（数字拼接，不加下划线）。|
+| 转场一次性音效 | `scene_<from><to>.(mp3/wav/ogg)` | `scene_12.mp3`, `scene_45.wav` | 表示从场景 `<from>` 跳到 `<to>` 的独特过渡（数字拼接，不加下划线）。|
 
 
 命名解读：
@@ -484,5 +484,5 @@ this.ctx.go('transition', {
 
 
 ## 未使用构思：
-    数织游戏
+- 数织游戏
      
