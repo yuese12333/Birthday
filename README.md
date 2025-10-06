@@ -40,7 +40,8 @@ js/
   scenes/            # 场景 0~7 源文件
   main.js            # 入口（注册场景 & 全局防抖 & 快捷键）
 data/
-  questions.json     # 外部题库（存在即覆盖内置）
+  questions.json     # 外部题库
+  scene1_script.json # 场景 1 分支脚本
 index.html
 README.md
 ```

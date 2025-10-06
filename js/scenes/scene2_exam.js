@@ -40,44 +40,14 @@ export class Scene2Exam extends BaseScene {
    */
   async init(){
     await super.init();
-    // 默认内置题库（仅在外部加载失败或为空时使用）
-    const defaultSubjects = [
-      { key:'chinese', title:'语文', questions:[
-        { type:'fill', difficulty:'easy', prompt:'补全：山有木兮木有枝，', answer:'心悦君兮君不知', placeholder:'_____', hint:'“心悦”二字是重点', solved:false, correctMsg:'诗意满分！你比王昭君还会写情书~', wrongMsg:'先别急，想想那句超级甜的古风情话。' },
-        { type:'fill', difficulty:'medium', prompt:'补全：愿得一心人，', answer:'白首不相离', placeholder:'_____', hint:'四字成语感觉', solved:false, correctMsg:'白首不相离——愿望收到，系统加密存档 ❤', wrongMsg:'这句很经典，我们常看的那句誓言~' }
-      ], done:false },
-      { key:'math', title:'数学', questions:[
-        { type:'fill', difficulty:'easy', prompt:'1 + 2 × 3 = ?', answer:'7', placeholder:'答案', hint:'乘法优先', solved:false, correctMsg:'逻辑清晰小天才 ✓', wrongMsg:'别被乘法优先级绊倒啦~' },
-        { type:'fill', difficulty:'medium', prompt:'(5 + 1) × 2 - 3 = ?', answer:'9', placeholder:'答案', hint:'括号先算', solved:false, correctMsg:'脑回路很顺畅！继续保持！', wrongMsg:'再过一遍：括号→乘除→加减。' }
-      ], done:false },
-      { key:'english', title:'英语', questions:[
-        { type:'fill', difficulty:'easy', prompt:'forever 的中文是？', answer:'永远', placeholder:'中文', hint:'以 “永” 开头', solved:false, correctMsg:'Forever = 永远喜欢你，就是这么直接~', wrongMsg:'再想想我们常说的“永____”那两个字。' },
-        { type:'fill', difficulty:'medium', prompt:'destiny 的中文是？', answer:'命运', placeholder:'中文', hint:'命___', solved:false, correctMsg:'命运都被你握住啦~', wrongMsg:'命开头的两个字，超常见组合。' }
-      ], done:false },
-      { key:'science', title:'理综', questions:[
-        { type:'select', difficulty:'easy', prompt:'水锅盖内壁小水珠主要由于？', options:['蒸发与冷凝','升华','分解'], answerIndex:0, hint:'两个过程组合', solved:false, correctMsg:'物理 + 生活经验完美结合！', wrongMsg:'试着回忆：水蒸气遇冷会发生什么？' },
-        { type:'select', difficulty:'hard', prompt:'下列哪种现象主要和光的折射有关？', options:['彩虹','回声','铁生锈'], answerIndex:0, hint:'雨后天空', solved:false, correctMsg:'彩虹都为你折一下色~', wrongMsg:'提示：声音那个是声学现象不是光学哦。' }
-      ], done:false }
-    ];
-
-  // 先假定使用默认，若外部加载成功则完全替换（替换模式：不是追加）
-    this.subjects = defaultSubjects;
-    // 尝试加载外部题库 JSON；成功则“替换”默认题库
-    try {
-      const resp = await fetch('./data/questions.json');
-      if(resp.ok){
-        const data = await resp.json();
-        const built = this.buildSubjectsFromExternal(data);
-        if(built.length){
-          this.subjects = built;
-          console.info('题库使用外部 questions.json (替换模式)');
-        } else {
-          console.warn('外部 questions.json 没有可识别题目，使用默认题库');
-        }
-      }
-    } catch(e){
-      console.warn('外部题库加载失败，回退默认题库', e);
-    }
+    // 不再内置默认题库：直接加载 external questions.json（若失败或为空将导致后续逻辑异常，符合“必须提供外部题库”要求）
+    const resp = await fetch('./data/questions.json');
+    if(!resp.ok) throw new Error('题库加载失败 (HTTP)');
+    const data = await resp.json();
+    const built = this.buildSubjectsFromExternal(data);
+    if(!built.length) throw new Error('外部题库为空或无法解析');
+    this.subjects = built;
+    console.info('题库加载成功：使用 external questions.json');
     this.score = 0;
     this.hintsUsed = 0;
     this.skippedQuestions = 0; // 统计宠溺跳过次数
