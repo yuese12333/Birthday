@@ -29,7 +29,6 @@ class AudioManager {
       audio.preload = 'auto';
       entry = { audio, targetVolume: volume };
       this.bgms.set(key, entry);
-      // Safari iOS 需用户手势后才能播放，调用方应在交互后触发
       const playPromise = audio.play();
       if(playPromise){ playPromise.catch(()=>{/* 静默失败，等待下一次用户交互重试 */}); }
     } else {
