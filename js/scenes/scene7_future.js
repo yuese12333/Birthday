@@ -1,4 +1,5 @@
 import { BaseScene } from '../core/baseScene.js';
+import { audioManager } from '../core/audioManager.js';
 
 export class Scene7Future extends BaseScene {
   async init(){
@@ -25,7 +26,9 @@ export class Scene7Future extends BaseScene {
         <p class='reality-note'>（真正的故事正在进行中。）</p>
       </div>
     `;
-    const sky = el.querySelector('.sky');
+  // 播放未来星空场景 BGM（若无文件会静默失败）
+  try { audioManager.playSceneBGM('7',{ loop:true, volume:0.55, fadeIn:900 }); } catch(e){}
+  const sky = el.querySelector('.sky');
     const input = el.querySelector('.wish-input');
     const addBtn = el.querySelector('.add');
     const list = el.querySelector('.wish-list');
@@ -60,6 +63,7 @@ export class Scene7Future extends BaseScene {
     // 不再提供重开按钮
     this.ctx.rootEl.appendChild(el);
   }
+  async exit(){ audioManager.stopBGM('7',{ fadeOut:900 }); }
   launchConfetti(canvas){
     if(!canvas) return;
     const ctx = canvas.getContext('2d');

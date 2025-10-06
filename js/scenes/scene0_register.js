@@ -54,7 +54,7 @@ export class Scene0Register extends BaseScene {
 
     // ---- BGM 自动播放逻辑 ----
     let bgmKilled = false;
-    const bgmAudio = audioManager.playBGM('scene0','./assets/audio/scene_0.mp3',{ loop:true, volume:0.5, fadeIn:700 });
+  const bgmAudio = audioManager.playSceneBGM('0',{ loop:true, volume:0.5, fadeIn:700 });
     let awaitingUnlock = false;
     if(bgmAudio && bgmAudio.paused){
       bgmAudio.play().catch(()=>{
@@ -64,6 +64,34 @@ export class Scene0Register extends BaseScene {
         window.addEventListener('pointerdown', unlock, { once:true });
       });
     }
+
+    // ---- 3 秒自动播放失败检测（仅注册场景启用） ----
+    this._audioUnlockBtn = null;
+    const scheduleAutoplayCheck = ()=>{
+      setTimeout(()=>{
+        // 若已经播放（非暂停且有一定进度或 readyState>2）则不提示
+        if(!bgmAudio) return;
+        const playing = !bgmAudio.paused && bgmAudio.currentTime > 0;
+        if(playing) return;
+        if(this._audioUnlockBtn) return; // 已存在
+        const btn = document.createElement('button');
+        btn.className='audio-unlock-tip';
+        btn.textContent='怎么没有声音呀？点我播放精心准备的音乐♪';
+        btn.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);z-index:99999;background:#ff6f90;color:#fff;padding:.55rem 1rem;border:none;border-radius:999px;font-size:.85rem;box-shadow:0 6px 16px -4px rgba(255,80,120,.45);animation:unlockPulse 1.6s ease-in-out infinite;';
+        if(!document.getElementById('unlock-audio-keyframes')){
+          const k=document.createElement('style');k.id='unlock-audio-keyframes';k.textContent='@keyframes unlockPulse{0%,100%{transform:translate(-50%,0) scale(1);}50%{transform:translate(-50%,0) scale(1.08);} }';document.head.appendChild(k);
+        }
+        btn.addEventListener('click',()=>{
+          bgmAudio.muted=false;
+          const p = bgmAudio.play();
+          if(p){ p.catch(()=>{}); }
+          btn.remove(); this._audioUnlockBtn=null;
+        });
+        document.body.appendChild(btn);
+        this._audioUnlockBtn = btn;
+      }, 3000);
+    };
+    scheduleAutoplayCheck();
 
     bgmBtn.addEventListener('click',()=>{
       if(bgmKilled){
@@ -223,5 +251,6 @@ export class Scene0Register extends BaseScene {
   async exit(){
     // 离开注册场景时确保背景音乐淡出停止，防止串场
     audioManager.stopBGM('scene0',{ fadeOut:600 });
+    if(this._audioUnlockBtn){ try{ this._audioUnlockBtn.remove(); }catch(e){} this._audioUnlockBtn=null; }
   }
 }

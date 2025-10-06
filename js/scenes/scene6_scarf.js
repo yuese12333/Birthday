@@ -1,4 +1,5 @@
 import { BaseScene } from '../core/baseScene.js';
+import { audioManager } from '../core/audioManager.js';
 
 export class Scene6Scarf extends BaseScene {
   async init(){
@@ -17,6 +18,7 @@ export class Scene6Scarf extends BaseScene {
       <div class='percent'>0%</div>
       <button class='toNext hidden'>围巾织好啦 →</button>
     `;
+    try { audioManager.playSceneBGM('6',{ loop:true, volume:0.6, fadeIn:800 }); } catch(e){}
     const grid = el.querySelector('.grid');
     const fill = el.querySelector('.fill');
     const percent = el.querySelector('.percent');
@@ -63,4 +65,5 @@ export class Scene6Scarf extends BaseScene {
     el.querySelector('.toNext').addEventListener('click',()=> this.ctx.go('future'));
     this.ctx.rootEl.appendChild(el);
   }
+  async exit(){ audioManager.stopBGM('6',{ fadeOut:600 }); }
 }

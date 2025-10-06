@@ -163,7 +163,7 @@ export class Scene2Exam extends BaseScene {
     const summaryEl = el.querySelector('.summary');
     const bgmBtn = el.querySelector('.bgm-btn');
     // 默认进入即尝试播放（可能被浏览器策略阻止；若阻止则第一次点击会重新尝试）
-    const bgmAudio = audioManager.playBGM('scene2','./assets/audio/scene_2.mp3',{ loop:true, volume:0.6, fadeIn:800 });
+  const bgmAudio = audioManager.playSceneBGM('2',{ loop:true, volume:0.6, fadeIn:800 });
     bgmBtn.addEventListener('click',()=>{
       // 若因自动播放策略被拦截，click 时再尝试播放
       if(bgmAudio && bgmAudio.paused){

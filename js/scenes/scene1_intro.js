@@ -1,5 +1,6 @@
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
+import { typeSfx } from '../core/typeSfx.js';
 
 // 场景1：脚本驱动分支叙事（信任值 + 安抚值）
 export class Scene1Intro extends BaseScene {
@@ -56,7 +57,7 @@ export class Scene1Intro extends BaseScene {
     const title=el.querySelector('.intro-title');
 
     // BGM
-    const bgmAudio=audioManager.playBGM('scene1','./assets/audio/scene_1.mp3',{loop:true,volume:0.55,fadeIn:900});
+  const bgmAudio=audioManager.playSceneBGM('1',{loop:true,volume:0.55,fadeIn:900});
     bgmBtn.addEventListener('click',()=>{
       if(bgmAudio && bgmAudio.paused){ bgmAudio.play().catch(()=>{}); audioManager.globalMuted=false; bgmAudio.muted=false; bgmBtn.classList.remove('muted'); return; }
       const muted=audioManager.toggleMute(); bgmBtn.classList.toggle('muted',muted);
@@ -89,7 +90,35 @@ export class Scene1Intro extends BaseScene {
 
     const findStage=id=>script.stages.find(s=>s.id===id);
     let lineQueue=[]; let lineIndex=0; let stageDoneCallback=null; let awaitingLine=false;
+    // 打字机状态
+  let isTyping=false; let typingTimer=null; let currentFullText=''; let typingIndex=0; const typingSpeed=34; // ms/char 可调
+  let sfxCharCounter=0; // 控制每隔若干有效字符触发一次声音
+    const finishTyping=()=>{ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } isTyping=false; vnText.textContent=currentFullText; };
+    const startTyping=(text)=>{
+      finishTyping(); // 清理上一次
+      currentFullText=text||''; typingIndex=0; vnText.textContent='';
+      if(!currentFullText){ isTyping=false; return; }
+      isTyping=true;
+      typingTimer=setInterval(()=>{
+        typingIndex++;
+        const ch = currentFullText.charAt(typingIndex-1);
+        vnText.textContent=currentFullText.slice(0,typingIndex);
+        // 判定字符是否需要声音: 中英文/数字，跳过标点和空格
+        if(/[\u4e00-\u9fa5A-Za-z0-9]/.test(ch)){
+          sfxCharCounter++;
+          if(sfxCharCounter>=2){ // 每两个有效字符响一次，减少噪点
+            sfxCharCounter=0;
+            if(!audioManager.globalMuted && typeSfx.isEnabled()){
+              typeSfx.play();
+            }
+          }
+        }
+        if(typingIndex>=currentFullText.length){ finishTyping(); }
+      }, typingSpeed);
+    };
     const updateSpeaker=(speaker)=>{
+      // 规格化，防止脚本里出现尾随空格或大小写差异
+      if(typeof speaker==='string') speaker=speaker.trim().toLowerCase();
       const map={me:'我',her:'她',system:'系统'}; const label=map[speaker]??speaker;
       // 先清除颜色类
       [speakerLeft,speakerRight].forEach(el=>{ el.classList.remove('speaker-me','speaker-her','speaker-system'); });
@@ -106,26 +135,33 @@ export class Scene1Intro extends BaseScene {
     };
     const renderNextLine=()=>{
       if(awaitingLine) return;
+      if(isTyping){ // 若仍在打字，先直接补完当前再返回
+        finishTyping();
+        return;
+      }
       if(lineIndex>=lineQueue.length){
-        speakerLeft.classList.add('hidden');
-        speakerRight.classList.add('hidden');
-        if(stageDoneCallback) stageDoneCallback();
+        // 所有行已显示完；确保不在打字状态后调用回调
+        if(!isTyping){
+          speakerLeft.classList.add('hidden');
+          speakerRight.classList.add('hidden');
+          if(stageDoneCallback) stageDoneCallback();
+        }
         return;
       }
       awaitingLine=true;
       const l=lineQueue[lineIndex++];
       updateSpeaker(l.speaker);
       vnText.classList.remove('flash-line');
-      void vnText.offsetWidth; // 强制重排以便重新触发动画
-      vnText.textContent = l.text;
+      void vnText.offsetWidth; // 重排重新触发动画
+      startTyping(l.text);
       vnText.classList.add('flash-line');
       awaitingLine=false;
     };
-    const appendLinesProgressively=(stage,done)=>{ lineQueue=(stage&&stage.lines)?[...stage.lines]:[]; lineIndex=0; stageDoneCallback=done; awaitingLine=false; vnText.textContent=''; renderNextLine(); };
+  const appendLinesProgressively=(stage,done)=>{ lineQueue=(stage&&stage.lines)?[...stage.lines]:[]; lineIndex=0; stageDoneCallback=done; awaitingLine=false; vnText.textContent=''; renderNextLine(); };
 
     const evaluateAuto=()=>{ if(!this.currentStage) return; const auto=this.currentStage.auto; if(!auto) return; const needT=auto.requireTrust; const needM=auto.requireMood; if((needT==null||this.trust>=needT)&&(needM==null||this.mood>=needM)){ const gotoId=auto.goto; if(gotoId && !this._pendingAuto){ this._pendingAuto=true; setTimeout(()=>{ this._pendingAuto=false; goStage(gotoId); },400); } } };
 
-    const endStage=stage=>{ if(stage.end){ const nextScene=stage.end.next||'exam'; phaseMsg.textContent='……'; setTimeout(()=>this.ctx.go('transition',{next:nextScene,style:'heart'}),700); return true; } return false; };
+  const endStage=stage=>{ if(stage.end){ const nextScene=stage.end.next||'exam'; phaseMsg.textContent='……'; setTimeout(()=>this.ctx.go('transition',{next:nextScene,style:'flash12'}),700); return true; } return false; };
 
   const renderChoices=stage=>{ choicesBox.innerHTML=''; if(!stage.choices||!stage.choices.length){ refreshChoiceLockStates(); return; } stage.choices.forEach(choice=>{ const btn=document.createElement('button'); btn.textContent=choice.text||'...'; if(choice.requireMood!=null) btn.dataset.requireMood=choice.requireMood; if(choice.requireTrust!=null) btn.dataset.requireTrust=choice.requireTrust; btn.addEventListener('click',()=>{ if(btn.disabled) return; if(typeof choice.trustDelta==='number'){ const before=this.trust; this.trust+=choice.trustDelta; if(this.trust<0) this.trust=0; if(this.trust>this.trustTarget) this.trust=this.trustTarget; const diff=this.trust-before; if(diff!==0) spawnBubble(btn,(diff>0?'+':'')+diff,'trust'); updateTrust(); } if(typeof choice.moodDelta==='number'){ const beforeM=this.mood; this.mood+=choice.moodDelta; if(this.mood<0) this.mood=0; if(this.mood>this.moodTarget) this.mood=this.moodTarget; const diffM=this.mood-beforeM; if(diffM!==0) spawnBubble(btn,(diffM>0?'+':'')+diffM,(diffM>=0?'pos':'neg')); updateMood(); } if(Array.isArray(choice.tagsAdd)){ const prev=this.tags.size; choice.tagsAdd.forEach(t=>this.tags.add(t)); if(this.tags.size>prev){ const level=this.tags.size; comboBadge.textContent='多样陪伴 x'+level; comboBadge.classList.remove('hidden'); comboBadge.classList.add('flash'); setTimeout(()=>comboBadge.classList.remove('flash'),500); } } if(choice.goto){ goStage(choice.goto); return; } }); choicesBox.appendChild(btn); }); refreshChoiceLockStates(); };
 
@@ -133,12 +169,14 @@ export class Scene1Intro extends BaseScene {
 
     // 推进事件：空格或点击空白区域
     const advanceHandler=(e)=>{
-      // 若当前阶段还在逐句且未显示选项，推进下一句
-      if(choicesBox.children.length===0 || lineIndex<lineQueue.length){
-        // 避免按钮点击重复推进（按钮自身点击由按钮逻辑处理）
-        if(e.target.tagName==='BUTTON' && e.target.closest('.dynamic-choices')) return;
-        renderNextLine();
-      }
+      // 避免点击选项按钮触发推进
+      if(e && e.target && e.target.tagName==='BUTTON' && e.target.closest('.dynamic-choices')) return;
+      // 首次交互预热音频上下文（iOS Safari）
+      if(!this._typedOnce){ this._typedOnce=true; typeSfx.warm(); }
+      // 情况1：正在打字 -> 立即补完
+      if(isTyping){ finishTyping(); return; }
+      // 情况2：已打完当前行 -> 进入下一行或阶段回调
+      renderNextLine();
     };
     window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); advanceHandler(e); } });
     el.addEventListener('click', advanceHandler);

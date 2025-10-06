@@ -65,7 +65,20 @@ export class Scene4Confession extends BaseScene {
       toNext.classList.remove('hidden');
     });
 
-    toNext.addEventListener('click', ()=> this.ctx.go('date'));
+    toNext.addEventListener('click', ()=> {
+      this.ctx.go('transition',{
+        next:'date',
+        style:'flash45',
+        images:[
+          './assets/images/mem_4_1.jpg',
+          './assets/images/mem_4_2.jpg',
+          './assets/images/mem_4_3.jpg',
+          './assets/images/mem_4_4.jpg'
+        ],
+        duration:4000,
+        sound:'./assets/audio/scene_45.wav'
+      });
+    });
 
     secretBtn.addEventListener('click', ()=>{
       secretClicks++;
@@ -79,7 +92,7 @@ export class Scene4Confession extends BaseScene {
     });
 
     // BGM 播放（若用户首次交互前浏览器阻止，将在点击按钮时恢复）
-    const bgmAudio = audioManager.playBGM('scene4','./assets/audio/scene_4.mp3',{ loop:true, volume:0.55, fadeIn:800 });
+  const bgmAudio = audioManager.playSceneBGM('4',{ loop:true, volume:0.55, fadeIn:800 });
     if(bgmAudio && bgmAudio.paused){
       // 尝试自动播放，若失败则静音等待一次手势解除
       bgmAudio.play().catch(()=>{/* ignore */});

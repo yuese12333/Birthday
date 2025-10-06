@@ -84,7 +84,7 @@ export class Scene5Date extends BaseScene {
     const bgmBtn = el.querySelector('.date-bgm');
 
     // 自动播放约会场景 BGM
-    const bgmAudio = audioManager.playBGM('scene5','./assets/audio/scene_5.mp3',{ loop:true, volume:0.6, fadeIn:900 });
+  const bgmAudio = audioManager.playSceneBGM('5',{ loop:true, volume:0.6, fadeIn:900 });
     bgmBtn.addEventListener('click',()=>{
       if(bgmAudio && bgmAudio.paused){
         const p = bgmAudio.play(); if(p) p.catch(()=>{});

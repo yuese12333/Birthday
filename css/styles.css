@@ -242,5 +242,23 @@ button.shake{ animation:shake .5s; }
 .transition-tip{ font-size:.85rem; letter-spacing:.5px; background:rgba(255,255,255,.55); padding:.6rem 1.1rem; border-radius:999px; box-shadow:0 4px 14px -4px rgba(0,0,0,.15); animation:tipFloat 3s ease-in-out infinite; }
 @keyframes tipFloat{0%,100%{transform:translateY(0);}50%{transform:translateY(-10px);} }
 /* style 可扩展：不同 data-style 可自定义心样式或替换图形 */
-/* heart 样式当前使用默认心跳，无额外覆盖 */
+/* flash12（原 heart）样式当前使用默认心跳，无额外覆盖 */
+/* 若后续需要给 flash12 单独配色，可添加：[data-style='flash12'] .pulse-heart { ... } */
+
+/* flash45 样式：多张回忆图片快速闪回 */
+[data-style='flash45'] .transition-tip{ background:rgba(0,0,0,.55); color:#ffeef5; letter-spacing:2px; font-weight:600; box-shadow:0 4px 18px -4px rgba(0,0,0,.45); }
+[data-style='flash45']{ background:#000; }
+.flash45-seq{ position:relative; width:100%; max-width:680px; height:380px; display:grid; place-items:center; overflow:hidden; border-radius:22px; box-shadow:0 10px 28px -10px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08) inset; background:#111; }
+.flash45-frame{ position:absolute; inset:0; background-size:cover; background-position:center; opacity:0; animation:flash45Frame 1s linear forwards; filter:brightness(.9) contrast(1.1) saturate(1.15); }
+.flash45-frame::after{ content:''; position:absolute; inset:0; background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.35), rgba(255,255,255,0) 60%); mix-blend-mode:overlay; opacity:.4; }
+.flash45-frame:nth-child(odd){ filter:brightness(1) contrast(1.15) saturate(1.25); }
+@keyframes flash45Frame{0%{opacity:0; transform:scale(1.12);}6%{opacity:1;}75%{opacity:1;}100%{opacity:0; transform:scale(1);} }
+/* 通过 --i 计算延迟 */
+.flash45-frame{ animation-delay:calc(var(--i)*0.22s); animation-duration:0.9s; }
+/* 闪白叠层 */
+.flash45-seq::before, .flash45-seq::after{ content:''; position:absolute; inset:0; pointer-events:none; }
+.flash45-seq::before{ background:radial-gradient(circle at 50% 50%, rgba(255,255,255,.18), rgba(255,255,255,0) 70%); mix-blend-mode:overlay; animation:flashPulse 2.4s ease-in-out infinite; }
+.flash45-seq::after{ background:linear-gradient(90deg, rgba(255,255,255,.08), rgba(255,255,255,0), rgba(255,255,255,.08)); opacity:.3; animation:scan 2.2s linear infinite; }
+@keyframes flashPulse{0%,100%{opacity:.3;}50%{opacity:.6;} }
+@keyframes scan{0%{transform:translateX(-40%);}100%{transform:translateX(40%);} }
 

@@ -8,6 +8,16 @@ class AudioManager {
   constructor(){
     this.bgms = new Map(); // key -> { audio, targetVolume }
     this.globalMuted = false;
+    this.currentSceneBGM = null;
+  }
+  /** 通用场景 BGM 播放辅助：sceneId -> assets/audio/scene_x.mp3，自动停止前一个 */
+  playSceneBGM(sceneId, { loop=true, volume=0.7, fadeIn=700 }={}){
+    // 停止前一个场景 BGM
+    if(this.currentSceneBGM && this.currentSceneBGM!==sceneId){
+      this.stopBGM(this.currentSceneBGM, { fadeOut:600 });
+    }
+    this.currentSceneBGM = sceneId;
+    return this.playBGM(sceneId, `./assets/audio/scene_${sceneId}.mp3`, { loop, volume, fadeIn });
   }
   playBGM(key, src, { loop=true, volume=0.7, fadeIn=0 }={}){
     // 若已存在同 key，直接调整目标音量
@@ -48,6 +58,7 @@ class AudioManager {
     } else {
       audio.pause(); this.bgms.delete(key);
     }
+    if(this.currentSceneBGM===key){ this.currentSceneBGM=null; }
   }
   toggleMute(){
     this.globalMuted = !this.globalMuted;

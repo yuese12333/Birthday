@@ -31,7 +31,7 @@ sceneManager.register('date', ()=> new Scene5Date(context()));
 sceneManager.register('scarf', ()=> new Scene6Scarf(context()));
 sceneManager.register('future', ()=> new Scene7Future(context()));
 // 新增：转场中介场景（用于动画 & BGM 交叉淡出缓冲）
-sceneManager.register('transition', ()=> new TransitionScene(context()));
+sceneManager.register('transition', ()=> new TransitionScene(context())); // 仍保留手动可用
 
 window.addEventListener('DOMContentLoaded', ()=>{
   // 若已注册过直接进入 intro，否则进入 register 仪式页

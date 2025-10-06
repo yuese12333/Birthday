@@ -1,4 +1,5 @@
 import { BaseScene } from '../core/baseScene.js';
+import { audioManager } from '../core/audioManager.js';
 
 export class Scene3Timeline extends BaseScene {
   async init(){
@@ -19,6 +20,8 @@ export class Scene3Timeline extends BaseScene {
       <button class='check'>检查</button>
       <div class='result'></div>
     `;
+    // 通用 BGM 播放（若不存在 scene_3.mp3 文件将静默失败不报错）
+    try { audioManager.playSceneBGM('3',{ loop:true, volume:0.55, fadeIn:700 }); } catch(e) { /* ignore */ }
     const list = el.querySelector('.draggable');
     const render = ()=>{
       list.innerHTML='';
@@ -74,4 +77,5 @@ export class Scene3Timeline extends BaseScene {
     });
     this.ctx.rootEl.appendChild(el);
   }
+  async exit(){ audioManager.stopBGM('3',{ fadeOut:500 }); }
 }

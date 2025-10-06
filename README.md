@@ -206,7 +206,7 @@ README.md
 | 机制 | 描述 |
 |------|------|
 | 场景管理 | `SceneManager` 控制生命周期 enter/exit，防并发切换锁。|
-| 转场场景 (NEW) | `TransitionScene` 作为中介：播放 1.4s 情绪动画 + 粒子，期间旧 BGM 淡出，下一场景自行淡入新 BGM。当前仅 demo: intro → exam。|
+| 转场场景 (NEW) | `TransitionScene` 手动调用过渡：支持 `flash12`（原 heart） / `flash45`（闪回图片序列 + 独立一次性音效），默认关闭自动插入；显式 `this.ctx.go('transition', {...})`。|
 | 事件总线 | `EventBus`（当前轻量，预留解耦扩展）。|
 | 全局防抖 | 任意元素加 `data-debounce` 即可，捕获阶段阻断重复点击。|
 | 本地持久 | `localStorage.hasRegistered` 标记注册通过一次即可跳过。|
@@ -237,7 +237,7 @@ README.md
 - 修改菜单：`scene5_date.js` 的 `this.menu`。
 - 围巾尺寸：`scene6_scarf.js` 中网格行列参数。
 - 愿望阈值：`scene7_future.js` 中 `this.required`。
-- 转场动画：`scene_transition.js` 可扩展 `style` 分支（目前仅 `heart`）。
+- 转场动画：`scene_transition.js` 可扩展 `style` 分支（已含 `flash12` / `flash45`，可自行新增 `petal` 等；`heart` 仍是向下兼容别名）。
 
 TODO（后续将逐步用转场包装的跳转示例）：
 ```
@@ -364,6 +364,80 @@ scarf -> future      ⏳ 待接入
 > 当前 UI 已隐藏信任/安抚进度条，但所有逻辑仍生效；只需重新移除 `hidden` 类即可恢复可视化。
 
 ---
+## 🎬 转场系统 (Transitions & SFX)
+手动在任一场景调用：
+```js
+this.ctx.go('transition', {
+  next: 'date',              // 进入的下一个场景 ID
+  style: 'flash45',          // flash12 | flash45 | (自定义 petal / memory ...)
+  images: ['.../mem_4_1.jpg','.../mem_4_2.jpg'], // 仅 flash45 需要
+  duration: 4000,            // ms；显式提供时不会被内部重算覆盖
+  sound: './assets/audio/scene_45.wav', // 一次性音效（优先级最高）
+  tip: '那些瞬间像流光一样掠过…',
+  useBGM: false              // true 则忽略一次性音效，使用过渡 BGM
+});
+```
+
+### 时长优先级
+| 条件 | 使用规则 |
+|------|----------|
+| 传入 duration | 直接使用，不再按帧数改写 |
+| 未传 & flash45 | 帧数 * 260ms ，钳制 1800~4500ms |
+| 未传 & flash12 | 使用默认构造时长 (3000ms) |
+
+### 音效优先级
+1. 显式 `sound`
+2. 自动命名（新增）：`./assets/audio/scene_<from><to>.{mp3,wav,ogg}` 例如从 1→2 尝试 `scene_12.mp3`；来源和目标通过场景 id 映射数字（`register=0,intro=1,exam=2,timeline=3,confession=4,date=5,scarf=6,future=7`）。
+3. 自动命名：`./assets/audio/transition_<style>.{wav,mp3,ogg}`
+4. （flash45 回退）`./assets/audio/scene_45.wav`
+5. `useBGM:true` → 跳过 1~4，播放一次性过渡 BGM（非循环）
+6. 仍无：flash45 静默，其它 style 播放默认 BGM
+
+> 建议一次性音效长度 0.4s~2s，首帧无静音。
+
+### 常见示例
+| 需求 | 调用参数 | 说明 |
+|------|----------|------|
+| 固定 4 秒照片闪回 | `style:'flash45', duration:4000, images:[...], sound:'scene_45.wav'` | 不随图片数变化 |
+| 基础心跳过渡 | `style:'flash12'` | 默认 3s + 粒子 |
+| 只换 BGM | `style:'flash12', useBGM:true` | 不放一次性音效 |
+| 静默黑场 | `style:'flash12', duration:1200, sound:undefined` + 自定义 CSS 隐藏元素 | 需要自定样式 |
+
+### 自定义新 style（示例 petal）
+1. 在 `scene_transition.js` : `if(style==='petal'){ ... }` 生成花瓣 DOM。
+2. 在 `styles.css` 增加 `[data-style='petal']` 样式与 `@keyframes petalFall`。
+3. 放置 `assets/audio/transition_petal.wav`（可省略）。
+4. 调用 `this.ctx.go('transition',{ next:'future', style:'petal', tip:'花瓣慢慢落下…' });`
+
+### 预加载建议
+```js
+['mem_4_1.jpg','mem_4_2.jpg'].forEach(n=>{ const img=new Image(); img.src='./assets/images/'+n; });
+```
+在用户任意首次点击后预热音频上下文以避免自动播放阻止。
+
+### 音频命名规范（新增约定）
+为统一管理与快速定位，建议后续将音频文件按以下规则命名：
+
+| 类型 | 命名模式 | 示例 | 说明 |
+|------|----------|------|------|
+| 场景 BGM | `scene_<x>.mp3` | `scene_1.mp3`, `scene_5.mp3` | 每个主要场景一个主 BGM（使用 mp3；若需无损可并行放 wav）。|
+| 转场一次性音效 | `scene_<from><to>.(mp3|wav|ogg)` | `scene_12.mp3`, `scene_45.wav` | 表示从场景 `<from>` 跳到 `<to>` 的独特过渡（数字拼接，不加下划线）。|
+
+
+命名解读：
+- 进入场景 5：系统可根据你显式调用 `audioManager.playSceneBGM('scene5')` 或自定义逻辑播放 `assets/audio/scene_5.mp3`。
+- 从 1 → 2 的转场：可在调用时指定 `sound:'./assets/audio/scene_12.mp3'`。
+- 从 4 → 5 若遵循既有案例：`scene_45.wav` 已被使用；也可换 mp3 保持统一。
+
+推荐实践：
+1. 新增转场时优先放置 `scene_<from><to>.mp3`；调用时直接显式 `sound`，避免靠风格推断。
+2. 若某转场需要多变体（例如不同分支音效），可扩展后缀：`scene_12_alt1.mp3`，并在代码中显式引用。
+3. 若想完全弃用 `transition_<style>` 方案，可在 README 旧位置标注“已废弃”，但目前保留兼容无需修改代码。
+4. 使用 wav 仅限短促（<2s）需要高瞬态清晰度的音效；一般统一 mp3 足够。
+
+（当前代码：显式 `sound` > `scene_<from><to>` 自动推断 > `transition_<style>` 自动推断 > flash45 特例 > BGM/静默。你仍可显式传 `sound` 覆盖所有自动推断。）
+
+---
 ## 🪄 未来路线（Roadmap）
 | 类别 | 计划 | 状态 |
 |------|------|------|
@@ -371,7 +445,7 @@ scarf -> future      ⏳ 待接入
 | 成就 | 全对 / 无提示 / 零跳过 / 彩蛋收集 | 待实现 |
 | 统计 | 组合最高值 / 错误来源分析 | 待实现 |
 | 音频 | BGM + 微动效音效 | 待添加 |
-| 转场 | 多款主题：heart / petal / memory fade / star tunnel | 进行中 (已上线 heart demo) |
+| 转场 | flash12 / flash45 / （规划：petal / memory fade / star tunnel） | 进行中 (flash12 + flash45) |
 | 彩蛋 | 统一 registry + 条件 DSL | 规划中 |
 | 个性化 | 终章引用前面统计（例如你“××题都跳过”） | 规划中 |
 | UI | 主题切换（粉 / 暖白 / 星空） | 规划中 |
@@ -404,3 +478,8 @@ scarf -> future      ⏳ 待接入
 私人情感礼物项目（非商业）。如需二次传播请先移除私人素材。
 
 > 祝：故事继续被认真书写，愿望都按计划一个个兑现。❤️
+
+
+构思：
+    数织游戏
+     
