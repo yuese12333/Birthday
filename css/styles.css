@@ -1,3 +1,7 @@
+/* =========================================================
+ * 全局字体设置
+ * 自定义情感字体：若加载失败会回退到系统字体
+ * ======================================================= */
 /* Global Custom Font */
 @font-face {
   font-family: 'BirthdayFont';
@@ -6,22 +10,26 @@
   font-style: normal;
   font-display: swap;
 }
+/* 页面基础布局与排版色彩（柔和粉色径向背景） */
 body { margin:0; font-family: 'BirthdayFont', 'Segoe UI', system-ui, sans-serif; background: radial-gradient(circle at 30% 30%, #FFE7D9, #FFC9B9, #FFB6C1); color:#5a2d2d; -webkit-font-smoothing:antialiased; }
 #app { min-height:100dvh; padding: clamp(12px,4vw,40px); box-sizing:border-box; display:flex; flex-direction:column; gap:1.2rem; }
 .scene h1 { margin:0 0 .5rem; font-size: clamp(1.6rem,4.5vw,2.6rem); }
+/* 通用按钮样式：圆角胶囊 + 柔和下投影 */
 button { cursor:pointer; background:#ff8da1; border:none; padding:.6rem 1rem; border-radius:999px; color:#fff; font-size:1rem; box-shadow:0 4px 12px -2px rgba(255,80,120,.4); transition:.3s; }
-/* 场景内 BGM 开关按钮（使用音符 + 斜杠静音视觉） */
+/* 场景内 BGM 开关按钮（音符图标 + 斜杠指示静音） */
 .bgm-btn{ position:relative; font-size:.85rem; width:42px; height:32px; display:inline-flex; align-items:center; justify-content:center; padding:0; }
 .bgm-btn.muted::after{ content:''; position:absolute; width:70%; height:3px; background:linear-gradient(90deg,#fff,#ffd1d9); top:50%; left:15%; transform:rotate(-40deg); border-radius:3px; box-shadow:0 0 4px rgba(255,255,255,.6); }
 .bgm-btn.muted{ opacity:.8; }
 button:hover { transform:translateY(-2px); box-shadow:0 6px 18px -4px rgba(255,80,120,.45); }
 button:active { transform:translateY(0); }
+/* data-debounce 状态：防止多次点按 */
 button.debouncing{ opacity:.55 !important; pointer-events:none !important; transform:none !important; }
+/* 通用选项按钮容器（视觉小说 & 其它分支场景共享） */
 .choices{ display:flex; flex-direction:column; gap:.5rem; max-width:400px; }
-.mood-bar{ width:100%; height:14px; background:#ffd1d9; border-radius:8px; overflow:hidden; margin-top:.6rem; }
-.mood-bar .fill{ display:block; height:100%; width:0; background:linear-gradient(90deg,#ff5f7a,#ffa4b8); transition:width .4s ease; }
+/* 轻微抖动反馈动画（错误/提醒） */
 button.shake{ animation:shake .5s; }
 @keyframes shake{10%,90%{transform:translateX(-1px);}20%,80%{transform:translateX(2px);}30%,50%,70%{transform:translateX(-4px);}40%,60%{transform:translateX(4px);} }
+/* ======================== Scene 2: 考试小游戏 ======================== */
 .scene-exam .tabs{ display:flex; flex-wrap:wrap; gap:.5rem; }
 .scene-exam .board{ background:rgba(255,255,255,.35); backdrop-filter:blur(8px); padding:1rem; border-radius:16px; min-height:140px; }
 .scene-exam .exam-top{ display:flex; justify-content:space-between; align-items:center; gap:1rem; flex-wrap:wrap; }
@@ -37,26 +45,19 @@ button.shake{ animation:shake .5s; }
 .scene-exam .progress-mini{ margin-top:.6rem; font-size:.75rem; opacity:.75; }
 .scene-exam .summary{ margin-top:1rem; }
 .scene-exam .summary-card{ background:rgba(255,255,255,.55); padding:1rem 1.2rem; border-radius:18px; box-shadow:0 4px 12px -3px rgba(0,0,0,.1); }
-/* 彩蛋样式增强 */
-.scene-exam .summary-card .easter-skip,
-.scene-exam .summary-card .easter-pampered-wrong,
-.scene-exam .summary-card .easter-skip-part{ margin-top:.6rem; padding:.65rem .8rem .65rem 2.2rem; border-radius:14px; font-size:.85rem; line-height:1.35; position:relative; overflow:hidden; }
+/* 彩蛋提示卡：三类不同成就/情境 */
+/* 新版彩蛋展示：使用 GIF 图片，去除伪元素动画与 skip-part 类型 */
+.scene-exam .summary-card .easter-block{ margin-top:.7rem; padding:.7rem .9rem; border-radius:16px; font-size:.85rem; line-height:1.45; display:flex; gap:.8rem; align-items:center; }
+.scene-exam .summary-card .easter-block img{ width:70px; height:70px; flex:0 0 auto; border-radius:12px; object-fit:cover; box-shadow:0 4px 10px -3px rgba(0,0,0,.18); animation:gifPop .6s ease; }
+.scene-exam .summary-card .easter-block .text{ flex:1; }
 .scene-exam .summary-card .easter-skip{ background:linear-gradient(135deg,#ffe2e9,#ffc1d0); color:#8a1c34; box-shadow:0 0 0 1px rgba(255,90,130,.25) inset; }
 .scene-exam .summary-card .easter-pampered-wrong{ background:linear-gradient(135deg,#e5f6ff,#cce9ff); color:#114b66; box-shadow:0 0 0 1px rgba(60,140,190,.25) inset; }
-.scene-exam .summary-card .easter-skip-part{ background:linear-gradient(135deg,#f5f0ff,#e3d7ff); color:#4c3175; box-shadow:0 0 0 1px rgba(120,80,200,.25) inset; }
-.scene-exam .summary-card .easter-skip::before,
-.scene-exam .summary-card .easter-pampered-wrong::before,
-.scene-exam .summary-card .easter-skip-part::before{ content:''; position:absolute; left:.9rem; top:50%; transform:translateY(-50%); width:1.1rem; height:1.1rem; border-radius:50%; background:radial-gradient(circle,#fff,rgba(255,255,255,.2)); box-shadow:0 0 0 3px rgba(255,255,255,.4); animation:eggPulse 3s ease-in-out infinite; }
-.scene-exam .summary-card .easter-skip::after{ content:'💋'; position:absolute; left:.6rem; top:50%; transform:translateY(-50%) scale(1); font-size:.95rem; animation:kissFloat 4s ease-in-out infinite; }
-.scene-exam .summary-card .easter-pampered-wrong::after{ content:'🛡️'; position:absolute; left:.55rem; top:50%; transform:translateY(-50%); font-size:.95rem; animation:shieldShine 5s linear infinite; }
-.scene-exam .summary-card .easter-skip-part::after{ content:'🤍'; position:absolute; left:.6rem; top:50%; transform:translateY(-50%); font-size:.95rem; animation:heartBlink 3.6s ease-in-out infinite; }
-@keyframes eggPulse{0%,100%{opacity:.9; transform:translateY(-50%) scale(1);}50%{opacity:.5; transform:translateY(-50%) scale(1.25);} }
-@keyframes kissFloat{0%,100%{transform:translateY(-50%) scale(1);}50%{transform:translateY(-60%) scale(1.2);} }
-@keyframes shieldShine{0%{filter:brightness(1);}50%{filter:brightness(1.35);}100%{filter:brightness(1);} }
-@keyframes heartBlink{0%,100%{opacity:.9; transform:translateY(-50%) scale(1);}40%{opacity:.4;}60%{opacity:1; transform:translateY(-50%) scale(1.25);} }
+@keyframes gifPop{0%{transform:scale(.35);opacity:0;}60%{transform:scale(1.12);opacity:1;}100%{transform:scale(1);} }
 .shake-mini{ animation:shakeMini .5s; }
 @keyframes shakeMini{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(3px);}30%,50%,70%{transform:translateX(-5px);}40%,60%{transform:translateX(5px);} }
+/* 试卷中的交互控件 */
 .paper input, .paper select { padding:.4rem .6rem; border:1px solid #ff9fb1; border-radius:6px; font-size:1rem; }
+/* ======================== Scene 3: 大学时间线排序 ==================== */
 .scene-timeline ul{ list-style:none; padding:0; margin:0 0 1rem; display:flex; flex-direction:column; gap:.6rem; }
 .scene-timeline li{ background:rgba(255,255,255,.5); padding:.8rem 1rem; border-radius:14px; box-shadow:0 2px 6px rgba(0,0,0,.08); }
 .scene-timeline li[draggable='true']{ cursor:grab; }
@@ -64,7 +65,7 @@ button.shake{ animation:shake .5s; }
 .scene-timeline ul.touch-mode li.pending{ outline:2px dashed #ff6f90; background:rgba(255,255,255,.9); }
 .scene-timeline ul.touch-mode li:active{ transform:scale(.97); }
 .result{ font-weight:600; margin-top:.4rem; }
-/* Confession Scene */
+/* ======================== Scene 4: 表白场景 ========================= */
 .scene-confession .dialogue{ position:relative; background:rgba(255,255,255,.45); padding:1rem 1.2rem; border-radius:18px; box-shadow:0 4px 12px rgba(0,0,0,.08); }
 .scene-confession .line{ margin:.4rem 0; opacity:1; transition:.4s; }
 .scene-confession .line.hidden{ opacity:0; height:0; overflow:hidden; }
@@ -74,7 +75,7 @@ button.shake{ animation:shake .5s; }
 .scene-confession .secret-btn{ font-size:.8rem; background:#ff7d94; }
 .floating-heart{ position:absolute; bottom:-10px; left:50%; transform:translateX(-50%); animation:floatUp 3s ease forwards; background:#ff6f90; color:#fff; padding:.4rem .8rem; border-radius:999px; font-size:.85rem; }
 @keyframes floatUp{0%{opacity:0; transform:translate(-50%,20px);}10%{opacity:1;}90%{opacity:1;}100%{opacity:0; transform:translate(-50%,-60px);} }
-/* Date Scene */
+/* ======================== Scene 5: 约会（卡牌 + 菜单） =============== */
 .scene-date .menu{ list-style:none; padding:0; margin:1rem 0; display:grid; gap:.6rem; grid-template-columns:repeat(auto-fill,minmax(140px,1fr)); }
 .scene-date .menu li{ background:rgba(255,255,255,.55); padding:.6rem .8rem; border-radius:14px; cursor:pointer; position:relative; transition:.3s; }
 .scene-date .menu li.chosen{ outline:2px solid #ff6f90; background:rgba(255,255,255,.85); }
@@ -84,7 +85,7 @@ button.shake{ animation:shake .5s; }
 .scene-date .lights .beam:nth-child(2){ left:45%; animation-delay:1.2s; }
 .scene-date .lights .beam:nth-child(3){ left:75%; animation-delay:2.1s; }
 @keyframes beamSwing{0%,100%{transform:rotate(-6deg);}50%{transform:rotate(6deg);} }
-/* Date Scene (Card Game Revamp) */
+/* 约会卡牌玩法：多关选择 + 协同标签 */
 .scene-date .level-info{ font-size:.75rem; opacity:.8; background:rgba(255,255,255,.4); padding:.35rem .7rem; border-radius:12px; display:inline-block; margin-bottom:.4rem; }
 .scene-date .card-grid{ display:grid; gap:.75rem; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); margin:.9rem 0 1rem; }
 .scene-date .card{ background:rgba(255,255,255,.55); backdrop-filter:blur(6px); border-radius:16px; padding:.7rem .75rem .85rem; box-shadow:0 4px 12px -4px rgba(0,0,0,.12); position:relative; cursor:pointer; transition:.28s; border:1px solid rgba(255,255,255,.4); display:flex; flex-direction:column; gap:.35rem; }
@@ -110,14 +111,14 @@ button.shake{ animation:shake .5s; }
 .scene-date .synergy-pop.show{ transform:translate(-50%,-70px) scale(1); opacity:1; }
 .scene-date .level-end{ margin-top:.8rem; font-size:.7rem; opacity:.85; }
 .scene-date .summary-card{ background:rgba(255,255,255,.55); padding:1rem 1.2rem; border-radius:18px; box-shadow:0 4px 15px -4px rgba(0,0,0,.12); margin-top:1rem; }
-/* Scarf Scene */
+/* ======================== Scene 6: 围巾编织 ========================= */
 .scene-scarf .grid{ display:grid; grid-template-columns:repeat(14, 18px); gap:4px; background:rgba(255,255,255,.35); padding:10px; border-radius:16px; width:max-content; }
 .scene-scarf .stitch{ width:18px; height:18px; background:#ffd7e0; border-radius:4px; box-shadow:0 1px 2px rgba(0,0,0,.1) inset; cursor:crosshair; transition:.2s; }
 .scene-scarf .stitch.on{ background:linear-gradient(135deg,#ff6f90,#ffa9c0); box-shadow:0 0 4px rgba(255,80,120,.6); }
 .scene-scarf .bar{ width:100%; background:#ffd1d9; height:12px; border-radius:8px; margin:.8rem 0 .4rem; overflow:hidden; }
 .scene-scarf .bar .fill{ display:block; height:100%; width:0; background:linear-gradient(90deg,#ff5f7a,#ffa4b8); transition:width .3s; }
 .scene-scarf .toNext.hidden{ display:none; }
-/* Future Scene */
+/* ======================== Scene 7: 未来愿望星空 ===================== */
 .scene-future .sky{ position:relative; height:300px; background:radial-gradient(circle at 50% 60%, #ffc2d2, #ff9ab4); border-radius:20px; overflow:hidden; box-shadow:0 4px 16px -4px rgba(255,80,120,.4); }
 .scene-future .star{ position:absolute; width:12px; height:12px; background:radial-gradient(circle,#fff,#ffd1e0); border-radius:50%; animation:twinkle 3s ease-in-out infinite; box-shadow:0 0 8px 2px rgba(255,255,255,.7); }
 @keyframes twinkle{0%,100%{transform:scale(.8); opacity:.7;}50%{transform:scale(1.2); opacity:1;} }
@@ -130,7 +131,7 @@ button.shake{ animation:shake .5s; }
 .scene-future .reality-note{ font-size:.85rem; opacity:.8; margin-top:.4rem; }
 .scene-future .final h2{ margin-top:0; font-size:2rem; background:linear-gradient(90deg,#ff6f90,#ffd36f); -webkit-background-clip:text; background-clip:text; color:transparent; }
 
-/* 通用移动端优化 */
+/* ======================== 响应式：移动端适配 ======================== */
 @media (hover:none){
 	button{ padding:.75rem 1.15rem; font-size:1.05rem; }
 	.scene-date .card{ padding:.85rem .85rem 1rem; }
@@ -146,7 +147,7 @@ button.shake{ animation:shake .5s; }
 
 @media (min-width:800px){ #app{ max-width:900px; margin:0 auto; } }
 
-/* Register Scene */
+/* ======================== Scene 0: 注册仪式 ========================= */
 .scene-register .desc{ font-size:.9rem; opacity:.85; line-height:1.5; }
 .scene-register .reg-form{ display:flex; flex-direction:column; gap:.8rem; max-width:380px; background:rgba(255,255,255,.45); padding:1rem 1.2rem; border-radius:18px; box-shadow:0 4px 14px -4px rgba(0,0,0,.12); }
 .scene-register label{ display:flex; flex-direction:column; gap:.3rem; font-size:.85rem; }
@@ -169,31 +170,13 @@ button.shake{ animation:shake .5s; }
 .scene-register .clues .clue-line em{ font-style:normal; font-weight:600; color:#c12d55; }
 .scene-register .clues .clue-line.full{ background:linear-gradient(90deg,#ffe1eb,#ffd5e1); padding:.4rem .5rem; border-radius:10px; margin-top:.4rem; }
 
-/* Intro Scene Enhanced */
-.scene-intro .choices.disabled{ pointer-events:none; opacity:.5; filter:grayscale(.3); }
-.scene-intro .progress-line{ font-size:.75rem; margin-bottom:.3rem; display:flex; align-items:center; gap:.6rem; flex-wrap:wrap; }
-.scene-intro .combo-badge{ background:#ff8da1; color:#fff; padding:.15rem .6rem; border-radius:999px; font-size:.65rem; letter-spacing:.5px; box-shadow:0 2px 6px -2px rgba(255,80,120,.6); }
-.scene-intro .combo-badge.hidden{ display:none; }
-.scene-intro .combo-badge.flash{ animation:comboFlash .5s; }
-@keyframes comboFlash{0%{transform:scale(.6); opacity:0;}60%{transform:scale(1.05); opacity:1;}100%{transform:scale(1); opacity:1;} }
-.scene-intro .fast-next{ margin-top:.8rem; background:#ff6f90; color:#fff; padding:.7rem 1.1rem; border-radius:14px; display:inline-block; font-size:.9rem; cursor:pointer; box-shadow:0 4px 12px -4px rgba(255,80,120,.4); position:relative; }
-.scene-intro .fast-next.hidden{ display:none; }
-.scene-intro .fast-next.pop-in{ animation:popIn .6s ease; }
-@keyframes popIn{0%{transform:scale(.5); opacity:0;}60%{transform:scale(1.08); opacity:1;}100%{transform:scale(1); opacity:1;} }
-.mood-bubble{ position:absolute; z-index:999; pointer-events:none; background:#fff; padding:.25rem .55rem; font-size:.65rem; border-radius:999px; box-shadow:0 4px 10px -2px rgba(0,0,0,.15); transform:translate(-50%,0) scale(.8); opacity:0; transition:.9s cubic-bezier(.25,.8,.3,1); border:1px solid rgba(255,140,160,.4); }
-.mood-bubble.rise{ transform:translate(-50%,-55px) scale(1); opacity:1; }
-.mood-bubble.pos{ background:linear-gradient(135deg,#ffe4ec,#ffd0dc); color:#b21e48; }
-.mood-bubble.neg{ background:linear-gradient(135deg,#f3f3f3,#e7e7e7); color:#555; }
-.mood-bubble.combo{ background:linear-gradient(135deg,#fff7d1,#ffe89b); color:#946400; }
-.mood-bubble.combo-strong{ background:linear-gradient(135deg,#fff1a8,#ffd766); color:#7a4f00; }
-.mood-bubble.rescue{ background:linear-gradient(135deg,#d9f9ff,#aeefff); color:#075b6f; }
-.mood-bubble.egg{ background:linear-gradient(135deg,#e3d7ff,#d0c0ff); color:#4b2f84; }
-.mood-bubble.fast{ background:linear-gradient(135deg,#ffd1e1,#ff9bb9); color:#8a1d3d; }
+/* ======================== Scene 1: 高中穿越（视觉小说） =============== */
+/* 已重构为纯分支：此处保留对话框/说话人 UI 样式 */
 .scene-intro .phase-msg{ font-size:.8rem; opacity:.85; background:rgba(255,255,255,.4); padding:.4rem .7rem; border-radius:12px; display:inline-block; }
 .scene-intro .title-egg{ margin-top:.4rem; font-size:.7rem; opacity:.8; color:#a22d52; }
 .scene-intro .title-egg.hidden{ display:none; }
 
-/* Visual Novel Single Dialogue Box */
+/* VN 单对话框布局与说话人徽标 */
 .scene-intro .vn-wrapper{ position:relative; margin:2rem auto 1.5rem; width:90%; max-width:960px; display:flex; flex-direction:column; gap:.9rem; align-items:stretch; }
 .scene-intro .vn-box{
   position:relative;
@@ -223,7 +206,7 @@ button.shake{ animation:shake .5s; }
 .scene-intro .vn-speaker.speaker-system{ background:linear-gradient(135deg,#ff5656,#d91e3a); box-shadow:0 4px 12px -3px rgba(220,40,60,.5),0 0 0 1px rgba(255,255,255,.35) inset; }
 .scene-intro .vn-speaker.hidden{ display:none; }
 
-/* Responsive adjustments for VN box */
+/* 小屏设备（手机）下的 VN 适配 */
 @media (max-width:700px){
   .scene-intro .vn-wrapper{ width:94%; margin:1.4rem auto 1rem; }
   .scene-intro .vn-box{ padding:.9rem 1rem 1.05rem; border-radius:18px; }
@@ -231,7 +214,7 @@ button.shake{ animation:shake .5s; }
   .scene-intro .vn-speaker{ font-size:.7rem; top:-0.7rem; }
 }
 
-/* Transition Scene */
+/* ======================== Transition: 转场动画系统 =================== */
 .transition-wrapper{ position:relative; flex:1; min-height:300px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:1.2rem; animation:transFadeIn .4s ease; }
 @keyframes transFadeIn{from{opacity:0; transform:translateY(10px);} to{opacity:1; transform:translateY(0);} }
 .pulse-heart{ width:120px; height:120px; background:radial-gradient(circle at 30% 30%, #ff89a3, #ff5f7f); position:relative; clip-path:path('M60 110 C-20 50 20 -10 60 20 C100 -10 140 50 60 110 Z'); filter:drop-shadow(0 6px 14px rgba(255,80,120,.45)); animation:heartPulse 1.4s ease-in-out infinite; }
@@ -245,7 +228,7 @@ button.shake{ animation:shake .5s; }
 /* flash12（原 heart）样式当前使用默认心跳，无额外覆盖 */
 /* 若后续需要给 flash12 单独配色，可添加：[data-style='flash12'] .pulse-heart { ... } */
 
-/* flash45 样式：多张回忆图片快速闪回 */
+/* flash45 样式：多张回忆图片快速闪回（走马灯式记忆） */
 [data-style='flash45'] .transition-tip{ background:rgba(0,0,0,.55); color:#ffeef5; letter-spacing:2px; font-weight:600; box-shadow:0 4px 18px -4px rgba(0,0,0,.45); }
 [data-style='flash45']{ background:#000; }
 .flash45-seq{ position:relative; width:100%; max-width:680px; height:380px; display:grid; place-items:center; overflow:hidden; border-radius:22px; box-shadow:0 10px 28px -10px rgba(0,0,0,.6),0 0 0 1px rgba(255,255,255,.08) inset; background:#111; }

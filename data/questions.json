@@ -1,39 +1,39 @@
 {
   "chinesePoemFill": [
-    {"question": "山有木兮木有枝，_____", "answer": "心悦君兮君不知", "encourageCorrect":"古风直击心巴，你绝对是懂浪漫的那个人。", "encourageWrong":"这一句在很多表白摘录里出现，再回想下～"},
-    {"question": "愿得一心人，_____", "answer": "白首不相离", "encourageCorrect":"白首不相离，被你填出来就像一个小小誓言。", "encourageWrong":"提示：四字，表达相守不分开。"},
-    {"question": "此情可待成追忆，_____", "answer": "只是当时已惘然", "encourageCorrect":"你连惆怅都写得这么好看。", "encourageWrong":"尾句有点小遗憾意味，再想想。"},
-    {"question": "两情若是久长时，_____", "answer": "又岂在朝朝暮暮", "encourageCorrect":"答对！我们不只是朝朝暮暮，是更久的久。", "encourageWrong":"这句强调‘久长’不在表面陪伴频率～"},
-    {"question": "执子之手，_____", "answer": "与子偕老", "encourageCorrect":"经典成对句，牵手→偕老，完美。", "encourageWrong":"后半句和‘执子之手’一样常被婚礼引用。"},
-    {"question": "春风十里不如你（补一句自创甜句）_____", "answer": "满天星光不及你回头一笑", "encourageCorrect":"原创加成！我会把这句收藏在心里。", "encourageWrong":"随便写一段甜的也行，勇敢输出！"},
-    {"question": "我见青山多妩媚，（仿写）_____", "answer": "料青山见我应如是", "encourageCorrect":"青山应如你所见，你也被喜欢着。", "encourageWrong":"仿写强调‘青山见我’，试着对称一下。"}
+    {"question": "山有木兮木有枝，_____", "answer": "心悦君兮君不知", "hints":["出自《越人歌》，后半句表达单向心意","四字 + ‘君不知’ 结构"], "encourageCorrect":"古风直击心巴，你绝对是懂浪漫的那个人。", "encourageWrong":"这一句在很多表白摘录里出现，再回想下～"},
+    {"question": "愿得一心人，_____", "answer": "白首不相离", "hints":["也是常出现在誓言里的四字句","对白头偕老的另一种表达：白首不相××"], "encourageCorrect":"白首不相离，被你填出来就像一个小小誓言。", "encourageWrong":"提示：四字，表达相守不分开。"},
+    {"question": "此情可待成追忆，_____", "answer": "只是当时已惘然", "hints":["‘追忆’后面接一种惆怅的情绪","最后两个字：惘×"], "encourageCorrect":"你连惆怅都写得这么好看。", "encourageWrong":"尾句有点小遗憾意味，再想想。"},
+    {"question": "两情若是久长时，_____", "answer": "又岂在朝朝暮暮", "hints":["强调感情不受限于‘天天见’","包含两个叠词：朝朝暮暮"], "encourageCorrect":"答对！我们不只是朝朝暮暮，是更久的久。", "encourageWrong":"这句强调‘久长’不在表面陪伴频率～"},
+    {"question": "执子之手，_____", "answer": "与子偕老", "hints":["婚礼常听到的绝配句","与子×× 两字表达一起变老"], "encourageCorrect":"经典成对句，牵手→偕老，完美。", "encourageWrong":"后半句和‘执子之手’一样常被婚礼引用。"},
+    {"question": "春风十里不如你（补一句自创甜句）_____", "answer": "满天星光不及你回头一笑", "hints":["可以写自然景 + 不及你××","往 ‘星光 / 烟火 / 雨后彩虹’ 方向想"], "encourageCorrect":"原创加成！我会把这句收藏在心里。", "encourageWrong":"随便写一段甜的也行，勇敢输出！"},
+    {"question": "我见青山多妩媚，（仿写）_____", "answer": "料青山见我应如是", "hints":["结构对称：我见…/青山见我…","第二个分句以 ‘料青山’ 开头"], "encourageCorrect":"青山应如你所见，你也被喜欢着。", "encourageWrong":"仿写强调‘青山见我’，试着对称一下。"}
   ],
   "mathPuzzles": [
-    {"question": "你=1，她=1，我们=?", "answer": "2", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "心跳每分钟≈70 次，我们约会 2 小时心跳大概多少次?", "answer": "8400", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "如果想你指数每天*2，第一天1次，第7天=?", "answer": "64", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "(520 + 1314) ÷ 2 = ? （象征平均甜度）", "answer": "917", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "一个拥抱消耗 5 卡路里，抱 20 次消耗?", "answer": "100", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "月亮=1 颗心=1 '你'+我= ? (写数字)", "answer": "2", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "密码：我们认识年份 * 喜欢她年份差 + 1，如果随便写就=？(彩蛋写 0)", "answer": "0", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
+    {"question": "你=1，她=1，我们=?", "answer": "2", "hints":["把它当很朴素的加法","1 + 1 = ?"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "心跳每分钟≈70 次，我们约会 2 小时心跳大概多少次?", "answer": "8400", "hints":["先算总分钟数","120 分钟 * 70"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "如果想你指数每天*2，第一天1次，第7天=?", "answer": "64", "hints":["以 1 为起点的 2 的幂次增长","第七天是 2 的 6 次方"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "(520 + 1314) ÷ 2 = ? （象征平均甜度）", "answer": "917", "hints":["先把两个数字加起来","1834 ÷ 2"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "一个拥抱消耗 5 卡路里，抱 20 次消耗?", "answer": "100", "hints":["简单乘法","20 * 5"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "月亮=1 颗心=1 '你'+我= ? (写数字)", "answer": "2", "hints":["同前一题思路：把两个 1 相加","象征‘我们俩’"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "密码：我们认识年份 * 喜欢她年份差 + 1，如果随便写就=？(彩蛋写 0)", "answer": "0", "hints":["题目明确给出彩蛋值","直接输入 0"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
   ],
   "englishMatch": [
-    {"word": "forever", "match": "永远", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"word": "destiny", "match": "命运", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"word": "serendipity", "match": "意外的美好", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"word": "galaxy", "match": "星系", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"word": "heartbeat", "match": "心跳", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"word": "cuddle", "match": "拥抱", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"word": "spark", "match": "火花", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"word": "init", "match": "初始化（程序员小梗）", "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
+    {"word": "forever", "match": "永远", "hints":["常见情感承诺词","for + ever"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "destiny", "match": "命运", "hints":["d 开头 7 字母","de- 开头，含意：宿命"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "serendipity", "match": "意外的美好", "hints":["长词：意外的好运/巧合","常用来形容甜蜜偶遇"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "galaxy", "match": "星系", "hints":["与 ‘星空’ 有关","g 开头 6 字母"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "heartbeat", "match": "心跳", "hints":["heart + beat 组合","象征情感/紧张"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "cuddle", "match": "拥抱", "hints":["更柔软/贴贴类的 ‘抱’","c 开头双辅音结尾 le"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "spark", "match": "火花", "hints":["比喻爱情最开始的感觉","s 开头 5 字母"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"word": "init", "match": "初始化（程序员小梗）", "hints":["缩写：initialize","程序里经常写 xxx_init"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
   ],
   "scienceQuiz": [
-    {"question": "水沸腾形成小水珠附着锅盖内侧主要因为?", "options": ["蒸发与冷凝", "升华", "分解"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "银河看起来像一条光带主要因为?", "options": ["恒星密度高", "月亮反光", "空气散射"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "夜空看不到全部星星的原因不包括?", "options": ["光污染", "大气散射", "星星忽然熄灭"], "answer": 2, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "以下哪个行为最可能让心情变好?", "options": ["跟你聊天", "一天不睡", "疯狂背单词"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "人体最‘忠诚’持续跳动的器官?", "options": ["心脏", "胃", "嗓子"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "以下哪种力与‘我被你吸引’最接近比喻?", "options": ["引力", "摩擦力", "浮力"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
-    {"question": "彩虹出现需要：阳光 + 空气中?", "options": ["水滴", "灰尘", "臭氧"], "answer": 0, "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
+    {"question": "水沸腾形成小水珠附着锅盖内侧主要因为?", "options": ["蒸发与冷凝", "升华", "分解"], "answer": 0, "hints":["两个物理过程的组合","加热→上升→遇冷成水珠"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "银河看起来像一条光带主要因为?", "options": ["恒星密度高", "月亮反光", "空气散射"], "answer": 0, "hints":["不是月亮也不是地球大气","很多星星挤在那一片"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "夜空看不到全部星星的原因不包括?", "options": ["光污染", "大气散射", "星星忽然熄灭"], "answer": 2, "hints":["选项里哪个是最戏剧化的","真实物理原因 vs 突然消失"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "以下哪个行为最可能让心情变好?", "options": ["跟你聊天", "一天不睡", "疯狂背单词"], "answer": 0, "hints":["健康与陪伴相关","和情绪支持直接相关的"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "人体最‘忠诚’持续跳动的器官?", "options": ["心脏", "胃", "嗓子"], "answer": 0, "hints":["它从出生到现在几乎不休息","love / heartbeat"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "以下哪种力与‘我被你吸引’最接近比喻?", "options": ["引力", "摩擦力", "浮力"], "answer": 0, "hints":["和星球相关的基本力","Newton 会懂的那个"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"},
+    {"question": "彩虹出现需要：阳光 + 空气中?", "options": ["水滴", "灰尘", "臭氧"], "answer": 0, "hints":["和光的色散有关","小小的液体颗粒"], "encourageCorrect":"占位-正确", "encourageWrong":"占位-再想想"}
   ]
 }

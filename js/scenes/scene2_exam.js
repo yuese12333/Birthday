@@ -66,7 +66,7 @@ export class Scene2Exam extends BaseScene {
         questions: data.chinesePoemFill.map(item=>({
           type:'fill', difficulty:'easy',
           prompt: item.question.includes('_____') ? item.question.replace('_____','') : item.question,
-          answer: item.answer, placeholder:'_____', hint:'诗句感受', solved:false,
+          answer: item.answer, placeholder:'_____', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
@@ -75,7 +75,7 @@ export class Scene2Exam extends BaseScene {
       subjects.push({
         key:'math', title:'数学', done:false,
         questions: data.mathPuzzles.map(item=>({
-          type:'fill', difficulty:'medium', prompt:item.question, answer:(item.answer||'').split(' ')[0], placeholder:'答案', hint:'仔细读提示', solved:false,
+          type:'fill', difficulty:'medium', prompt:item.question, answer:(item.answer||'').split(' ')[0], placeholder:'答案', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
@@ -84,7 +84,7 @@ export class Scene2Exam extends BaseScene {
       subjects.push({
         key:'english', title:'英语', done:false,
         questions: data.englishMatch.map(item=>({
-          type:'fill', difficulty:'easy', prompt:`${item.word} 的中文是？`, answer:item.match, placeholder:'中文', hint:'记忆里的那个词', solved:false,
+          type:'fill', difficulty:'easy', prompt:`${item.word} 的中文是？`, answer:item.match, placeholder:'中文', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
@@ -93,7 +93,7 @@ export class Scene2Exam extends BaseScene {
       subjects.push({
         key:'science', title:'理综', done:false,
         questions: data.scienceQuiz.map(item=>({
-          type:'select', difficulty:'medium', prompt:item.question, options:item.options, answerIndex:item.answer, hint:'回想课堂', solved:false,
+          type:'select', difficulty:'medium', prompt:item.question, options:item.options, answerIndex:item.answer, hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
@@ -272,28 +272,38 @@ export class Scene2Exam extends BaseScene {
       const skipBtn = wrapper.querySelector('.skip-love-btn');
       const hintArea = wrapper.querySelector('.hint-area');
 
-  // 提示按钮逻辑：累计 3 次，第三次直接完成题目
+  // 提示按钮逻辑：前两次依次显示 JSON 中的 hints[0], hints[1]；第三次自动给答案
   hintBtn.addEventListener('click',()=>{
-        // 多次提示：前两次显示提示文本，第三次直接给出答案并判定通过
         if(nextQ.solved) return; // 已完成无需提示
         nextQ.hintCount = (nextQ.hintCount||0) + 1;
         this.hintsUsed++;
-        if(nextQ.hintCount < 3){
-          const label = nextQ.hintCount === 1 ? '提示' : `再次提示(${nextQ.hintCount}/3)`;
-          hintArea.textContent = label + '：' + (nextQ.hint || '暂无');
+        const hintsArr = Array.isArray(nextQ.hints) ? nextQ.hints : [];
+        if(nextQ.hintCount <= 2){
+          const idx = nextQ.hintCount - 1; // 0 或 1
+          const text = hintsArr[idx] || (idx===0 ? '暂无提示' : (hintsArr[0] ? hintsArr[0] : '没有更多提示了'));
+          const label = nextQ.hintCount === 1 ? '提示①' : '提示②';
+          // 累积显示，不覆盖之前提示
+          const line = document.createElement('div');
+          line.className = 'hint-line';
+          line.textContent = `${label}：${text}`;
+          hintArea.appendChild(line);
+          // 按需求：按钮文字保持恒定为“提示”不做变化
+          hintBtn.textContent = '提示';
         } else {
-          // 第三次：自动判定正确，显示答案并给分（不扣分）
+          // 第三次：直接送答案并判定通过
           nextQ.solved = true;
-          nextQ._autoHint = true; // 记录此题通过第三次提示自动完成
+          nextQ._autoHint = true;
           const base = 2;
           const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
-          const gained = base * weight; 
+          const gained = base * weight;
           this.score += gained;
           const answerReveal = nextQ.type==='fill' ? nextQ.answer : (nextQ.options?.[nextQ.answerIndex] || '');
+          // 覆盖之前的提示行
           hintArea.innerHTML = `<span class='auto-answer'>直接送你答案：<strong>${answerReveal}</strong></span>`;
-          status.innerHTML = `<span class='ok'>第三次提示触发宠溺：答案我直接告诉你~</span> <em>+${gained} 分</em>`;
+          status.innerHTML = `<span class='ok'>第三次提示：我直接把答案告诉你啦~</span> <em>+${gained} 分</em>`;
           updateHUD();
           wrapper._locked = true;
+          hintBtn.textContent = '提示';
           hintBtn.disabled = true; submitBtn.disabled = true; skipBtn.disabled = true;
           setTimeout(()=> renderSubject(subject), 600);
         }
@@ -402,6 +412,7 @@ export class Scene2Exam extends BaseScene {
       const totalQuestions = this.subjects.reduce((a,s)=> a + s.questions.length,0);
       summaryEl.classList.remove('hidden');
       const allSkipped = this.skippedQuestions === totalQuestions;
+      // 取消 partialHighSkip 展示：仍计算但不再使用（保留变量以便未来需要恢复时方便）
       const partialHighSkip = !allSkipped && totalQuestions>0 && (this.skippedQuestions / totalQuestions >= 0.5);
       // 统计错误宠溺通过数量（既标记 _pamperedWrong 且未 _skipped）
       const pamperedWrongCount = this.subjects.reduce((acc,s)=> acc + s.questions.filter(q=> q._pamperedWrong).length,0);
@@ -409,16 +420,26 @@ export class Scene2Exam extends BaseScene {
       // 统计自动提示完成
       const autoHintCount = this.subjects.reduce((acc,s)=> acc + s.questions.filter(q=> q._autoHint).length,0);
       const allAutoHint = autoHintCount === totalQuestions && totalQuestions>0;
-      // 彩蛋互斥优先级：全跳过 > 全自动提示 > 全错误宠溺 > 高跳过率
+      // 新版彩蛋展示：使用 GIF 图片，不再使用 ::after emoji；互斥顺序：全跳过 > 全自动提示 > 全错误宠溺；忽略 partialHighSkip
       let easterHTML = '';
       if(allSkipped){
-        easterHTML = `<div class='easter-skip'>你怎么全跳过了呀？罚你亲我一口，小笨蛋 ❤</div>`;
+        easterHTML = `
+          <div class='easter-skip easter-block'>
+            <img src="./assets/images/allSkipped.gif" alt="全跳过彩蛋" />
+            <div class='text'>你怎么全部跳过啦？罚你补一个超级长的抱抱，然后亲我一口 ❤</div>
+          </div>`;
       } else if(allAutoHint){
-        easterHTML = `<div class='easter-pampered-wrong'>全部靠第三次提示解锁？说明你超会『撒娇请求帮助』，判你享受终身答题代写权益 ❤</div>`;
+        easterHTML = `
+          <div class='easter-pampered-wrong easter-block'>
+            <img src="./assets/images/allAutoHint.gif" alt="全自动提示彩蛋" />
+            <div class='text'>全部靠第三次提示解锁？表示你超会软软求助，判定为『终身被我包办难题特权』 ❤</div>
+          </div>`;
       } else if(allPamperedWrong){
-        easterHTML = `<div class='easter-pampered-wrong'>居然所有题都靠“答错被宠”过关？证明你超会撒娇——判处终身被我保护 ❤</div>`;
-      } else if(partialHighSkip){
-        easterHTML = `<div class='easter-skip-part'>你悄悄跳过了一半以上… 这是不是在示弱撒娇？那我全都宠着！</div>`;
+        easterHTML = `
+          <div class='easter-pampered-wrong easter-block'>
+            <img src="./assets/images/allPamperedWrong.gif" alt="全错误宠溺彩蛋" />
+            <div class='text'>所有题都通过“答错被宠”方式过关？！说明你已经掌握『用可爱征服一切』技能 ❤</div>
+          </div>`;
       }
       summaryEl.innerHTML = `
         <div class='summary-card'>

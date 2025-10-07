@@ -15,7 +15,7 @@ export class Scene0Register extends BaseScene {
     el.className = 'scene scene-register';
     const has = localStorage.getItem('hasRegistered') === '1';
     el.innerHTML = `
-      <h1>进入之前 · 一个小小的仪式</h1>
+      <h1>进入之前 · 一个小小的仪式（开发版本不代表最终品质）</h1>
       <p class='desc'>这是我们专属的纪念入口。随便写一个“用户名”，然后输入那一天的日期当作密码。</p>
       <form class='reg-form'>
         <label>用户名<input name='user' placeholder='请输入用户名' autocomplete='off'/></label>
@@ -53,8 +53,10 @@ export class Scene0Register extends BaseScene {
     const bgmBtn = form.querySelector('.reg-bgm');
 
     // ---- BGM 自动播放逻辑 ----
+    // 注意：使用 playSceneBGM 传入的是场景 id '0'，其内部以同样的 key '0' 存储。
+    // 之前 stopBGM 误用了 'scene0' 作为 key 导致无法真正停止，仅按钮被置灰。
     let bgmKilled = false;
-  const bgmAudio = audioManager.playSceneBGM('0',{ loop:true, volume:0.5, fadeIn:700 });
+    const bgmAudio = audioManager.playSceneBGM('0',{ loop:true, volume:0.5, fadeIn:700 });
     let awaitingUnlock = false;
     if(bgmAudio && bgmAudio.paused){
       bgmAudio.play().catch(()=>{
@@ -149,7 +151,7 @@ export class Scene0Register extends BaseScene {
         setTimeout(()=> this.ctx.go('intro'), 800);
       } else {
         wrongTimes++;
-        if(!bgmKilled){ audioManager.stopBGM('scene0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
+  if(!bgmKilled){ audioManager.stopBGM('0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
         const { imgRow, lines } = ensureErrorStructure();
         if(wrongTimes < 5){
           const angryLines = [ 
@@ -177,7 +179,7 @@ export class Scene0Register extends BaseScene {
     forgotBtn.addEventListener('click',()=>{
       if(forgotBtn.disabled) return;
       this._forgotClicks++;
-      if(!bgmKilled){ audioManager.stopBGM('scene0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
+  if(!bgmKilled){ audioManager.stopBGM('0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
       // 使用统一结构，避免后续密码错误覆盖表情
       const { imgRow } = ensureErrorStructure();
       // 查找或创建忘记表情容器
@@ -250,7 +252,8 @@ export class Scene0Register extends BaseScene {
 
   async exit(){
     // 离开注册场景时确保背景音乐淡出停止，防止串场
-    audioManager.stopBGM('scene0',{ fadeOut:600 });
+  // 退出时同样使用正确的 key '0'
+  audioManager.stopBGM('0',{ fadeOut:600 });
     if(this._audioUnlockBtn){ try{ this._audioUnlockBtn.remove(); }catch(e){} this._audioUnlockBtn=null; }
   }
 }
