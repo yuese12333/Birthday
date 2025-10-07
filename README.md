@@ -70,6 +70,7 @@ README.md
 - 脚本仅保留阶段 `lines` + `choices` + 终结 `end`。
 - 选择仅作分支跳转，不产生隐藏数值变化；体验节奏更聚焦剧情。
 - 标题彩蛋：点击 6 次提示，再多几次获得文字彩蛋（不再加隐藏数值）。
+ - 移动端点击分支兼容：增加 pointer / touch 双通道路由，修复部分手机 WebView 上偶发“选项无响应”问题。
 
 **迁移说明**
 旧脚本里的字段（若仍残留）将被忽略：`trustDelta` / `moodDelta` / `requireTrust` / `requireMood` / `auto`。

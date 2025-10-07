@@ -132,12 +132,29 @@ export class Scene1Intro extends BaseScene {
       if(!stage.choices || !stage.choices.length){ refreshChoiceLockStates(); return; }
       stage.choices.forEach(choice=>{
         const btn=document.createElement('button');
+        btn.type='button';
         btn.textContent=choice.text||'...';
-        btn.addEventListener('click',()=>{ if(choice.goto) goStage(choice.goto); });
+        if(choice.goto) btn.dataset.goto = choice.goto;
+        // 保留 click 以兼容桌面；移动端采用 pointer 事件委托，避免某些浏览器 click 延迟 / 丢失
+        btn.addEventListener('click', (e)=>{
+          const targetGoto = e.currentTarget.dataset.goto; if(targetGoto) goStage(targetGoto);
+        });
         choicesBox.appendChild(btn);
       });
       refreshChoiceLockStates();
     };
+
+    // 移动端偶发 click 不触发，增加 pointerup / touchend 委托作为兜底
+    const choiceTapHandler = (e)=>{
+      const btn = e.target.closest('button[data-goto]');
+      if(!btn || !choicesBox.contains(btn)) return;
+      // 避免同时触发 click 与 pointerup 导致重复跳转：使用节流标记
+      if(btn._tapHandledAt && performance.now() - btn._tapHandledAt < 300) return;
+      btn._tapHandledAt = performance.now();
+      const to = btn.dataset.goto; if(to) goStage(to);
+    };
+    choicesBox.addEventListener('pointerup', choiceTapHandler, { passive:true });
+    choicesBox.addEventListener('touchend', choiceTapHandler, { passive:true });
 
     const goStage=id=>{ const st=findStage(id); if(!st) return; this.currentStage=st; appendLinesProgressively(st,()=>{ if(endStage(st)) return; renderChoices(st); }); };
 
