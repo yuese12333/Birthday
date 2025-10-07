@@ -17,6 +17,51 @@ const sceneManager = new SceneManager(rootEl, bus);
 
 // 配置：若设为 true，无论 localStorage 是否已有 hasRegistered 都先进入注册页
 const FORCE_REGISTER_ALWAYS = true; // 修改为 true 即可默认进入注册页面
+const ENABLE_PRELOAD_SCREEN = true; // 是否启用首屏资源预加载
+
+async function preloadAssets(){
+  try{
+    const resp = await fetch('./data/asset_manifest.json?_=' + Date.now());
+    if(!resp.ok) throw new Error('manifest load fail');
+    const manifest = await resp.json();
+    const tasks = [];
+    const progress = { done:0, total:0 };
+    const addTask = (p)=>{ progress.total++; tasks.push(p.finally(()=>{ progress.done++; updateProgress(progress); })); };
+    const updateProgressBar = document.getElementById('preload-progress');
+    function updateProgress(pr){ if(updateProgressBar){ const ratio = pr.total? (pr.done/pr.total):0; updateProgressBar.style.setProperty('--p', (ratio*100).toFixed(2)); updateProgressBar.textContent = `加载中 ${(ratio*100).toFixed(0)}%`; } }
+    (manifest.images||[]).forEach(src=>{
+      addTask(new Promise(res=>{ const img=new Image(); img.onload=img.onerror=()=>res(); img.src=src; }));
+    });
+    (manifest.audio||[]).forEach(src=>{
+      addTask(new Promise(res=>{ try{ const a=new Audio(); a.preload='auto'; a.src=src; // 不直接 play，部分策略会报错
+        // 通过 metadata 事件认为足够
+        const timer=setTimeout(()=>res(),4000);
+        a.addEventListener('loadeddata',()=>{ clearTimeout(timer); res(); });
+        a.addEventListener('error',()=>{ clearTimeout(timer); res(); });
+      }catch(e){ res(); } }));
+    });
+    await Promise.all(tasks);
+  }catch(e){ /* 忽略预加载失败，直接进入 */ }
+}
+
+function mountPreloadScreen(){
+  if(!ENABLE_PRELOAD_SCREEN) return null;
+  const wrap = document.createElement('div');
+  wrap.id='preload-screen';
+  wrap.style.cssText='position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 40% 40%, #ffe5ec,#ffc0d2,#ffb0c9);z-index:10000;font-family:BirthdayFont,system-ui,sans-serif;color:#6a2d3a;';
+  wrap.innerHTML=`<div style="text-align:center;display:flex;flex-direction:column;gap:1.2rem;align-items:center;">
+    <h1 style="margin:0;font-size:clamp(1.6rem,5vw,2.6rem);letter-spacing:1px;">回忆旅程准备中…</h1>
+    <div id='preload-progress' style="--p:0;background:rgba(255,255,255,.5);backdrop-filter:blur(6px);padding:.9rem 1.4rem;border-radius:18px;min-width:220px;font-size:.9rem;position:relative;overflow:hidden;">
+      <span style="position:absolute;inset:0;background:linear-gradient(90deg,#ff8fb5,#ff6f9d);width:calc(var(--p)*1%);mix-blend-mode:multiply;opacity:.35;pointer-events:none;transition:width .35s;" ></span>
+      加载中 0%
+    </div>
+    <div style="font-size:.7rem;opacity:.75;">（首屏资源预热，避免进入后首段音乐与图片卡顿）</div>
+  </div>`;
+  document.body.appendChild(wrap);
+  return wrap;
+}
+
+function removePreloadScreen(){ const el=document.getElementById('preload-screen'); if(el){ el.style.opacity='0'; el.style.transition='opacity .5s'; setTimeout(()=> el.remove(), 520); } }
 
 function context(){
   return { rootEl, bus, go:(name,data)=>sceneManager.go(name,data) };
@@ -33,7 +78,12 @@ sceneManager.register('future', ()=> new Scene7Future(context()));
 // 新增：转场中介场景（用于动画 & BGM 交叉淡出缓冲）
 sceneManager.register('transition', ()=> new TransitionScene(context())); // 仍保留手动可用
 
-window.addEventListener('DOMContentLoaded', ()=>{
+window.addEventListener('DOMContentLoaded', async ()=>{
+  let preloadWrap=null;
+  if(ENABLE_PRELOAD_SCREEN){
+    preloadWrap = mountPreloadScreen();
+    await preloadAssets();
+  }
   // 若已注册过直接进入 intro，否则进入 register 仪式页
   const has = localStorage.getItem('hasRegistered') === '1';
   const params = new URLSearchParams(location.search);
@@ -42,17 +92,7 @@ window.addEventListener('DOMContentLoaded', ()=>{
   const goRegister = FORCE_REGISTER_ALWAYS ? true : (force || !has);
   sceneManager.go(goRegister ? 'register' : 'intro');
 
-  // 已注册情况下提供悬浮“重新验证”按钮（除非已经强制在注册页）
-  if(!goRegister){
-    const btn = document.createElement('button');
-    btn.textContent = '重新验证';
-    btn.style.cssText = 'position:fixed;bottom:14px;right:14px;z-index:9998;font-size:.7rem;padding:.45rem .8rem;background:#ffb3c6;color:#702438;box-shadow:0 4px 10px -2px rgba(0,0,0,.25);';
-    btn.addEventListener('click',()=>{
-      localStorage.removeItem('hasRegistered');
-      sceneManager.go('register');
-    });
-    document.body.appendChild(btn);
-  }
+  if(preloadWrap){ removePreloadScreen(); }
 });
 
 /**

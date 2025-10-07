@@ -1,0 +1,18 @@
+{
+  "version": 1,
+  "images": [
+    "./assets/images/allSkipped.gif",
+    "./assets/images/allAutoHint.gif",
+    "./assets/images/allPamperedWrong.gif",
+    "./assets/images/angry.png",
+    "./assets/images/angry.png"
+  ],
+  "audio": [
+    "./assets/audio/scene_0.mp3",
+    "./assets/audio/scene_1.mp3",
+    "./assets/audio/scene_2.mp3",
+    "./assets/audio/scene_3.mp3",
+    "./assets/audio/scene_4.mp3",
+    "./assets/audio/scene_45.wav"
+  ]
+}
