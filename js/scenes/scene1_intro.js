@@ -60,15 +60,20 @@ export class Scene1Intro extends BaseScene {
       const muted=audioManager.toggleMute(); bgmBtn.classList.toggle('muted',muted);
     });
 
-  // 旧“锁定/解锁”逻辑已废弃：不需要 refreshChoiceLockStates
-
-  // ---------------------------
-  // 载入外部脚本（失败则回退到最小兜底）
-  // ---------------------------
-    let script=null; try{ const resp=await fetch('./data/scene1_script.json?_='+Date.now()); if(resp.ok) script=await resp.json(); }catch(e){}
-    if(!script || !Array.isArray(script.stages)) script={stages:[{id:'intro',lines:[{speaker:'system',text:'脚本加载失败，使用兜底。'}]}]};
+    const resp=await fetch('./data/scene1_script.json?_='+Date.now());
+    const script=await resp.json();
 
     const findStage=id=>script.stages.find(s=>s.id===id);
+    // === 精简版 dialogue_x_y & win/fail ===
+    // 约定：id = dialogue_<failCount>_<seq>
+    // fail 分支：跳到 dialogue_{failCount+1}_1
+    const dialoguePattern = /^dialogue_(\d+)_([\w-]+)$/;
+    const computeNextFailId = currentId => {
+      const m = dialoguePattern.exec(currentId||'');
+      if(!m) return null;
+      const curFail = parseInt(m[1],10);
+      return `dialogue_${curFail+1}_1`;
+    };
     let lineQueue=[];     // 当前阶段行数组
     let lineIndex=0;      // 下一待渲染的行索引
     let stageDoneCallback=null; // 阶段全部行显示完后的回调
@@ -167,8 +172,6 @@ export class Scene1Intro extends BaseScene {
      */
     const appendLinesProgressively=(stage,done)=>{ lineQueue=(stage&&stage.lines)?[...stage.lines]:[]; lineIndex=0; stageDoneCallback=done; awaitingLine=false; vnText.textContent=''; renderNextLine(); };
 
-    // （历史遗留说明）旧的“基于隐藏数值自动跳转”系统已彻底移除。
-
   /**
    * 阶段是否包含终结：有则触发转场到下一场景。
    * end: { next: 'exam' }
@@ -188,7 +191,21 @@ export class Scene1Intro extends BaseScene {
         if(choice.goto) btn.dataset.goto = choice.goto;
         // 保留 click 以兼容桌面；移动端采用 pointer 事件委托，避免某些浏览器 click 延迟 / 丢失
         btn.addEventListener('click', (e)=>{
-          const targetGoto = e.currentTarget.dataset.goto; if(targetGoto) goStage(targetGoto);
+          const targetGoto = e.currentTarget.dataset.goto;
+          if(!targetGoto) return;
+          if(targetGoto==='win'){
+            showOutcomeOverlay('win').then(()=> this.ctx.go('transition',{next:'exam',style:'flash12'}));
+            return;
+          }
+          if(targetGoto==='fail'){
+            const curId = this.currentStage?.id;
+            showOutcomeOverlay('fail').then(()=>{
+              const next = computeNextFailId(curId);
+              if(findStage(next)) goStage(next); else console.warn('未找到下一失败阶段', next);
+            });
+            return;
+          }
+          goStage(targetGoto);
         });
         choicesBox.appendChild(btn);
       });
@@ -236,7 +253,8 @@ export class Scene1Intro extends BaseScene {
     // 标题点击彩蛋：第 6 次出现提示；第 10 次给隐藏文案，仅一次
     title.addEventListener('click',()=>{ this.titleClicks++; if(this.titleClicks===6){ titleEgg.textContent='（再点几下也许会有点什么~）'; titleEgg.classList.remove('hidden'); } if(this.titleClicks===10 && !this._titleBonusGiven){ this._titleBonusGiven=true; titleEgg.textContent='（给你一个看不见的勇气 buff！）'; }});
 
-    goStage('intro');
+  // 强制使用新命名起始；假设一定存在 dialogue_0_1
+  goStage('dialogue_0_1');
     this.ctx.rootEl.appendChild(el);
   }
 

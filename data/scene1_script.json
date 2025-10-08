@@ -5,7 +5,7 @@
   },
   "stages": [
     {
-      "id": "intro",
+      "id": "dialogue_0_1",
       "lines": [
         { "speaker": "me", "text": "溜溜生日要到啦，该想想给她准备什么生日礼物了。emmm……做个什么好呢？" },
         { "speaker": "her", "text": "（她正翻着练习册抬头）这道题你会不会？" },
@@ -22,13 +22,13 @@
         { "speaker": "her", "text": "搞什么啊？你到底会不会？不会我问别人了。" }
       ],
       "choices": [
-        { "text": "你就不好奇溜溜是谁吗？", "goto": "trust_build_1" },
-        { "text": "我会！当然会！（这高中的题目我还不是手拿把掐哼哼~）", "goto": "trust_build_2" },
-        { "text": "你要问谁？", "goto": "trust_build_1" }
+        { "text": "你就不好奇溜溜是谁吗？", "goto": "dialogue_2" },
+        { "text": "我会！当然会！（这高中的题目我还不是手拿把掐哼哼~）", "goto": "dialogue_2" },
+        { "text": "你要问谁？", "goto": "dialogue_2" }
       ]
     },
     {
-      "id": "trust_build_1",
+      "id": "dialogue_2",
       "lines": [
         { "speaker": "me", "text": "我知道这有点不可思议，但你得相信我，我是从未来穿越过来的。我们未来在一起了，溜溜是你的昵称。" },
         { "speaker": "her", "text": "？？什么鬼啊？你发烧了？" },
@@ -38,9 +38,9 @@
         { "speaker": "her", "text": "你要怎么证明？" }
       ],
       "choices": [
-        { "text": "她午休趴桌子会在指尖画圈", "goto": "trust_react" },
-        { "text": "她体育课后会把额前碎发撩三下", "goto": "trust_react" },
-        { "text": "瞎编一个细节（她皱眉）", "goto": "prove" }
+        { "text": "1", "goto": "win" },
+        { "text": "2", "goto": "fail" },
+        { "text": "3", "goto": "fail" }
       ]
     }
   ]

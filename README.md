@@ -7,7 +7,7 @@
 | 场景编号 | 标题关键词 | 玩法核心 | 状态 |
 |----------|------------|----------|------|
 | 0 | 注册仪式 | 纪念日密码 + 线索渐进 | 已基本实现 ✅ |
-| 1 | 高中安抚 / 穿越自证 | 纯分支对话 | 正在实现 ✅ |
+| 1 | 高中安抚 / 穿越自证 | 纯分支对话（dialogue_x_y + win/fail） | 正在实现 ✅ |
 | 2 | 高考小游戏 | 顺序四科 + 独立计时 + 宠溺得分 + 三段提示 + 题型/难度外部化 | 正在实现 ✅ |
 | 3 | 大学时间线（占位） | 玩法待设计（当前仅跳转按钮） | 占位 ✅ |
 | 4 | 表白（占位） | 玩法待设计（当前跳转占位） | 占位 ✅ |
@@ -67,24 +67,29 @@ README.md
 - 可以通过 debug 面板进入任意场景。
 
 ### 1. 高中安抚 / 穿越自证（Scene1Intro）
-**当前实现（纯分支视觉小说内核）**
-- 外部脚本驱动：`data/scene1_script.json` 定义阶段数组，每阶段含 `lines` 与可选 `choices` / `end`。
-- 无隐藏数值：已移除信任/安抚/进度等系统，仅保留最小“行 → 分支”循环。
-- 打字机效果：逐字显示，支持空格 / 点击空白跳过当前行或推进下一行。
-- 说话人徽标：根据 `speaker` (me/her/system) 切换左右/颜色。
-- 标题点击彩蛋：第 6 次提示继续点击，第 10 次出现一次性隐藏文案。
-- 移动端交互增强：pointerup + touchend 兜底，解决某些 WebView 丢失 click 的问题。
-- 音效：BGM 自动淡入；打字机敲击声每两个有效字符触发一次（可在代码里调频率/间隔）。
+**当前实现（统一命名 + 失败推进）**
+- 外部脚本驱动：`data/scene1_script.json`。
+- 阶段命名强制：`dialogue_<failCount>_<seq>`；入口固定 `dialogue_0_1`。
+- 分支支持特殊 goto：`win` / `fail`。
+  - `win`：显示成功 overlay → 过渡到下一正式场景（当前为 `exam`）。
+  - `fail`：显示失败 overlay → 自动跳转 `dialogue_{当前failCount+1}_1`（必须存在；未找到仅控制台警告）。
+- 去除旧 fallback：假设脚本必然成功加载且结构正确。
+- 无隐藏数值：只保留“逐行播放 → 分支选择 → 跳阶段 / 触发 win/fail”。
+- 打字机：空格 / 点击空白提前补全或推进下一行。
+- 说话人徽标：`me` 左、`her` 右人物、`system` 右系统色。
+- 彩蛋：标题多次点击触发提示与一次性隐藏文案。
+- 移动端：pointerup + touchend 兜底防丢点击。
+- 打字机音效：每两个有效字符（中英文数字）播放一声，降低噪点。
 
-**脚本格式精简说明**
+**脚本字段仍精简**
 - Stage: `{ id, lines:[{speaker,text}], choices:[{text,goto}], end:{next} }`
-- 不再解析或使用：`trustDelta` / `moodDelta` / `requireTrust` / `requireMood` / `auto` 等旧字段；残留即忽略不报错。
+- 忽略并不报错：`trustDelta` / `moodDelta` / `requireTrust` / `requireMood` / `auto` 等历史字段。
 
-**扩展预留点（尚未实现，仅接口层想象）**
-- tagsAdd：未来可在 choice 上添加标签写入 `this.tags` 并被后续场景读取。
-- 行级 typingSpeed：为个别台词调整节奏。
-- 条件分支：在渲染 choices 前按 requireTags / excludeTags 过滤。
-- 分支统计：记录走过的阶段 id 供终章文案引用。
+**扩展预留（尚未实现）**
+- tagsAdd：为后续场景准备上下文标签。
+- 行级 typingSpeed：个别台词节奏。
+- 条件过滤：requireTags / excludeTags。
+- 路径统计：用于终章个性化总结。
 
 ### 剧情梗概
 （占位：此处不写具体剧情内容，保持私密性）
@@ -284,86 +289,87 @@ case 'multiSelect': return [...wrapper.querySelectorAll("input[type=checkbox]:ch
 
 ---
 ## 📜 Scene1 分支脚本 JSON Schema (`data/scene1_script.json`)
-（2024/重构后版本：仅保留基础分支字段，已移除数值驱动机制）
+（2025/统一命名 + win/fail 版本）
 
-### 最小示例（简化后）
+### 最小示例（dialogue_x_y + win/fail）
 ```jsonc
 {
-  "meta": { "version": 2, "desc": "Scene1 branching script" },
+  "meta": { "version": 3, "desc": "Scene1 branching script (dialogue_x_y)" },
   "stages": [
-    {
-      "id": "intro",
-      "lines": [
+    { "id": "dialogue_0_1", "lines": [
         { "speaker": "me", "text": "为了给你准备一个最特别的生日礼物，我竟然……时空裂开了！" },
         { "speaker": "her", "text": "……你是谁？" }
       ],
       "choices": [
-        { "text": "认真解释", "goto": "prove" },
-        { "text": "开个玩笑", "goto": "intro" }
+        { "text": "说出专属记忆细节", "goto": "dialogue_0_2" },
+        { "text": "随口糊弄（翻车）", "goto": "fail" }
       ]
     },
-    {
-      "id": "prove",
-      "lines": [ { "speaker": "her", "text": "……这些细节，确实只有他才知道。" } ],
-      "choices": [ { "text": "继续安抚情绪", "goto": "comfort" } ]
-    },
-    {
-      "id": "comfort",
-      "lines": [ { "speaker": "system", "text": "尝试让她平静下来…" } ],
-      "choices": [ { "text": "进入下一幕", "goto": "end_transition" } ]
-    },
-    { "id": "end_transition", "lines": [ { "speaker": "system", "text": "（你们将一起面对下一段记忆……）" } ], "end": { "next": "exam" } }
+    { "id": "dialogue_0_2", "lines": [ { "speaker": "her", "text": "……这些细节，确实只有他才知道。" } ],
+      "choices": [ { "text": "继续安抚", "goto": "dialogue_0_3" } ] },
+    { "id": "dialogue_0_3", "lines": [ { "speaker": "system", "text": "她的防备似乎在慢慢下降…" } ],
+      "choices": [ { "text": "进入下一幕", "goto": "win" } ] },
+    { "id": "dialogue_1_1", "lines": [ { "speaker": "her", "text": "你刚才那些说辞…完全站不住脚。" } ],
+      "choices": [
+        { "text": "这次认真讲述过去", "goto": "dialogue_1_2" },
+        { "text": "继续嘴硬（再次失败）", "goto": "fail" }
+      ] },
+    { "id": "dialogue_1_2", "lines": [ { "speaker": "me", "text": "我记得你那次晚自习忘带水杯…" } ],
+      "choices": [ { "text": "她情绪缓和了", "goto": "dialogue_1_3" } ] },
+    { "id": "dialogue_1_3", "lines": [ { "speaker": "system", "text": "或许这次终于成功说服她…" } ],
+      "choices": [ { "text": "进入下一幕", "goto": "win" } ] }
   ]
 }
 ```
 
-### 字段定义（精简）
+### 字段定义
 | 层级 | 字段 | 类型 | 说明 |
 |------|------|------|------|
 | 根 | meta | object? | 元信息（可忽略）。|
-| 根 | stages | Stage[] | 阶段数组，按需引用，不要求顺序线性。|
-| Stage | id | string | 阶段唯一标识。|
+| 根 | stages | Stage[] | 阶段数组；引用自由，不要求顺序排列。|
+| Stage | id | string | 必须匹配 `dialogue_<failCount>_<seq>`。|
 | Stage | lines | Line[] | 进入阶段后按顺序逐句播放。|
-| Stage | choices | Choice[]? | 所有台词播完后显示的分支按钮；缺省表示无按钮。|
-| Stage | end | { next: string }? | 阶段结束后触发场景转场：`next` 为目标场景 ID（例：`exam`）。|
+| Stage | choices | Choice[]? | 所有台词播完后显示的分支按钮。|
+| Stage | end | { next: string }? | 阶段结束后触发转场：`next` 为目标场景 ID（例：`exam`）。|
 
 #### Line
 | 字段 | 说明 |
 |------|------|
-| speaker | `me` | `her` | `system`，决定对话框上方说话人徽标颜色与位置。|
-| text | 文本（支持换行 \n；无需添加“我：”前缀）。|
+| speaker | `me` | `her` | `system`。|
+| text | 台词文本（支持 `\n`）。|
 
 #### Choice
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | text | string | 按钮文案。|
-| tagsAdd | string[]? | （保留）添加标签，可供后续场景读取。|
-| goto | string? | 跳转到的下一个阶段 ID。|
-
-（AutoRule 结构已移除）
+| tagsAdd | string[]? | 预留：添加标签。|
+| goto | string? | 下一阶段 ID；或特殊：`win` / `fail`。|
 
 #### End
 | 字段 | 类型 | 说明 |
 |------|------|------|
-| next | string | 结束后跳转的“后续场景”ID（非阶段；用于 `this.ctx.go('transition', { next })`）。|
+| next | string | 跳往的下一场景（非阶段）。|
 
-### 行为流程（精简后）
-1. 进入阶段 → `lines` 逐句播放（空格 / 点击空白推进）。
-2. `lines` 播完：若存在 `end` → 触发转场；否则渲染 `choices`。
-3. 点击某个 `choice` → 跳转其 `goto` 阶段。
+### 行为流程（dialogue_x_y 版本）
+1. 起点：`dialogue_0_1`。
+2. 播放 `lines`（空格 / 点击空白推进；打字中再次触发补全）。
+3. 播放完：若存在 `end` → 转场；否则渲染 `choices`。
+4. 普通 `goto`：直接跳 `dialogue_*_*`。
+5. `goto: fail`：失败 overlay → 跳 `dialogue_{当前failCount+1}_1`。
+6. `goto: win`：成功 overlay → 转场到下一场景（`exam`）。
 
-### 失败兜底 & 容错
-- 若网络或解析失败，代码会回退到一个仅含 intro 的最小脚本，避免卡死。
-- 未找到 `goto` 的阶段会被忽略（安全失败：无跳转）。
-- 数值自动钳制在 0 ~ 目标上限；负值不会抛异常。
+### 失败链与容错
+- 不再提供脚本加载失败 fallback；脚本必须完整。
+- 所有 fail 目标阶段 `dialogue_{n+1}_1` 必须显式存在。
+- 缺失目标：仅控制台警告（开发期暴露配置问题）。
 
 ### 可扩展建议（尚未内置）
-- requireTags / excludeTags：基于多样陪伴标签锁定分支。
-- typingSpeed：行级局部打字机速度覆盖全局。
-- moodDecay：阶段级别情绪随时间衰减（倒逼及时选择）。
-- branchKey + 回溯：记录路径用于终章统计。
+- requireTags / excludeTags：基于标签做分支锁定。
+- 行级 typingSpeed：节奏微调。
+- 分支路径记录：终章个性化统计引用。
+- 更复杂失败树：允许 `fail` 携带参数决定不同后续（未来可拓展 `fail:x` 语法）。
 
-> 旧数值逻辑已彻底移除；历史脚本中残留相关字段会被忽略，不会报错。
+> 历史数值驱动字段已移除；残留将被静默忽略。
 
 ---
 ## 🛡️ 全局机制
