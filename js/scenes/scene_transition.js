@@ -27,11 +27,11 @@ export class TransitionScene extends BaseScene {
 
   // 过渡：停止上一场景 BGM
   try { audioManager.stopAll({ fadeOut:600 }); } catch(e){}
-  // 独特音效策略：优先级
+  // 独特音效策略：优先级（仅保留新命名）
   // 1. data.sound 显式传入路径
-  // 2. 自动推断命名： ./assets/audio/scene_<from><to>.{mp3,wav,ogg} （来源与目标场景数字或 id 拼接）
-  // 3. 自动推断命名： ./assets/audio/transition_<style>.{wav,mp3,ogg}
-  // 4. flash45 特例：scene_45.wav 作为兜底候选
+  // 2. flash_<from><to>.{mp3,wav,ogg}
+  // 3. transition_<style>.{wav,mp3,ogg}
+  // 4. flash45 特例：flash_45.(mp3|wav|ogg)
   // 5. 若 data.useBGM === true 则忽略一次性音效，使用默认 transition BGM
   // 6. 最终回退：若以上均失败，flash45 静默，其它播放过渡 BGM
   const useBGM = data?.useBGM === true;
@@ -54,13 +54,16 @@ export class TransitionScene extends BaseScene {
     const fromCode = mapToCode(fromId);
     const toCode = mapToCode(next);
     if(fromCode && toCode){
-      ['.mp3','.wav','.ogg'].forEach(ext=> tryCandidates.push(`./assets/audio/scene_${fromCode}${toCode}${ext}`));
+      // 2) 新命名 flash_<from><to>
+      ['.mp3','.wav','.ogg'].forEach(ext=> tryCandidates.push(`./assets/audio/flash_${fromCode}${toCode}${ext}`));
     }
     // 3) transition_<style>
     const base = `./assets/audio/transition_${originalStyle}`;
     ['.wav','.mp3','.ogg'].forEach(ext=> tryCandidates.push(base+ext));
     // 4) flash45 特例
-    if(originalStyle==='flash45') tryCandidates.push('./assets/audio/scene_45.wav');
+    if(originalStyle==='flash45'){
+      ['.mp3','.wav','.ogg'].forEach(ext=> tryCandidates.push(`./assets/audio/flash_45${ext}`));
+    }
   }
   let playedOneShot=false;
   if(!useBGM){

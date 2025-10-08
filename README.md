@@ -427,7 +427,7 @@ this.ctx.go('transition', {
   style: 'flash45',          // flash12 | flash45 | (自定义 petal / memory ...)
   images: ['.../mem_4_1.jpg','.../mem_4_2.jpg'], // 仅 flash45 需要
   duration: 4000,            // ms；显式提供时不会被内部重算覆盖
-  sound: './assets/audio/scene_45.wav', // 一次性音效（优先级最高）
+  sound: './assets/audio/flash_45.mp3', // 一次性音效（优先级最高，统一 flash_<from><to> 命名）
   tip: '那些瞬间像流光一样掠过…',
   useBGM: false              // true 则忽略一次性音效，使用过渡 BGM
 });
@@ -440,13 +440,19 @@ this.ctx.go('transition', {
 | 未传 & flash45 | 帧数 * 260ms ，钳制 1800~4500ms |
 | 未传 & flash12 | 使用默认构造时长 (3000ms) |
 
-### 音效优先级
+#### 关于缺失转场音效的健壮性
+若某次转场未放置对应 `flash_<from><to>` 文件（且若使用 flash12 样式也不存在 `transition_flash12.(wav|mp3|ogg)` 兜底），系统回退链为：
+1. 显式 `data.sound`
+2. `flash_<from><to>.(mp3|wav|ogg)`
+4. （无命中且未 useBGM）播放一次性过渡 BGM；不会报错，仅缺少特定短音效层。
+
+### 音效优先级（纯净版）
 1. 显式 `sound`
-2. 自动命名（新增）：`./assets/audio/scene_<from><to>.{mp3,wav,ogg}` 例如从 1→2 尝试 `scene_12.mp3`；来源和目标通过场景 id 映射数字（`register=0,intro=1,exam=2,timeline=3,confession=4,date=5,scarf=6,future=7`）。
-3. 自动命名：`./assets/audio/transition_<style>.{wav,mp3,ogg}`
-4. （flash45 回退）`./assets/audio/scene_45.wav`
-5. `useBGM:true` → 跳过 1~4，播放一次性过渡 BGM（非循环）
-6. 仍无：flash45 静默，其它 style 播放默认 BGM
+2. `flash_<from><to>.{mp3,wav,ogg}`（统一命名）
+3. `transition_<style>.{wav,mp3,ogg}`（风格兜底）
+4. flash45 兜底：`flash_45.(mp3|wav|ogg)`
+5. `useBGM:true` → 直接播放过渡 BGM（非循环）
+6. 仍无：flash45 静默，其它 style 回退过渡 BGM
 
 > 建议一次性音效长度 0.4s~2s，首帧无静音。
 
@@ -470,27 +476,28 @@ this.ctx.go('transition', {
 ```
 在用户任意首次点击后预热音频上下文以避免自动播放阻止。
 
-### 音频命名规范（新增约定）
-为统一管理与快速定位，建议后续将音频文件按以下规则命名：
+### 音频命名规范（统一 flash_<from><to>）
+仅保留新规范：转场一次性音效采用 `flash_<from><to>`（数字拼接，不加下划线）；不再使用旧 `scene_<from><to>`。
 
 | 类型 | 命名模式 | 示例 | 说明 |
 |------|----------|------|------|
 | 场景 BGM | `scene_<x>.mp3` | `scene_1.mp3`, `scene_5.mp3` | 每个主要场景一个主 BGM（使用 mp3；若需无损可并行放 wav）。|
-| 转场一次性音效 | `scene_<from><to>.(mp3/wav/ogg)` | `scene_12.mp3`, `scene_45.wav` | 表示从场景 `<from>` 跳到 `<to>` 的独特过渡（数字拼接，不加下划线）。|
+| 转场一次性音效 | `flash_<from><to>.(mp3/wav/ogg)` | `flash_12.mp3`, `flash_45.mp3` | 从场景 `<from>` 跳到 `<to>` 的独特过渡（数字拼接，不加下划线）。|
 
 
 命名解读：
-- 进入场景 5：系统可根据你显式调用 `audioManager.playSceneBGM('scene5')` 或自定义逻辑播放 `assets/audio/scene_5.mp3`。
-- 从 1 → 2 的转场：可在调用时指定 `sound:'./assets/audio/scene_12.mp3'`。
-- 从 4 → 5 若遵循既有案例：`scene_45.wav` 已被使用；也可换 mp3 保持统一。
+- 进入场景 5：主 BGM 仍使用 `scene_5.mp3`（BGM 前缀不变）。
+- 从 1 → 2 的转场：使用 `flash_12.mp3`。
+- 从 4 → 5 的转场：使用 `flash_45.mp3`。
 
 推荐实践：
-1. 新增转场时优先放置 `scene_<from><to>.mp3`；调用时直接显式 `sound`，避免靠风格推断。
-2. 若某转场需要多变体（例如不同分支音效），可扩展后缀：`scene_12_alt1.mp3`，并在代码中显式引用。
-3. 若想完全弃用 `transition_<style>` 方案，可在 README 旧位置标注“已废弃”，但目前保留兼容无需修改代码。
-4. 使用 wav 仅限短促（<2s）需要高瞬态清晰度的音效；一般统一 mp3 足够。
+1. 新增转场直接放置 `flash_<from><to>.mp3`，可省略 `sound`。
+2. 多变体用后缀：`flash_12_alt1.mp3`（显式传 `sound`）。
+3. `transition_<style>` 仅作应急兜底，不再新增此前缀文件。
+4. wav 仅用于短促高瞬态（<2s），常规统一 mp3。
+5. 无 `flash_12` 时可补 `flash_12.mp3` 或使用 `transition_flash12.mp3` 获得区分度。
 
-（当前代码：显式 `sound` > `scene_<from><to>` 自动推断 > `transition_<style>` 自动推断 > flash45 特例 > BGM/静默。你仍可显式传 `sound` 覆盖所有自动推断。）
+（当前代码：显式 `sound` > `flash_<from><to>` > `transition_<style>` > `flash_45` 兜底 > BGM/静默。）
 
 ---
 ## 🪄 未来路线（Roadmap）

@@ -194,7 +194,19 @@ export class Scene1Intro extends BaseScene {
           const targetGoto = e.currentTarget.dataset.goto;
           if(!targetGoto) return;
           if(targetGoto==='win'){
-            showOutcomeOverlay('win').then(()=> this.ctx.go('transition',{next:'exam',style:'flash12'}));
+            showOutcomeOverlay('win').then(()=>{
+              // 隐藏对话框 & 选项，显示占位过渡面板
+              const vnWrapper = el.querySelector('.vn-wrapper');
+              vnWrapper.classList.add('hidden');
+              const placeholder=document.createElement('div');
+              placeholder.className='win-next-wrapper';
+              placeholder.innerHTML=`<div class='win-text' style="margin:1.2rem 0;font-size:1.05rem;line-height:1.6;">她终于相信了你。<br/>（这里将来放入一小段更走心的文字过渡到下一段记忆）</div>
+              <button class='btn-go-exam' style='padding:.65rem 1.2rem;font-size:.95rem;'>一起面对下一段记忆 →</button>`;
+              el.appendChild(placeholder);
+              placeholder.querySelector('.btn-go-exam').addEventListener('click',()=>{
+                this.ctx.go('transition',{next:'exam',style:'flash12'});
+              });
+            });
             return;
           }
           if(targetGoto==='fail'){
@@ -227,7 +239,9 @@ export class Scene1Intro extends BaseScene {
   /**
    * 跳转阶段：装入 lines → 播放；若阶段含 end 则走转场；否则渲染 choices。
    */
-  const goStage=id=>{ const st=findStage(id); if(!st) return; this.currentStage=st; appendLinesProgressively(st,()=>{ if(endStage(st)) return; renderChoices(st); }); };
+  const goStage=id=>{ const st=findStage(id); if(!st) return; this.currentStage=st; // 清空残留选项防止上一阶段按钮闪留
+    const choicesBox=el.querySelector('.dynamic-choices'); if(choicesBox) choicesBox.innerHTML='';
+    appendLinesProgressively(st,()=>{ if(endStage(st)) return; renderChoices(st); }); };
 
     // 推进事件：空格或点击空白区域
   /**
