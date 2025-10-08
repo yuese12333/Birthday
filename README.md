@@ -67,12 +67,14 @@ README.md
 - 可以通过 debug 面板进入任意场景。
 
 ### 1. 高中安抚 / 穿越自证（Scene1Intro）
-**当前实现（统一命名 + 失败推进）**
+**当前实现（统一命名 + 失败推进 + 扩展 fail:x）**
 - 外部脚本驱动：`data/scene1_script.json`。
 - 阶段命名强制：`dialogue_<failCount>_<seq>`；入口固定 `dialogue_0_1`。
-- 分支支持特殊 goto：`win` / `fail`。
+- 分支支持特殊 goto：`win` / `fail` / `fail:x`（x 为数字）。
   - `win`：显示成功 overlay → 过渡到下一正式场景（当前为 `exam`）。
-  - `fail`：显示失败 overlay → 自动跳转 `dialogue_{当前failCount+1}_1`（必须存在；未找到仅控制台警告）。
+  - `fail`：显示失败 overlay → 自动跳转 `dialogue_{当前failCount+1}_1`。
+  - `fail:x`：显示失败 overlay → 跳转指定失败层级 `dialogue_x_1`（可用于分支回溯或多类失败分叉）。
+  - 特殊 token 匹配大小写不敏感，并会自动 trim（如 "  WIN  " 仍被识别）。
 - 去除旧 fallback：假设脚本必然成功加载且结构正确。
 - 无隐藏数值：只保留“逐行播放 → 分支选择 → 跳阶段 / 触发 win/fail”。
 - 打字机：空格 / 点击空白提前补全或推进下一行。
@@ -342,8 +344,9 @@ case 'multiSelect': return [...wrapper.querySelectorAll("input[type=checkbox]:ch
 | 字段 | 类型 | 说明 |
 |------|------|------|
 | text | string | 按钮文案。|
+| win | boolean \| null? | 三态：`true`=胜利分支，`false`=失败分支（自动推导下一失败层），`null` 或缺省=普通分支；若存在该字段（非 `null`）将忽略 `goto`。|
+| goto | string \| null? | 普通阶段 ID（例如 `dialogue_0_2`）；不再书写 `win`/`fail` 特殊 token；若旧脚本仍使用 `win`/`fail`/`fail:x` 会被兼容解析。|
 | tagsAdd | string[]? | 预留：添加标签。|
-| goto | string? | 下一阶段 ID；或特殊：`win` / `fail`。|
 
 #### End
 | 字段 | 类型 | 说明 |
@@ -354,20 +357,26 @@ case 'multiSelect': return [...wrapper.querySelectorAll("input[type=checkbox]:ch
 1. 起点：`dialogue_0_1`。
 2. 播放 `lines`（空格 / 点击空白推进；打字中再次触发补全）。
 3. 播放完：若存在 `end` → 转场；否则渲染 `choices`。
-4. 普通 `goto`：直接跳 `dialogue_*_*`。
-5. `goto: fail`：失败 overlay → 跳 `dialogue_{当前failCount+1}_1`。
-6. `goto: win`：成功 overlay → 转场到下一场景（`exam`）。
+4. 分支优先判定 `choice.win`：
+  - `true` → win overlay → 下一场景。
+  - `false` → fail overlay → `dialogue_{failCount+1}_1`。
+  - `null` / 缺省 → 继续看 `goto`。
+5. 普通 `goto`：跳 `dialogue_*_*`（若阶段不存在给短暂提示 + console.warn）。
+6. 兼容旧脚本：若未提供 `win` 字段且 `goto` 填写了 `win` / `fail` / `fail:x`，仍按旧规则处理；未来可以逐步迁移为新写法。 
+7. `fail:x`（旧写法兼容）仍可指定失败层起点 `dialogue_x_1`，推荐迁移为 `win:false` + 在脚本设计上控制当前层级。 
+8. goto 解析前依旧会 trim + 小写判断特殊 token（仅兼容阶段），普通阶段 ID 按原值匹配。
 
 ### 失败链与容错
 - 不再提供脚本加载失败 fallback；脚本必须完整。
-- 所有 fail 目标阶段 `dialogue_{n+1}_1` 必须显式存在。
-- 缺失目标：仅控制台警告（开发期暴露配置问题）。
+- 自动递增失败：`fail` 根据当前阶段 failCount 计算下一层 `dialogue_{n+1}_1`。
+- 指定失败层级：`fail:x` 允许显式跳到某个失败层链起点，支持分叉/回溯设计。
+- 缺失目标阶段：界面弹出 4 秒提示（不打断体验）+ 控制台警告，便于开发排查。
 
 ### 可扩展建议（尚未内置）
 - requireTags / excludeTags：基于标签做分支锁定。
 - 行级 typingSpeed：节奏微调。
 - 分支路径记录：终章个性化统计引用。
-- 更复杂失败树：允许 `fail` 携带参数决定不同后续（未来可拓展 `fail:x` 语法）。
+- 更复杂失败树：已提供 `fail:x` 精确跳转，可进一步叠加标签/条件形成多维失败分支。
 
 > 历史数值驱动字段已移除；残留将被静默忽略。
 

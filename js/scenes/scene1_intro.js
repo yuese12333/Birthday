@@ -2,6 +2,40 @@ import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
 import { typeSfx } from '../core/typeSfx.js';
 
+// 若全局未提供 showOutcomeOverlay，这里给出一个最小可用的本地兜底实现
+// 语义：返回一个 Promise，在用户点击“继续”按钮后 resolve
+// 如果外部以后定义了 window.showOutcomeOverlay，会优先使用外部版本（保持可替换性）
+const showOutcomeOverlay = (type)=>{
+  try {
+    if(typeof window !== 'undefined' && typeof window.showOutcomeOverlay === 'function'){
+      return window.showOutcomeOverlay(type);
+    }
+  } catch(_e) { /* 忽略 window 访问异常（极少数环境）*/ }
+  return new Promise(resolve=>{
+    // 移除旧的
+    const old=document.querySelector('.outcome-overlay-fallback');
+    if(old) old.remove();
+    const ov=document.createElement('div');
+    ov.className='outcome-overlay-fallback';
+    ov.style.cssText='position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);';
+    const box=document.createElement('div');
+    box.style.cssText='background:#fff;padding:1.4rem 1.6rem;max-width:340px;width:88%;border-radius:14px;box-shadow:0 6px 22px -4px rgba(0,0,0,.28);font-size:.95rem;line-height:1.55;animation:fadeScale .32s ease;';
+    const isWin=type==='win';
+    box.innerHTML=`<h2 style="margin:0 0 .75rem;font-size:1.25rem;color:${isWin?'#e91e63':'#3949ab'};text-align:center;">${isWin?'成功':'失败'}</h2>
+      <p style='margin:.2rem 0 1rem;white-space:pre-line;'>${isWin? '她信了你一次。（可在脚本里自定义更走心的文字）':'这次没说服她，再试试别的说法吧。'}</p>
+      <button class='outcome-continue' style='display:block;margin:0 auto;padding:.55rem 1.2rem;border-radius:999px;border:none;background:${isWin?'#ff4d84':'#5c6bc0'};color:#fff;font-size:.9rem;cursor:pointer;'>继续</button>`;
+    ov.appendChild(box);
+    document.body.appendChild(ov);
+    const done=()=>{
+      ov.style.opacity='0';
+      ov.style.transition='opacity .22s';
+      setTimeout(()=>{ ov.remove(); resolve(); },230);
+    };
+    box.querySelector('.outcome-continue').addEventListener('click',done);
+    ov.addEventListener('click',e=>{ if(e.target===ov) done(); });
+  });
+};
+
 /**
  * Scene1Intro
  * 第一幕：纯分支视觉小说（无任何隐藏数值 / 好感度 / 进度条）
@@ -63,7 +97,11 @@ export class Scene1Intro extends BaseScene {
     const resp=await fetch('./data/scene1_script.json?_='+Date.now());
     const script=await resp.json();
 
-    const findStage=id=>script.stages.find(s=>s.id===id);
+  // 构建映射提升检索 + 兼容任意顺序
+  // JSON 设计说明：不强制 version>=3；当前脚本示例 version:1 也可运行。
+  // 起始阶段不再硬编码必须存在 dialogue_0_1；若缺失则取第一条，增强脚本灵活性。
+  const stageMap = new Map(script.stages.map(s=>[s.id,s]));
+  const findStage=id=>stageMap.get(id);
     // === 精简版 dialogue_x_y & win/fail ===
     // 约定：id = dialogue_<failCount>_<seq>
     // fail 分支：跳到 dialogue_{failCount+1}_1
@@ -74,7 +112,7 @@ export class Scene1Intro extends BaseScene {
       const curFail = parseInt(m[1],10);
       return `dialogue_${curFail+1}_1`;
     };
-    let lineQueue=[];     // 当前阶段行数组
+  let lineQueue=[];     // 当前阶段行数组
     let lineIndex=0;      // 下一待渲染的行索引
     let stageDoneCallback=null; // 阶段全部行显示完后的回调
     let awaitingLine=false;     // 防止并发推进
@@ -147,12 +185,8 @@ export class Scene1Intro extends BaseScene {
         return;
       }
       if(lineIndex>=lineQueue.length){
-        // 所有行已显示完；确保不在打字状态后调用回调
-        if(!isTyping){
-          speakerLeft.classList.add('hidden');
-          speakerRight.classList.add('hidden');
-          if(stageDoneCallback) stageDoneCallback();
-        }
+        // 行队列完成：保留最后说话人徽标用于提示“是谁的发言导致出现这些选项”
+        if(!isTyping && stageDoneCallback) stageDoneCallback();
         return;
       }
       awaitingLine=true;
@@ -181,6 +215,69 @@ export class Scene1Intro extends BaseScene {
     /**
      * 渲染当前阶段分支按钮；无 choices 时直接返回等待推进或结束。
      */
+    // 新三态分支处理：choice.win === true(胜利)/false(失败)/null(普通)
+    // 需求变更：不再弹出 overlay，而是：
+    //  - win: 隐藏原对话框，直接显示一段胜利文本 + 继续按钮（进入下一场景）
+    //  - fail: 不显示弹窗，直接跳转下一失败阶段；若不存在提示缺失
+    const handleChoice = (choice)=>{
+      if(!choice) return;
+      if(choice.win === true){
+        const vnWrapper = el.querySelector('.vn-wrapper');
+        if(vnWrapper) vnWrapper.classList.add('hidden');
+        // 防止重复生成
+        if(el.querySelector('.win-next-wrapper')) return;
+        const placeholder=document.createElement('div');
+        placeholder.className='win-next-wrapper';
+        placeholder.style.cssText='margin-top:1.2rem;animation:fadeIn .35s ease;';
+        // 可根据脚本 meta.winText 外部化（若存在）
+        const winText = (script.meta && script.meta.winText) || '她终于相信了你。\n（这里可以写更走心的过渡文案）';
+        placeholder.innerHTML=`<div class='win-text' style="white-space:pre-line;margin:0 0 1.1rem;font-size:1.05rem;line-height:1.6;">${winText}</div>
+        <button class='btn-go-exam' style='padding:.65rem 1.2rem;font-size:.95rem;border:none;border-radius:8px;background:#ff4d84;color:#fff;cursor:pointer;'>进入下一段记忆 →</button>`;
+        el.appendChild(placeholder);
+        placeholder.querySelector('.btn-go-exam').addEventListener('click',()=>{
+          this.ctx.go('transition',{next:'exam',style:'flash12'});
+        });
+        return;
+      }
+      if(choice.win === false){
+        const curId = this.currentStage?.id;
+        const nextFailId = computeNextFailId(curId);
+        if(nextFailId && findStage(nextFailId)){
+          goStage(nextFailId);
+        } else {
+          console.warn('未找到下一失败阶段', nextFailId);
+          if(!el.querySelector('.fail-missing-tip')){
+            const tip=document.createElement('div');
+            tip.className='fail-missing-tip';
+            tip.style.cssText='margin-top:.6rem;font-size:.75rem;opacity:.75;';
+            tip.textContent='（失败后续阶段未配置，仍停留当前）';
+            el.appendChild(tip);
+            setTimeout(()=>tip.remove(),4000);
+          }
+        }
+        return;
+      }
+      // 普通分支：依赖 goto 为阶段 ID
+      const target = (choice.goto||'').trim();
+      if(!target){
+        console.warn('普通分支缺少 goto 阶段 ID', choice);
+        return;
+      }
+      if(!findStage(target)){
+        console.warn('阶段不存在：', target);
+        if(!el.querySelector('.missing-stage-tip')){
+          const tip=document.createElement('div');
+          tip.className='missing-stage-tip';
+          tip.style.cssText='margin-top:.6rem;font-size:.75rem;opacity:.75;';
+          tip.textContent=`（脚本未定义阶段 ${target} ）`;
+          el.appendChild(tip);
+          setTimeout(()=>tip.remove(),4000);
+        }
+        return;
+      }
+      goStage(target);
+    };
+
     const renderChoices=stage=>{
       choicesBox.innerHTML='';
       if(!stage.choices || !stage.choices.length){ return; }
@@ -188,53 +285,29 @@ export class Scene1Intro extends BaseScene {
         const btn=document.createElement('button');
         btn.type='button';
         btn.textContent=choice.text||'...';
-        if(choice.goto) btn.dataset.goto = choice.goto;
-        // 保留 click 以兼容桌面；移动端采用 pointer 事件委托，避免某些浏览器 click 延迟 / 丢失
-        btn.addEventListener('click', (e)=>{
-          const targetGoto = e.currentTarget.dataset.goto;
-          if(!targetGoto) return;
-          if(targetGoto==='win'){
-            showOutcomeOverlay('win').then(()=>{
-              // 隐藏对话框 & 选项，显示占位过渡面板
-              const vnWrapper = el.querySelector('.vn-wrapper');
-              vnWrapper.classList.add('hidden');
-              const placeholder=document.createElement('div');
-              placeholder.className='win-next-wrapper';
-              placeholder.innerHTML=`<div class='win-text' style="margin:1.2rem 0;font-size:1.05rem;line-height:1.6;">她终于相信了你。<br/>（这里将来放入一小段更走心的文字过渡到下一段记忆）</div>
-              <button class='btn-go-exam' style='padding:.65rem 1.2rem;font-size:.95rem;'>一起面对下一段记忆 →</button>`;
-              el.appendChild(placeholder);
-              placeholder.querySelector('.btn-go-exam').addEventListener('click',()=>{
-                this.ctx.go('transition',{next:'exam',style:'flash12'});
-              });
-            });
-            return;
-          }
-          if(targetGoto==='fail'){
-            const curId = this.currentStage?.id;
-            showOutcomeOverlay('fail').then(()=>{
-              const next = computeNextFailId(curId);
-              if(findStage(next)) goStage(next); else console.warn('未找到下一失败阶段', next);
-            });
-            return;
-          }
-          goStage(targetGoto);
-        });
+        btn._choiceData=choice; // 保存引用
         choicesBox.appendChild(btn);
+      });
+      choicesBox.querySelectorAll('button').forEach(btn=>{
+        btn.addEventListener('click', e=>{
+          if(btn._handled) return;
+          btn._handled=true; setTimeout(()=>btn._handled=false,400);
+          handleChoice(btn._choiceData);
+        });
       });
       refreshChoiceLockStates();
     };
 
   // 移动端偶发 click 不触发：增加 pointerup / touchend 兜底（防某些 WebView 丢失 click）
     const choiceTapHandler = (e)=>{
-      const btn = e.target.closest('button[data-goto]');
+      const btn = e.target.closest('button');
       if(!btn || !choicesBox.contains(btn)) return;
-      // 避免同时触发 click 与 pointerup 导致重复跳转：使用节流标记
-      if(btn._tapHandledAt && performance.now() - btn._tapHandledAt < 300) return;
+      if(btn._tapHandledAt && performance.now() - btn._tapHandledAt < 250) return; // 节流
       btn._tapHandledAt = performance.now();
-      const to = btn.dataset.goto; if(to) goStage(to);
+      handleChoice(btn._choiceData);
     };
     choicesBox.addEventListener('pointerup', choiceTapHandler, { passive:true });
-    choicesBox.addEventListener('touchend', choiceTapHandler, { passive:true });
+    // touchend 可能与 pointerup 重复，在现代浏览器 pointer 统一即可；若需兼容旧环境再加。
 
   /**
    * 跳转阶段：装入 lines → 播放；若阶段含 end 则走转场；否则渲染 choices。
@@ -267,8 +340,12 @@ export class Scene1Intro extends BaseScene {
     // 标题点击彩蛋：第 6 次出现提示；第 10 次给隐藏文案，仅一次
     title.addEventListener('click',()=>{ this.titleClicks++; if(this.titleClicks===6){ titleEgg.textContent='（再点几下也许会有点什么~）'; titleEgg.classList.remove('hidden'); } if(this.titleClicks===10 && !this._titleBonusGiven){ this._titleBonusGiven=true; titleEgg.textContent='（给你一个看不见的勇气 buff！）'; }});
 
-  // 强制使用新命名起始；假设一定存在 dialogue_0_1
-  goStage('dialogue_0_1');
+  // 起始阶段选择策略：优先 dialogue_0_1；否则使用脚本第一条；再否则提示无阶段
+  // 这样旧脚本/实验脚本可以不用写 fail 体系的 0 号入口也能调试。
+  const startId = findStage('dialogue_0_1')? 'dialogue_0_1' : (script.stages[0]?.id || null);
+  if(startId) goStage(startId); else {
+    vnText.textContent='脚本中未找到任何阶段 (stages[])';
+  }
     this.ctx.rootEl.appendChild(el);
   }
 
