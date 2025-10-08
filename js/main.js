@@ -15,8 +15,7 @@ const bus = new EventBus();
 const rootEl = document.getElementById('app');
 const sceneManager = new SceneManager(rootEl, bus);
 
-// 配置：若设为 true，无论 localStorage 是否已有 hasRegistered 都先进入注册页
-const FORCE_REGISTER_ALWAYS = true; // 修改为 true 即可默认进入注册页面
+const FORCE_REGISTER_ALWAYS = true; // 是否默认进入注册页面
 const ENABLE_PRELOAD_SCREEN = true; // 是否启用首屏资源预加载
 
 async function preloadAssets(){

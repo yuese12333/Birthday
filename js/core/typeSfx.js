@@ -73,17 +73,17 @@ class TypeSfx {
     
     // 主音量包络 - 快速上升然后迅速衰减
     gainMain.gain.setValueAtTime(0.0001, t);
-    gainMain.gain.exponentialRampToValueAtTime(0.35, t + 0.005);
+    gainMain.gain.exponentialRampToValueAtTime(0.18, t + 0.005);
     gainMain.gain.exponentialRampToValueAtTime(0.0001, t + 0.06);
     
     // 高频泛音音量 - 比主音小，持续时间更短
     gainHigh.gain.setValueAtTime(0.0001, t);
-    gainHigh.gain.exponentialRampToValueAtTime(0.15, t + 0.003);
+    gainHigh.gain.exponentialRampToValueAtTime(0.08, t + 0.003);
     gainHigh.gain.exponentialRampToValueAtTime(0.0001, t + 0.03);
     
     // 噪声音量 - 非常短的峰值
     noiseGain.gain.setValueAtTime(0.0001, t);
-    noiseGain.gain.exponentialRampToValueAtTime(0.1, t + 0.002);
+    noiseGain.gain.exponentialRampToValueAtTime(0.05, t + 0.002);
     noiseGain.gain.exponentialRampToValueAtTime(0.0001, t + 0.015);
     
     // 连接节点
