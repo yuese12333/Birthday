@@ -4,7 +4,6 @@
  * 规则：
  *  - 用户名任意（可为空）
  *  - 密码必须为 20241007 （在一起的日子）
- *  - 成功后写入 localStorage.hasRegistered = '1' 并跳转 intro 场景
  */
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
@@ -13,7 +12,7 @@ export class Scene0Register extends BaseScene {
   async enter(){
     const el = document.createElement('div');
     el.className = 'scene scene-register';
-    const has = localStorage.getItem('hasRegistered') === '1';
+        // 已移除注册印记机制，无需 localStorage 标记
     el.innerHTML = `
       <h1>进入之前 · 一个小小的仪式（开发版本不代表最终品质）</h1>
       <p class='desc'>这是我们专属的纪念入口。随便写一个“用户名”，然后输入那一天的日期当作密码。</p>
@@ -39,7 +38,7 @@ export class Scene0Register extends BaseScene {
           <button type='button' data-jump='date' style='background:#bbb;'>Date</button>
           <button type='button' data-jump='scarf' style='background:#bbb;'>Scarf</button>
           <button type='button' data-jump='future' style='background:#bbb;'>Future</button>
-          <button type='button' data-jump='resetReg' style='background:#e8a;'>清除注册标记</button>
+              <button type='button' data-jump='resetReg' style='background:#e8a;' disabled>清除注册标记</button>
         </div>
         <p style='margin:.6rem 0 0; line-height:1.4;'>说明：
           1) 按钮直接调用 sceneManager.go；2) 不做状态校验；3) 若需完全移除，删除本 details 块与下方相关监听即可。</p>
@@ -146,7 +145,6 @@ export class Scene0Register extends BaseScene {
       const data = new FormData(form);
       const pass = (data.get('pass')||'').trim();
       if(pass === '20241007'){
-        localStorage.setItem('hasRegistered','1');
         msg.innerHTML = `<span class='ok'>验证成功！那天开始的一切，都继续写在下面的故事里 ❤</span>`;
         setTimeout(()=> this.ctx.go('intro'), 800);
       } else {
@@ -235,14 +233,8 @@ export class Scene0Register extends BaseScene {
       debugPanel.querySelectorAll('button[data-jump]').forEach(btn=>{
         btn.addEventListener('click',()=>{
           const target = btn.getAttribute('data-jump');
-          if(target === 'resetReg'){
-            localStorage.removeItem('hasRegistered');
-            msg.innerHTML = `<span class='ok'>已清除标记，可再次体验注册。</span>`;
-            return;
-          }
           // 跳场景前可选择是否写入注册标记，确保后续流程不被卡住
           if(target !== 'intro' && target !== 'resetReg'){
-            localStorage.setItem('hasRegistered','1');
           }
             this.ctx.go(target);
         });

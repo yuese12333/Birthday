@@ -22,13 +22,13 @@
         { "speaker": "her", "text": "搞什么啊？你到底会不会？不会我问别人了。" }
       ],
       "choices": [
-        { "text": "你就不好奇溜溜是谁吗？", "trustDelta": 12, "goto": "trust_build_1" },
-        { "text": "我会！当然会！（这高中的题目我还不是手拿把掐哼哼~）", "trustDelta": 15, "goto": "trust_build_2" },
-        { "text": "你要问谁？", "trustDelta": 10, "goto": "trust_build_1" }
+        { "text": "你就不好奇溜溜是谁吗？", "goto": "trust_build_1" },
+        { "text": "我会！当然会！（这高中的题目我还不是手拿把掐哼哼~）", "goto": "trust_build_2" },
+        { "text": "你要问谁？", "goto": "trust_build_1" }
       ]
     },
     {
-      "id": "prove",
+      "id": "trust_build_1",
       "lines": [
         { "speaker": "me", "text": "我知道这有点不可思议，但你得相信我，我是从未来穿越过来的。我们未来在一起了，溜溜是你的昵称。" },
         { "speaker": "her", "text": "？？什么鬼啊？你发烧了？" },
@@ -42,45 +42,6 @@
         { "text": "她体育课后会把额前碎发撩三下", "goto": "trust_react" },
         { "text": "瞎编一个细节（她皱眉）", "goto": "prove" }
       ]
-    },
-    {
-      "id": "trust_react",
-      "lines": [
-        { "speaker": "me", "text": "（她盯着你几秒，呼吸慢慢放缓）" },
-        { "speaker": "her", "text": "……好。如果你真是未来的他……那现在我有点慌。" }
-      ],
-      "choices": [
-        { "text": "我先安抚你，别怕", "goto": "comfort" },
-        { "text": "再说一条记忆巩固", "goto": "prove" }
-      ]
-    },
-    {
-      "id": "comfort",
-      "lines": [
-        { "speaker": "system", "text": "（试着让她情绪稳定下来）" },
-        { "speaker": "her", "text": "我脑子好乱…考试要完了。" }
-      ],
-      "choices": [
-        { "text": "陪伴：先一起深呼吸", "goto": "comfort_loop" },
-        { "text": "鼓励：你已经准备得很好", "goto": "comfort_loop" },
-        { "text": "温柔：给你一个拥抱（想象）", "goto": "comfort_loop" }
-      ]
-    },
-    {
-      "id": "comfort_loop",
-      "lines": [
-        { "speaker": "me", "text": "（她的肩膀逐渐放松了一点）" }
-      ],
-      "choices": [
-        { "text": "继续：我们把今天拆成小块", "goto": "comfort_loop" },
-        { "text": "继续：考试只是一个节点", "goto": "comfort_loop" },
-        { "text": "她已经稳定了，进入下一幕", "goto": "end_transition" }
-      ]
-    },
-    {
-      "id": "end_transition",
-      "lines": [ { "speaker": "her", "text": "谢谢……那我们去面对它吧。" } ],
-      "end": { "next": "exam" }
     }
   ]
 }

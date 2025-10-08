@@ -2,7 +2,21 @@ import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
 import { typeSfx } from '../core/typeSfx.js';
 
-// 场景1：纯分支视觉小说（已移除信任/安抚数值系统）
+/**
+ * Scene1Intro
+ * 第一幕：纯分支视觉小说（无任何隐藏数值 / 好感度 / 进度条）
+ * 设计原则：
+ *  - “脚本驱动”：所有剧情行与分支按钮全部来源于外部 JSON（data/scene1_script.json）
+ *  - “最小内核”：只有【行播放 → 行播完显示分支 → 选择跳转阶段】三件事
+ *  - “无副作用状态”：不在内部累计数值；仅预留 this.tags 供未来可选扩展
+ *  - “可热更新脚本”：追加 Date.now() 防缓存，便于直接刷新调试脚本
+ *  - “可读性优先”：打字机 + 说话人徽标 + 移动端点击兼容
+ *
+ * 扩展点预留：
+ *  - 标签：choice 可在未来扩展 tagsAdd 字段写入 this.tags
+ *  - 语速：可在脚本行级添加 typingSpeed 覆盖全局 typingSpeed
+ *  - 条件分支：未来可在渲染 choices 前过滤 requireTags / excludeTags
+ */
 export class Scene1Intro extends BaseScene {
   async enter(){
     const el=document.createElement('div');
@@ -29,7 +43,7 @@ export class Scene1Intro extends BaseScene {
   this.titleClicks=0; this._titleBonusGiven=false;
 
     // 引用
-    const vnBox=el.querySelector('.vn-box');
+  // 已移除 vnBox 直接引用（保留 DOM 结构即可）
     const vnText=el.querySelector('.vn-text');
     const speakerLeft=el.querySelector('.vn-speaker.left');
     const speakerRight=el.querySelector('.vn-speaker.right');
@@ -46,17 +60,29 @@ export class Scene1Intro extends BaseScene {
       const muted=audioManager.toggleMute(); bgmBtn.classList.toggle('muted',muted);
     });
 
-    const refreshChoiceLockStates=()=>{}; // 不再有锁定需求
+  // 旧“锁定/解锁”逻辑已废弃：不需要 refreshChoiceLockStates
 
-    // 加载脚本
+  // ---------------------------
+  // 载入外部脚本（失败则回退到最小兜底）
+  // ---------------------------
     let script=null; try{ const resp=await fetch('./data/scene1_script.json?_='+Date.now()); if(resp.ok) script=await resp.json(); }catch(e){}
     if(!script || !Array.isArray(script.stages)) script={stages:[{id:'intro',lines:[{speaker:'system',text:'脚本加载失败，使用兜底。'}]}]};
 
     const findStage=id=>script.stages.find(s=>s.id===id);
-    let lineQueue=[]; let lineIndex=0; let stageDoneCallback=null; let awaitingLine=false;
-    // 打字机状态
-  let isTyping=false; let typingTimer=null; let currentFullText=''; let typingIndex=0; const typingSpeed=34; // ms/char 可调
-  let sfxCharCounter=0; // 控制每隔若干有效字符触发一次声音
+    let lineQueue=[];     // 当前阶段行数组
+    let lineIndex=0;      // 下一待渲染的行索引
+    let stageDoneCallback=null; // 阶段全部行显示完后的回调
+    let awaitingLine=false;     // 防止并发推进
+
+    // ---------------------------
+    // 打字机状态与参数
+    // ---------------------------
+    let isTyping=false;          // 是否正在逐字播放
+    let typingTimer=null;        // setInterval 句柄
+    let currentFullText='';      // 本行完整文本
+    let typingIndex=0;           // 已展示字符数
+    const typingSpeed=34;        // ms / char (可按体验快慢调)
+    let sfxCharCounter=0;        // 每两个有效字符触发一次敲击音，减少噪点
     const finishTyping=()=>{ if(typingTimer){ clearInterval(typingTimer); typingTimer=null; } isTyping=false; vnText.textContent=currentFullText; };
     const startTyping=(text)=>{
       finishTyping(); // 清理上一次
@@ -80,7 +106,14 @@ export class Scene1Intro extends BaseScene {
         if(typingIndex>=currentFullText.length){ finishTyping(); }
       }, typingSpeed);
     };
-    const updateSpeaker=(speaker)=>{
+  /**
+   * 更新对话框上方“说话人”徽标
+   * 规则：
+   *  - me: 左侧粉色
+   *  - her: 右侧（人物）
+   *  - system: 右侧系统色
+   */
+  const updateSpeaker=(speaker)=>{
       // 规格化，防止脚本里出现尾随空格或大小写差异
       if(typeof speaker==='string') speaker=speaker.trim().toLowerCase();
       const map={me:'我',her:'她',system:'系统'}; const label=map[speaker]??speaker;
@@ -97,7 +130,12 @@ export class Scene1Intro extends BaseScene {
         speakerLeft.classList.add('hidden');
       } 
     };
-    const renderNextLine=()=>{
+  /**
+   * 推进到下一行：
+   *  - 若仍在打字：先补完当前行（直接填充全文）
+   *  - 若行队列已空：触发阶段完成回调 → 渲染分支或转场
+   */
+  const renderNextLine=()=>{
       if(awaitingLine) return;
       if(isTyping){ // 若仍在打字，先直接补完当前再返回
         finishTyping();
@@ -121,15 +159,28 @@ export class Scene1Intro extends BaseScene {
       vnText.classList.add('flash-line');
       awaitingLine=false;
     };
-  const appendLinesProgressively=(stage,done)=>{ lineQueue=(stage&&stage.lines)?[...stage.lines]:[]; lineIndex=0; stageDoneCallback=done; awaitingLine=false; vnText.textContent=''; renderNextLine(); };
+    /**
+     * 进入一个阶段：
+     *  - 复制其 lines
+     *  - 重置索引
+     *  - 设置阶段完成回调
+     */
+    const appendLinesProgressively=(stage,done)=>{ lineQueue=(stage&&stage.lines)?[...stage.lines]:[]; lineIndex=0; stageDoneCallback=done; awaitingLine=false; vnText.textContent=''; renderNextLine(); };
 
-  // 自动跳转逻辑（基于数值）已移除。
+    // （历史遗留说明）旧的“基于隐藏数值自动跳转”系统已彻底移除。
 
-    const endStage=stage=>{ if(stage.end){ const nextScene=stage.end.next||'exam'; phaseMsg.textContent='……'; setTimeout(()=>this.ctx.go('transition',{next:nextScene,style:'flash12'}),700); return true; } return false; };
+  /**
+   * 阶段是否包含终结：有则触发转场到下一场景。
+   * end: { next: 'exam' }
+   */
+  const endStage=stage=>{ if(stage.end){ const nextScene=stage.end.next||'exam'; phaseMsg.textContent='……'; setTimeout(()=>this.ctx.go('transition',{next:nextScene,style:'flash12'}),700); return true; } return false; };
 
+    /**
+     * 渲染当前阶段分支按钮；无 choices 时直接返回等待推进或结束。
+     */
     const renderChoices=stage=>{
       choicesBox.innerHTML='';
-      if(!stage.choices || !stage.choices.length){ refreshChoiceLockStates(); return; }
+      if(!stage.choices || !stage.choices.length){ return; }
       stage.choices.forEach(choice=>{
         const btn=document.createElement('button');
         btn.type='button';
@@ -144,7 +195,7 @@ export class Scene1Intro extends BaseScene {
       refreshChoiceLockStates();
     };
 
-    // 移动端偶发 click 不触发，增加 pointerup / touchend 委托作为兜底
+  // 移动端偶发 click 不触发：增加 pointerup / touchend 兜底（防某些 WebView 丢失 click）
     const choiceTapHandler = (e)=>{
       const btn = e.target.closest('button[data-goto]');
       if(!btn || !choicesBox.contains(btn)) return;
@@ -156,10 +207,20 @@ export class Scene1Intro extends BaseScene {
     choicesBox.addEventListener('pointerup', choiceTapHandler, { passive:true });
     choicesBox.addEventListener('touchend', choiceTapHandler, { passive:true });
 
-    const goStage=id=>{ const st=findStage(id); if(!st) return; this.currentStage=st; appendLinesProgressively(st,()=>{ if(endStage(st)) return; renderChoices(st); }); };
+  /**
+   * 跳转阶段：装入 lines → 播放；若阶段含 end 则走转场；否则渲染 choices。
+   */
+  const goStage=id=>{ const st=findStage(id); if(!st) return; this.currentStage=st; appendLinesProgressively(st,()=>{ if(endStage(st)) return; renderChoices(st); }); };
 
     // 推进事件：空格或点击空白区域
-    const advanceHandler=(e)=>{
+  /**
+   * 空白推进 / 空格键推进：
+   *  - 忽略点击在分支按钮上
+   *  - 首次交互预热 WebAudio（typeSfx）
+   *  - 打字中：直接补完
+   *  - 否则：进入下一行
+   */
+  const advanceHandler=(e)=>{
       // 避免点击选项按钮触发推进
       if(e && e.target && e.target.tagName==='BUTTON' && e.target.closest('.dynamic-choices')) return;
       // 首次交互预热音频上下文（iOS Safari）
@@ -172,14 +233,15 @@ export class Scene1Intro extends BaseScene {
     window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); advanceHandler(e); } });
     el.addEventListener('click', advanceHandler);
 
-    // 标题彩蛋
-  title.addEventListener('click',()=>{ this.titleClicks++; if(this.titleClicks===6){ titleEgg.textContent='（再点几下也许会有点什么~）'; titleEgg.classList.remove('hidden'); } if(this.titleClicks===10 && !this._titleBonusGiven){ this._titleBonusGiven=true; titleEgg.textContent='（给你一个看不见的勇气 buff！）'; }});
+    // 标题点击彩蛋：第 6 次出现提示；第 10 次给隐藏文案，仅一次
+    title.addEventListener('click',()=>{ this.titleClicks++; if(this.titleClicks===6){ titleEgg.textContent='（再点几下也许会有点什么~）'; titleEgg.classList.remove('hidden'); } if(this.titleClicks===10 && !this._titleBonusGiven){ this._titleBonusGiven=true; titleEgg.textContent='（给你一个看不见的勇气 buff！）'; }});
 
     goStage('intro');
     this.ctx.rootEl.appendChild(el);
   }
 
   async exit(){ 
-    audioManager.stopBGM('scene1',{fadeOut:600}); 
+    // 退出场景：使用与播放相同的 key '1' 做淡出，避免残留
+    audioManager.stopBGM('1',{fadeOut:600}); 
   }
 }

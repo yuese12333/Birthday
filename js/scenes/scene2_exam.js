@@ -29,7 +29,37 @@ import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
 
 // 难度权重：影响统一得分（当前统一公式：2 * weight）
+// 可扩展：在外部 JSON 的题目里声明 difficulty（若缺省按科目默认 / easy）
 const DIFFICULTY_WEIGHT = { easy: 1, medium: 2, hard: 3 };
+
+// 题型渲染/输入注册表：未来添加新题型时只需 push 一个 handler
+// handler 接口：({q, wrapper}) => { 返回需要的 input/select DOM 字符串或直接操作 wrapper }
+const QUESTION_TYPE_REGISTRY = {
+  fill: (q)=> `<input class='q-input' data-qtype='fill' placeholder='${q.placeholder||''}' />`,
+  select: (q)=> `<select class='q-select' data-qtype='select'><option value=''>选择</option>${(q.options||[]).map((o,i)=>`<option value='${i}'>${o}</option>`).join('')}</select>`
+  // 预留：multiSelect / dragMatch / order / audio 等
+};
+
+/**
+ * 统一抽取用户答案：新增题型时在此 switch 添加分支
+ */
+function extractUserAnswer(wrapper, q){
+  switch(q.type){
+    case 'fill': return wrapper.querySelector('.q-input')?.value.trim();
+    case 'select': return wrapper.querySelector('.q-select')?.value;
+    // case 'multiSelect': return [...wrapper.querySelectorAll('input[type=checkbox]:checked')].map(n=>n.value)
+    default: return '';
+  }
+}
+
+/**
+ * 判定正确性：可在未来扩展不同题型的比较策略
+ */
+function isAnswerCorrect(q, userAns){
+  if(q.type==='fill') return userAns === q.answer;
+  if(q.type==='select') return parseInt(userAns,10) === q.answerIndex;
+  return false; // 未知题型默认 false（或可改为 true 宽松模式）
+}
 
 export class Scene2Exam extends BaseScene {
   /**
@@ -60,40 +90,49 @@ export class Scene2Exam extends BaseScene {
    */
   buildSubjectsFromExternal(data){
     const subjects = [];
+    // 语文（填空）
     if(Array.isArray(data.chinesePoemFill) && data.chinesePoemFill.length){
       subjects.push({
         key:'chinese', title:'语文', done:false,
         questions: data.chinesePoemFill.map(item=>({
-          type:'fill', difficulty:'easy',
+          // 支持外部指定 questionType / difficulty（兼容旧字段）
+          type: item.questionType || item.type || 'fill',
+          difficulty: item.difficulty || 'easy',
           prompt: item.question.includes('_____') ? item.question.replace('_____','') : item.question,
           answer: item.answer, placeholder:'_____', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
     }
+    // 数学（填空）
     if(Array.isArray(data.mathPuzzles) && data.mathPuzzles.length){
       subjects.push({
         key:'math', title:'数学', done:false,
         questions: data.mathPuzzles.map(item=>({
-          type:'fill', difficulty:'medium', prompt:item.question, answer:(item.answer||'').split(' ')[0], placeholder:'答案', hints: item.hints || [], solved:false,
+          type: item.questionType || item.type || 'fill',
+          difficulty: item.difficulty || 'medium', prompt:item.question, answer:(item.answer||'').split(' ')[0], placeholder:'答案', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
     }
+    // 英语（匹配 → 填空）
     if(Array.isArray(data.englishMatch) && data.englishMatch.length){
       subjects.push({
         key:'english', title:'英语', done:false,
         questions: data.englishMatch.map(item=>({
-          type:'fill', difficulty:'easy', prompt:`${item.word} 的中文是？`, answer:item.match, placeholder:'中文', hints: item.hints || [], solved:false,
+          type: item.questionType || item.type || 'fill',
+          difficulty: item.difficulty || 'easy', prompt:`${item.word} 的中文是？`, answer:item.match, placeholder:'中文', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
     }
+    // 理综（选择）
     if(Array.isArray(data.scienceQuiz) && data.scienceQuiz.length){
       subjects.push({
         key:'science', title:'理综', done:false,
         questions: data.scienceQuiz.map(item=>({
-          type:'select', difficulty:'medium', prompt:item.question, options:item.options, answerIndex:item.answer, hints: item.hints || [], solved:false,
+          type: item.questionType || item.type || 'select',
+          difficulty: item.difficulty || 'medium', prompt:item.question, options:item.options, answerIndex:item.answer, hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       });
@@ -243,10 +282,11 @@ export class Scene2Exam extends BaseScene {
       wrapper.className='paper';
       const diffTag = `<span class='diff diff-${nextQ.difficulty}'>${nextQ.difficulty}</span>`;
       let inputHtml='';
-      if(nextQ.type==='fill'){
-        inputHtml = `<input class='q-input' placeholder='${nextQ.placeholder||''}' />`;
-      } else if(nextQ.type==='select'){
-        inputHtml = `<select class='q-select'><option value=''>选择</option>${nextQ.options.map((o,i)=>`<option value='${i}'>${o}</option>`).join('')}</select>`;
+      if(QUESTION_TYPE_REGISTRY[nextQ.type]){
+        inputHtml = QUESTION_TYPE_REGISTRY[nextQ.type](nextQ);
+      } else {
+        // 未知题型：提示并降级为填空
+        inputHtml = QUESTION_TYPE_REGISTRY.fill({placeholder:'(未知题型降级为填空)'});
       }
       wrapper.innerHTML = `
         <p>${diffTag} ${nextQ.prompt}</p>
@@ -313,8 +353,7 @@ export class Scene2Exam extends BaseScene {
   submitBtn.addEventListener('click',()=>{
         if(wrapper._locked) return; // 操作锁
         let userAns='';
-        if(nextQ.type==='fill') userAns = wrapper.querySelector('.q-input').value.trim();
-        if(nextQ.type==='select') userAns = wrapper.querySelector('.q-select').value;
+  userAns = extractUserAnswer(wrapper, nextQ);
         // 空输入/未选择：不给分也不判错，给予轻提示
         const isEmpty = (nextQ.type==='fill' && userAns==='') || (nextQ.type==='select' && userAns==='');
         if(isEmpty){
@@ -323,7 +362,7 @@ export class Scene2Exam extends BaseScene {
           setTimeout(()=> wrapper.classList.remove('shake-mini'),400);
           return;
         }
-        const correct = nextQ.type==='fill' ? (userAns === nextQ.answer) : (parseInt(userAns,10) === nextQ.answerIndex);
+  const correct = isAnswerCorrect(nextQ, userAns);
         if(correct){
           nextQ.solved = true;
           const base = 2; // 基础分
@@ -468,6 +507,6 @@ export class Scene2Exam extends BaseScene {
     if(this._subjectTimer){ clearInterval(this._subjectTimer); this._subjectTimer=null; }
     if(this._betweenTimer){ clearInterval(this._betweenTimer); this._betweenTimer=null; }
     // 淡出停止本场景 BGM
-    audioManager.stopBGM('scene2',{ fadeOut:700 });
+    audioManager.stopBGM('2',{ fadeOut:700 });
   }
 }
