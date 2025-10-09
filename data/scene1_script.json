@@ -1,7 +1,8 @@
 {
   "meta": {
     "version": 1,
-    "desc": "Scene1 穿越自证 & 安抚外部脚本 (可增删台词/阶段)"
+    "desc": "Scene1 穿越自证 & 安抚外部脚本 (可增删台词/阶段)",
+    "winText": "胜利文本（占位）"
   },
   "stages": [
     {
@@ -120,6 +121,43 @@
         {
           "text": "3",
           "win": false,
+          "goto": null
+        }
+      ]
+    },
+    {
+      "id": "dialogue_1_1",
+      "lines": [
+        {
+          "speaker": "me",
+          "text": "占位"
+        }
+      ],
+      "choices": [
+        {
+          "text": "1",
+          "win": true,
+          "goto": null
+        },
+        {
+          "text": "2",
+          "win": false,
+          "goto": null
+        }
+      ]
+    },
+    {
+      "id": "dialogue_2_1",
+      "lines": [
+        {
+          "speaker": "me",
+          "text": "占位"
+        }
+      ],
+      "choices": [
+        {
+          "text": "win",
+          "win": true,
           "goto": null
         }
       ]

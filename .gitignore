@@ -29,4 +29,7 @@ Thumbs.db
 *.swp
 
 # Local tool script not to commit
-qt.py
+scene1_script_editor.py
+
+# Ignore entire local editor tools directory
+editor/

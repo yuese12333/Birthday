@@ -116,6 +116,7 @@ export class Scene1Intro extends BaseScene {
     let lineIndex=0;      // 下一待渲染的行索引
     let stageDoneCallback=null; // 阶段全部行显示完后的回调
     let awaitingLine=false;     // 防止并发推进
+    let ended=false;            // 胜利终局后阻断进一步互动
 
     // ---------------------------
     // 打字机状态与参数
@@ -222,21 +223,25 @@ export class Scene1Intro extends BaseScene {
     const handleChoice = (choice)=>{
       if(!choice) return;
       if(choice.win === true){
+        if(ended) return; // 避免重复执行
+        ended=true;
         const vnWrapper = el.querySelector('.vn-wrapper');
-        if(vnWrapper) vnWrapper.classList.add('hidden');
-        // 防止重复生成
-        if(el.querySelector('.win-next-wrapper')) return;
-        const placeholder=document.createElement('div');
-        placeholder.className='win-next-wrapper';
-        placeholder.style.cssText='margin-top:1.2rem;animation:fadeIn .35s ease;';
-        // 可根据脚本 meta.winText 外部化（若存在）
-        const winText = (script.meta && script.meta.winText) || '她终于相信了你。\n（这里可以写更走心的过渡文案）';
-        placeholder.innerHTML=`<div class='win-text' style="white-space:pre-line;margin:0 0 1.1rem;font-size:1.05rem;line-height:1.6;">${winText}</div>
-        <button class='btn-go-exam' style='padding:.65rem 1.2rem;font-size:.95rem;border:none;border-radius:8px;background:#ff4d84;color:#fff;cursor:pointer;'>进入下一段记忆 →</button>`;
-        el.appendChild(placeholder);
-        placeholder.querySelector('.btn-go-exam').addEventListener('click',()=>{
-          this.ctx.go('transition',{next:'exam',style:'flash12'});
-        });
+        const vnBox = vnWrapper && vnWrapper.querySelector('.vn-box');
+        const localChoices = el.querySelector('.dynamic-choices');
+        if(localChoices){
+          localChoices.innerHTML='';
+          localChoices.style.display='none';
+        }
+        if(vnBox){
+          const winText = (script.meta && script.meta.winText) || '她终于相信了你。\n（这里可以写更走心的过渡文案）';
+          vnBox.innerHTML=`<div class='win-final' style="animation:fadeIn .35s ease;white-space:pre-line;line-height:1.6;min-height:4.5rem;display:flex;flex-direction:column;justify-content:center;">${winText}</div>
+          <div style='text-align:center;margin-top:1rem;'>
+            <button class='btn-go-exam' style='padding:.65rem 1.2rem;font-size:.95rem;border:none;border-radius:8px;background:#ff4d84;color:#fff;cursor:pointer;'>进入下一段记忆 →</button>
+          </div>`;
+          vnBox.querySelector('.btn-go-exam').addEventListener('click',()=>{
+            this.ctx.go('transition',{next:'exam',style:'flash12'});
+          });
+        }
         return;
       }
       if(choice.win === false){
@@ -325,6 +330,7 @@ export class Scene1Intro extends BaseScene {
    *  - 否则：进入下一行
    */
   const advanceHandler=(e)=>{
+      if(ended) return; // 终局后不再允许推进
       // 避免点击选项按钮触发推进
       if(e && e.target && e.target.tagName==='BUTTON' && e.target.closest('.dynamic-choices')) return;
       // 首次交互预热音频上下文（iOS Safari）
