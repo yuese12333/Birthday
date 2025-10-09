@@ -69,10 +69,10 @@ export class Scene3Timeline extends BaseScene {
     const leftCluesEl = root.querySelector('.left-clues-area .left-inner');
     const gridContainer = root.querySelector('.grid-container');
     const gridScroller = gridContainer.parentElement; // .grid-scroller
-    const btnReset = root.querySelector('.btn-reset');
-  const btnHint = root.querySelector('.btn-hint');
-    const btnRules = root.querySelector('.btn-rules');
-    const btnNext = root.querySelector('.btn-next');
+    let btnReset = root.querySelector('.btn-reset');
+    let btnHint = root.querySelector('.btn-hint');
+    let btnRules = root.querySelector('.btn-rules');
+    let btnNext = root.querySelector('.btn-next');
     const statusMsg = root.querySelector('.status-msg');
     const rulesOverlay = root.querySelector('.rules-overlay');
 
@@ -139,6 +139,7 @@ export class Scene3Timeline extends BaseScene {
       const progEl = root.querySelector('.puzzle-progress');
       if(progEl){ progEl.textContent = `(${currentIndex+1}/${puzzles.length})`; }
       btnNext.classList.add('hidden'); // 新题开始时隐藏
+      btnNext.disabled = true; // 初始保持禁用（直到完成时再启用）
       statusMsg.textContent = '';
       // 新题启用重置按钮
       btnReset.disabled = false;
@@ -152,6 +153,17 @@ export class Scene3Timeline extends BaseScene {
     initPuzzle();
     // 运行时根据图片构建数织功能已移除；仅保留通过 JSON 加载并渲染的路径。
     function renderPuzzle(matrix, rowClues, colClues, w, h){
+      // 为避免多次 addEventListener 累积，克隆按钮以清除旧监听。
+      function replaceButton(oldBtn){
+        if(!oldBtn || !oldBtn.parentNode) return oldBtn;
+        const newBtn = oldBtn.cloneNode(true);
+        oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+        return newBtn;
+      }
+      btnReset = replaceButton(btnReset);
+      if(btnHint) btnHint = replaceButton(btnHint);
+      if(btnRules) btnRules = replaceButton(btnRules);
+      btnNext = replaceButton(btnNext);
       // rowClues / colClues 已由上层传入，避免重复声明冲突
       const sizing = autoCellSize(w,h, 640, 480, 32, 14); // 计算合适 cell 大小
       gridContainer.style.setProperty('--cell-size', sizing.cell+'px');
@@ -162,7 +174,7 @@ export class Scene3Timeline extends BaseScene {
         updateColHighlight(changedX);
         if (checkComplete(matrix, gridContainer)) {
           statusMsg.textContent = '完成！';
-          btnNext.classList.remove('hidden');
+          enableNextButton();
           runCompletionAnimation();
         } else {
           statusMsg.textContent = '';
@@ -192,9 +204,16 @@ export class Scene3Timeline extends BaseScene {
         updateColHighlight(pick.x);
         if (checkComplete(matrix, gridContainer)) {
           statusMsg.textContent = '完成！';
-          btnNext.classList.remove('hidden');
+          enableNextButton();
           runCompletionAnimation();
         }
+      }
+      // 统一启用进入下一幕按钮的方法，防止被克隆或属性残留导致禁用
+      function enableNextButton(){
+        if(!btnNext) return;
+        btnNext.classList.remove('hidden');
+        btnNext.disabled = false;
+        btnNext.removeAttribute('disabled'); // 双保险移除属性
       }
       function updateRowHighlight(y){
         const rowRuns = extractRuns(gridContainer, y, 'row');
@@ -235,9 +254,7 @@ export class Scene3Timeline extends BaseScene {
         for(let x=0;x<w;x++) updateColHighlight(x);
       });
       if(btnHint){
-        btnHint.addEventListener('click', () => {
-          revealOneCorrect();
-        });
+        btnHint.addEventListener('click', () => { if(!btnHint.disabled) revealOneCorrect(); });
       }
       // 原图查看按钮与遮罩已移除
       if(btnRules){
@@ -405,7 +422,12 @@ export class Scene3Timeline extends BaseScene {
       // 完成后禁用提示按钮
       if(btnHint) btnHint.disabled = true;
       const revealImg = gridScroller.querySelector('.nonogram-reveal-img');
-      setTimeout(()=>{ if(revealImg) revealImg.classList.add('show'); }, GRID_FADE_DURATION);
+      // 若存在图片且有 src 则淡入；若无图片，仍然保证按钮可点击
+      setTimeout(()=>{ 
+        if(revealImg && revealImg.getAttribute('src')) revealImg.classList.add('show');
+        // 再次强化按钮启用（防止极端情况下其它逻辑改动状态）
+        if(btnNext){ btnNext.disabled=false; btnNext.removeAttribute('disabled'); }
+      }, GRID_FADE_DURATION);
     }
     // 旧的 updateClueHighlights 被拆分为局部的 updateRowHighlight / updateColHighlight
     function extractRuns(grid, index, mode){
