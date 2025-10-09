@@ -152,6 +152,8 @@ export class Scene2Exam extends BaseScene {
     if(existing.length){ existing.forEach(node=> node.remove()); }
     const el = document.createElement('div');
     el.className='scene scene-exam';
+    // 统一通过 BaseScene 公共方法禁用文字选择
+    this.applyNoSelect(el);
     el.innerHTML = `
       <h1>场景2：高考小考站</h1>
       <div class='exam-top'>

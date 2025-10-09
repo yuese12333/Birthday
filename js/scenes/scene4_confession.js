@@ -18,6 +18,10 @@ export class Scene4Confession extends BaseScene {
       </div>
       <button class='go-next' data-debounce>进入下一幕</button>
     `;
+
+    // 统一使用基类提供的文字不可选封装
+    this.applyNoSelect(el);
+
     // 播放 BGM（占位，可换成未来表白专属 BGM）
     const bgmAudio = audioManager.playSceneBGM('4',{ loop:true, volume:0.55, fadeIn:800 });
     const bgmBtn = el.querySelector('.confession-bgm');

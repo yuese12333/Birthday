@@ -24,6 +24,8 @@ export class Scene3Timeline extends BaseScene {
 
     const root = document.createElement('div');
     root.className = 'scene scene-nonogram';
+    // 使用 BaseScene 公共方法统一禁用文字选择
+    this.applyNoSelect(root);
 
   // 样式已抽取至全局 css/styles.css 中的 Scene 3 Nonogram 段落，不再动态注入。
     root.innerHTML = `

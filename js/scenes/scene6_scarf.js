@@ -23,6 +23,10 @@ export class Scene6Scarf extends BaseScene {
       </p>
       <button class='next-btn' data-debounce='600'>继续 →</button>
     `;
+
+    // 统一使用基类提供的文字不可选封装
+    this.applyNoSelect(el);
+
     try { audioManager.playSceneBGM('6',{ loop:true, volume:0.6, fadeIn:600 }); } catch(e){}
     el.querySelector('.next-btn').addEventListener('click',()=> this.ctx.go('future'));
     this.ctx.rootEl.appendChild(el);

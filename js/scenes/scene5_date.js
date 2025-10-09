@@ -97,6 +97,9 @@ export class Scene5Date extends BaseScene {
       <div class='synergy-pop'></div>
     `;
 
+    // 统一使用基类提供的文字不可选封装
+    this.applyNoSelect(el);
+
     // ---- DOM 引用缓存 ----
     const levelInfo = el.querySelector('.level-info');
     const grid = el.querySelector('.card-grid');

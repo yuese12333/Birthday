@@ -23,11 +23,15 @@ export class Scene8Final extends BaseScene {
       </div>
       <p class='note'>( 占位终章：后续将加入统计汇总 / 个性化语料 / 成就展示 / 图片拼贴 )</p>
     `;
+
+    // 统一使用基类提供的文字不可选封装
+    this.applyNoSelect(el);
+
     try { audioManager.playSceneBGM('7',{ loop:true, volume:0.55, fadeIn:800 }); } catch(e){}
     el.querySelector('.replay').addEventListener('click',()=>{
       // 清除仅限一次性的占位状态（若需要）然后回到开场
       // 不强制清除 hasRegistered，以便直接体验；若想重走仪式，可手动 ctrl+alt+R
-      this.ctx.go('intro');
+      this.ctx.go('register');
     });
     this.ctx.rootEl.appendChild(el);
   }

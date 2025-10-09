@@ -23,6 +23,10 @@ export class Scene7Future extends BaseScene {
         <p class='note'>( 完整愿望玩法 / 个性化引用统计 将在后续版本呈现 )</p>
       </div>
     `;
+
+    // 统一使用基类提供的文字不可选封装
+    this.applyNoSelect(el);
+
     try { audioManager.playSceneBGM('7',{ loop:true, volume:0.55, fadeIn:800 }); } catch(e){}
     const btn = el.querySelector('.go-final');
     btn.addEventListener('click',()=>{

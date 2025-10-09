@@ -38,13 +38,15 @@ export class Scene0Register extends BaseScene {
           <button type='button' data-jump='date' style='background:#bbb;'>Date</button>
           <button type='button' data-jump='scarf' style='background:#bbb;'>Scarf</button>
           <button type='button' data-jump='future' style='background:#bbb;'>Future</button>
-              <button type='button' data-jump='resetReg' style='background:#e8a;' disabled>清除注册标记</button>
         </div>
         <p style='margin:.6rem 0 0; line-height:1.4;'>说明：
           1) 按钮直接调用 sceneManager.go；2) 不做状态校验；3) 若需完全移除，删除本 details 块与下方相关监听即可。</p>
       </details>
       <!-- DEBUG PANEL END -->
     `;
+
+    // 统一使用基类提供的文字不可选封装
+    this.applyNoSelect(el);
 
     const form = el.querySelector('.reg-form');
     const msg = el.querySelector('.msg');

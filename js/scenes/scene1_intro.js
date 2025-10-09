@@ -72,6 +72,9 @@ export class Scene1Intro extends BaseScene {
       <div class='title-egg hidden'></div>
     `;
 
+    // 统一使用基类提供的文字不可选封装
+    this.applyNoSelect(el);
+
   // 状态变量
   this.tags=new Set();
   this.titleClicks=0; this._titleBonusGiven=false;
