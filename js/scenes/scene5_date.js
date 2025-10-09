@@ -6,7 +6,7 @@ import { audioManager } from '../core/audioManager.js';
  * --------------------------------------------------------------------
  * 设计目标（本次重构核心）：
  *  1. 数据外部化：所有关卡（levels）、卡牌（cards）、协同规则（synergyRules）由
- *     ./data/date_levels.json 提供；代码仅做驱动与评分，不写死业务内容。
+ *     ./data/scene5_levels.json 提供；代码仅做驱动与评分，不写死业务内容。
  *  2. 可塑性：不同关可以拥有完全不同的卡牌集合 / 选择数量区间 / 目标标签。
  *  3. 协同引擎抽象：统一遍历 rule 列表执行，当前内置：
  *        - type: 'set'     固定卡牌 id 全部被选中触发
@@ -47,25 +47,11 @@ import { audioManager } from '../core/audioManager.js';
 export class Scene5Date extends BaseScene {
   async init(){
     await super.init();
-    try {
-      const resp = await fetch('./data/date_levels.json');
-      if(!resp.ok) throw new Error('关卡配置加载失败');
-      const data = await resp.json();
-      this.levels = Array.isArray(data.levels)? data.levels : [];
-    } catch(e){
-      // Fallback：最小一关（防止空配置阻断流程）
-      console.warn('[Scene5] 使用 fallback 关卡：', e.message);
-      this.levels = [
-        { id:1, title:'占位关卡', tip:'想要：轻松 + 温柔', pick:[2,3], targetTags:['light','soft'],
-          cards:[
-            { id:'show_soft', title:'话剧 · 治愈系对白', base:2, tags:['soft','healing','show'], hint:'温柔对白' },
-            { id:'drink_milk', title:'饮品 · 温牛奶', base:2, tags:['warm','soft','drink'], hint:'安抚柔和' },
-            { id:'drink_orange', title:'饮品 · 橙子气泡', base:1, tags:['fresh','light','drink'], hint:'清爽提神' }
-          ],
-          synergyRules:[ { type:'set', ids:['show_soft','drink_milk'], bonus:1, label:'柔声与温奶' } ]
-        }
-      ];
-    }
+    const resp = await fetch('./data/scene5_levels.json');
+    if(!resp.ok) throw new Error('关卡配置加载失败: ' + resp.status);
+    const data = await resp.json();
+    if(!Array.isArray(data.levels)) throw new Error('关卡配置格式错误：levels 必须为数组');
+    this.levels = data.levels;
     this.currentLevelIndex = 0;
     this.levelScores = [];
     this.selected = new Set();

@@ -5,7 +5,8 @@
     "./assets/images/allAutoHint.gif",
     "./assets/images/allPamperedWrong.gif",
     "./assets/images/angry.png",
-    "./assets/images/cry.png"
+    "./assets/images/cry.png",
+    "./assets/images/demo_0.png"
   ],
   "audio": [
     "./assets/audio/scene_0.mp3",

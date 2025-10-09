@@ -48,7 +48,7 @@ export class Scene3Timeline extends BaseScene {
           <h2>数织规则</h2>
           <div class='rules-content'>
             <p><strong>核心元素</strong></p>
-            <p>网格由固定行列组成；每格最终状态：填色 或 留白(可打 X 标记)。</p>
+            <p>网格由固定行列组成；每格最终状态：填色 或 留白(可标记)。</p>
             <p><strong>行 / 列提示数</strong>：每个数字表示一段连续填色块的长度；多个数字之间至少有 1 个留白格隔开。提示“0” 表示该行 / 列全部留白。</p>
             <p><strong>规则</strong></p>
             <ul>
@@ -75,6 +75,16 @@ export class Scene3Timeline extends BaseScene {
     let btnHint = root.querySelector('.btn-hint');
     let btnRules = root.querySelector('.btn-rules');
     let btnNext = root.querySelector('.btn-next');
+    // 无障碍兼容：确保按钮元素具有正确的 role/tabindex
+    function ensureBtnAccessible(btn){
+      if(!btn) return;
+      try{
+        if(!btn.hasAttribute('role')) btn.setAttribute('role','button');
+        if(!btn.hasAttribute('tabindex')) btn.setAttribute('tabindex','0');
+        if(btn.classList.contains('hidden')) btn.setAttribute('aria-hidden','true'); else btn.removeAttribute('aria-hidden');
+      }catch(e){ /* defensive */ }
+    }
+    ensureBtnAccessible(btnNext);
     const statusMsg = root.querySelector('.status-msg');
     const rulesOverlay = root.querySelector('.rules-overlay');
 
@@ -126,6 +136,9 @@ export class Scene3Timeline extends BaseScene {
       if(!revealImg){
         revealImg = document.createElement('img');
         revealImg.className = 'nonogram-reveal-img';
+        // 可访问性：提供 alt 与 title（若为装饰图可设置为空 alt）
+        revealImg.alt = p.meta && p.meta.title ? p.meta.title : (p.image ? 'nonogram reveal' : '');
+        revealImg.title = p.meta && p.meta.title ? p.meta.title : '';
         gridScroller.insertBefore(revealImg, gridScroller.firstChild); // 放在 gridContainer 前面以便位于下层
       }
       revealImg.src = p.image || '';
@@ -140,13 +153,13 @@ export class Scene3Timeline extends BaseScene {
       // 更新进度文本
       const progEl = root.querySelector('.puzzle-progress');
       if(progEl){ progEl.textContent = `(${currentIndex+1}/${puzzles.length})`; }
-      btnNext.classList.add('hidden'); // 新题开始时隐藏
-      btnNext.disabled = true; // 初始保持禁用（直到完成时再启用）
-      statusMsg.textContent = '';
-      // 新题启用重置按钮
-      btnReset.disabled = false;
-      // 新题启用提示按钮
-      if(btnHint) btnHint.disabled = false;
+  const btnNextEl = root.querySelector('.btn-next');
+  if(btnNextEl){ btnNextEl.classList.add('hidden'); }
+    statusMsg.textContent = '';
+  // 新题启用重置按钮（通过显示/隐藏控制）
+  if(btnReset) btnReset.classList.remove('hidden');
+    // 新题启用提示按钮
+    if(btnHint) btnHint.classList.remove('hidden');
     }
     // 已移除运行时图片生成功能；编辑器现在仅使用预生成的 JSON
     function runtimeImageBuild(){
@@ -158,14 +171,28 @@ export class Scene3Timeline extends BaseScene {
       // 为避免多次 addEventListener 累积，克隆按钮以清除旧监听。
       function replaceButton(oldBtn){
         if(!oldBtn || !oldBtn.parentNode) return oldBtn;
+        const wasDebouncing = !!oldBtn._debouncing || oldBtn.classList.contains('debouncing');
         const newBtn = oldBtn.cloneNode(true);
+        // replace in DOM
         oldBtn.parentNode.replaceChild(newBtn, oldBtn);
+        // avoid carrying over a stale debouncing state: clear on the new node
+        try{
+          newBtn._debouncing = false;
+          newBtn.classList.remove('debouncing');
+        }catch(e){}
+        // ensure accessibility attributes
+        ensureBtnAccessible(newBtn);
         return newBtn;
       }
-      btnReset = replaceButton(btnReset);
+  btnReset = replaceButton(btnReset);
       if(btnHint) btnHint = replaceButton(btnHint);
-      if(btnRules) btnRules = replaceButton(btnRules);
-      btnNext = replaceButton(btnNext);
+  if(btnRules) btnRules = replaceButton(btnRules);
+  btnNext = replaceButton(btnNext);
+  // 保证本地引用同步到最新 DOM 节点
+  btnNext = root.querySelector('.btn-next');
+  // 确保克隆后的按钮仍然具备无障碍属性
+  ensureBtnAccessible(btnNext);
+  console.debug('[Nonogram] renderPuzzle: btnNext replaced/refreshed:', btnNext);
       // rowClues / colClues 已由上层传入，避免重复声明冲突
       const sizing = autoCellSize(w,h, 640, 480, 32, 14); // 计算合适 cell 大小
       gridContainer.style.setProperty('--cell-size', sizing.cell+'px');
@@ -212,10 +239,12 @@ export class Scene3Timeline extends BaseScene {
       }
       // 统一启用进入下一幕按钮的方法，防止被克隆或属性残留导致禁用
       function enableNextButton(){
-        if(!btnNext) return;
-        btnNext.classList.remove('hidden');
-        btnNext.disabled = false;
-        btnNext.removeAttribute('disabled'); // 双保险移除属性
+        const btn = root.querySelector('.btn-next');
+        console.debug('[Nonogram] enableNextButton called, btn found:', !!btn, btn);
+        if(!btn) return;
+        // 仅通过显示/隐藏控制按钮可用性
+        btn.classList.remove('hidden');
+        ensureBtnAccessible(btn);
       }
       function updateRowHighlight(y){
         const rowRuns = extractRuns(gridContainer, y, 'row');
@@ -256,7 +285,8 @@ export class Scene3Timeline extends BaseScene {
         for(let x=0;x<w;x++) updateColHighlight(x);
       });
       if(btnHint){
-        btnHint.addEventListener('click', () => { if(!btnHint.disabled) revealOneCorrect(); });
+        // 直接响应点击，按钮的可见性由 hidden 类控制
+        btnHint.addEventListener('click', () => { revealOneCorrect(); });
       }
       // 原图查看按钮与遮罩已移除
       if(btnRules){
@@ -414,23 +444,24 @@ export class Scene3Timeline extends BaseScene {
       return true;
     }
     // 简化完成动画：锁定 -> 网格淡出(0.6s) -> 图片淡入(0.9s)
-    function runCompletionAnimation(){
-      if(gridContainer.dataset.animDone) return;
-      gridContainer.dataset.animDone='1';
-      const GRID_FADE_DURATION = 600; // ms
-      gridContainer.classList.add('completed-locked','grid-fade-out');
-      // 完成后禁用重置按钮
-      btnReset.disabled = true;
-      // 完成后禁用提示按钮
-      if(btnHint) btnHint.disabled = true;
-      const revealImg = gridScroller.querySelector('.nonogram-reveal-img');
-      // 若存在图片且有 src 则淡入；若无图片，仍然保证按钮可点击
-      setTimeout(()=>{ 
-        if(revealImg && revealImg.getAttribute('src')) revealImg.classList.add('show');
-        // 再次强化按钮启用（防止极端情况下其它逻辑改动状态）
-        if(btnNext){ btnNext.disabled=false; btnNext.removeAttribute('disabled'); }
-      }, GRID_FADE_DURATION);
-    }
+      function runCompletionAnimation(){
+        if(gridContainer.dataset.animDone) return;
+        gridContainer.dataset.animDone='1';
+        const GRID_FADE_DURATION = 600; // ms
+        gridContainer.classList.add('completed-locked','grid-fade-out');
+  // 完成后隐藏重置和提示按钮（不再使用 disabled）
+  if(btnReset) { btnReset.classList.add('hidden'); ensureBtnAccessible(btnReset); }
+  if(btnHint) { btnHint.classList.add('hidden'); ensureBtnAccessible(btnHint); }
+        const revealImg = gridScroller.querySelector('.nonogram-reveal-img');
+        // 若存在图片且有 src 则淡入；若无图片，仍然保证按钮可点击
+        setTimeout(()=>{ 
+          if(revealImg && revealImg.getAttribute('src')) revealImg.classList.add('show');
+          // 再次显示下一题按钮（不使用 disabled）
+          const btn = root.querySelector('.btn-next');
+          console.debug('[Nonogram] runCompletionAnimation timeout: showing btnNext found=', !!btn, btn);
+          if(btn){ btn.classList.remove('hidden'); }
+        }, GRID_FADE_DURATION);
+      }
     // 旧的 updateClueHighlights 被拆分为局部的 updateRowHighlight / updateColHighlight
     function extractRuns(grid, index, mode){
       const cells = [];

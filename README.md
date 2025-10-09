@@ -37,8 +37,8 @@ js/
   scenes/            # 场景 0~7 源文件
   main.js            # 入口（注册场景 & 全局防抖 & 快捷键）
 data/
-  questions.json     # 外部题库
-  scene1_script.json # 场景 1 分支脚本
+  scene2_questions.json # 外部题库
+  scene1_script.json    # 场景 1 分支脚本
 index.html
 README.md
 ```
@@ -101,7 +101,7 @@ README.md
 1. BGM：进入自动尝试淡入播放（失败可点音符解锁），离场淡出；使用场景 key `2` 管理。
 2. 科目顺序：语文 → 数学 → 英语 → 理综，需依次完成（已完成科可回看但不再计时）。
 3. 单科 5 分钟倒计时：进入科目启动；完成或超时后停止；与下一科之间若 30 秒未开始出现“懒散提醒”彩蛋行。
-4. 外部题库：强制依赖 `data/questions.json`；加载成功后完全覆盖（无 fallback 题库）。
+4. 外部题库：强制依赖 `data/scene2_questions.json`；加载成功后完全覆盖（无 fallback 题库）。
 5. 题目结构外部可配置 `questionType`（渲染/交互方式）与 `difficulty`（easy|medium|hard）。
 6. 难度权重：easy=1 / medium=2 / hard=3；统一得分公式：`gained = 2 * weight`。
 7. 宠溺模式：正确 / 错误（被宠）/ 跳过 / 第三次提示 均给予完整得分（并标记不同来源统计）。
@@ -162,6 +162,34 @@ README.md
 
 > 当前版本聚焦“稳定解题 + 动画反馈 + 外部化加载”；高级推导辅助与计时/成就将在后续补充。
 
+---
+### ⚒️ Debug 纪念：修复 "下一题按钮在部分关卡不可点击" 的故障
+
+背景：在一次测试中发现 Scene3（数织）在第一张图完成并点击“下一题”后，第二张图完成时“下一题/进入下一幕”按钮虽可见但无法点击。
+
+症状：
+- 第二题完成后按钮可见但无法交互（浏览器 Accessibility 显示 role 为 generic 而非 button）。
+- 浏览器控制台中观察到按钮有 class="debouncing"，CSS 对 .debouncing 设置了 pointer-events:none，导致无法点击。
+
+调查与根因：
+- 项目中存在全局点击防抖逻辑（任意带 `data-debounce` 的元素在点击后会被标记为 `_debouncing` 并添加 `debouncing` 类，阻止短时间内重复点击）。该逻辑位于 `js/main.js`。
+- 场景在重新渲染新题时，会用 `cloneNode`/`replaceChild` 的方式替换按钮（目的是清理旧的事件监听）。当旧按钮处于 debouncing 状态时，克隆会把 `class='debouncing'` 一并带到新节点，从而使新节点也处于不可交互状态，且没有及时清除 `_debouncing` 标志。
+
+修复措施（已实现）：
+1. 统一去除基于 `disabled` 的多处读写，改为通过 CSS 的 `hidden` 类控制按钮显示/隐藏，避免属性冲突。
+2. 在 `js/scenes/scene3_timeline.js` 中：
+  - 为动态插入的 reveal 图片添加 `alt` 和 `title`，修复无障碍警告。
+  - 增加 `ensureBtnAccessible(btn)` 辅助函数，为按钮设置 `role="button"`、`tabindex="0"` 并维护 `aria-hidden`，确保 Accessibility 面板正确显示。
+  - 修改 `replaceButton()`：在替换（clone/replace）后会主动清除新节点的 `_debouncing` 标记并移除 `debouncing` 类，同时确保无障碍属性被同步。这样就不会把旧按钮的“按下阻塞状态”带到新节点。
+
+受影响的文件：
+- js/scenes/scene3_timeline.js （修复主要逻辑、无障碍、替换/清理 debouncing）
+- js/main.js （检视了全局 data-debounce 行为作为根因；未修改此文件）
+- css/styles.css （.debouncing 的样式存在于此，未修改）
+
+纪念一下
+- 一开始遇到下一题（下一幕）按钮在第二张图完成后为禁用状态的问题下意识觉得是因为状态设为disabled导致的，但在调整思路取消这个按钮的disabled机制后仍然出现这个问题，在编辑器中的调试已经无法解决，只能转战浏览器的开发模式寻找问题，在点击按钮时发现点击后的一小段时间按钮状态会变为debouncing，并在第二张图完成后发现btn_next处于debouncing状态，意识到在第一次点击这个按钮后这个状态一直保持到第二次出现，并没有被清除掉。至此发现真正的问题所在，随后通过copilot解决问题。
+
 ### 4. 表白（Scene4Confession）
 当前为占位：原计划“多段逐行表白 + 分支回应”玩法尚未设计完成。页面仅显示占位说明、BGM 按钮与“进入下一幕”按钮（带转场 flash45）。
 
@@ -174,7 +202,7 @@ README.md
 
 ### 5. 第一次约会（Scene5Date）
 **当前实现（外部数据驱动 - 初版）**
-- 外部 JSON：`data/date_levels.json` 定义 `levels[]`，每关自带 `cards` / `pick:[min,max]` / `targetTags` / `synergyRules`。
+  - 外部 JSON：`data/scene5_levels.json` 定义 `levels[]`，每关自带 `cards` / `pick:[min,max]` / `targetTags` / `synergyRules`。
 - 完全每关独立卡池：不再共用全局卡牌，方便做“主题差异化”关卡。
 - 协同评分引擎（rule engine）：当前内置两类
   - `set`：指定 `ids` 全被选中触发（固定组合）
@@ -252,7 +280,7 @@ README.md
 
 ---
 ## 📌 外部题库结构（场景2）
-当前版本题库完全外部化，可直接编辑 `data/questions.json` 热替换（刷新后生效）。
+当前版本题库完全外部化，可直接编辑 `data/scene2_questions.json` 热替换（刷新后生效）。
 
 ### 最小可运行示例（含题型/难度/多提示）
 ```jsonc
@@ -423,7 +451,7 @@ case 'multiSelect': return [...wrapper.querySelectorAll("input[type=checkbox]:ch
 | 事件总线 | `EventBus`（当前轻量，预留解耦扩展）。|
 | 全局防抖 | 任意元素加 `data-debounce` 即可，捕获阶段阻断重复点击。|
 | 本地持久 | （已精简：注册标记机制移除，当前无全局持久状态）|
-| 外部题库 | 自动 fetch `data/questions.json` 覆盖内置。|
+| 外部题库 | 自动 fetch `data/scene2_questions.json` 覆盖内置。|
 | 彩蛋系统 | 目前分散（场景1 标题点击 / 场景2 结果统计），后续计划集中注册。|
 | 移动端适配 | 时间线触摸点选交换 / 围巾拖动连续涂抹 / 按钮命中区域放大 | ✔ 已完成首轮 |
 
@@ -442,11 +470,11 @@ case 'multiSelect': return [...wrapper.querySelectorAll("input[type=checkbox]:ch
 
 ---
 ## 🧩 自定义常用入口
-- 修改题库：放置 / 编辑 `data/questions.json`。
+- 修改题库：放置 / 编辑 `data/scene2_questions.json`。
 - 修改高中场景对话脚本：`data/scene1_script.json`（信任阶段/解锁后台词外部化，可追加阶段）。
 - 增减时间线事件：`scene3_timeline.js` 的 `this.items`。
 - 增加表白台词：`scene4_confession.js` 中对话数组。
-- 约会关卡：编辑 `data/date_levels.json`（卡牌 / 关卡 / 协同）。
+- 约会关卡：编辑 `data/scene5_levels.json`（卡牌 / 关卡 / 协同）。
 - 围巾尺寸：`scene6_scarf.js` 中网格行列参数。
 - 愿望阈值：`scene7_future.js` 中 `this.required`。
 - 转场动画：`scene_transition.js` 可扩展 `style` 分支（已含 `flash12` / `flash45`，可自行新增 `petal` 等）。
@@ -586,5 +614,4 @@ this.ctx.go('transition', {
 
 
 ## 未使用构思：
-- 数织游戏
      

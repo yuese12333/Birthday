@@ -1,9 +1,9 @@
 /**
  * 场景2：高考四科小游戏（语/数/英/理综）
  * 设计理念：
- *  - 零挫败：答错也给满分（标记 _pamperedWrong），跳过也给分（_skipped），第三次提示直接送答案。
+ *  - 零挫败：答错也给满分（标记 _pamperedWr    // 不再内置默认题库：直接加载 external scene2_questions.json（若失败或为空将导致后续逻辑异常，符合"必须提供外部题库"要求）ng），跳过也给分（_skipped），第三次提示直接送答案。
  *  - 情感陪伴：所有“失败路径”都会输出宠溺 / 鼓励话语，维持轻松甜蜜氛围。
- *  - 数据驱动：题库优先从 external JSON (questions.json) 替换加载；失败则使用内置 fallback。
+ *  - 数据驱动：题库优先从 external JSON (scene2_questions.json) 替换加载；失败则使用内置 fallback。
  *  - 防并发/稳态：通过场景管理器 + 本地 DOM 清理，避免重复渲染；按钮加 _locked 防连击。
  *  - 可扩展：score 公式集中、题目对象字段统一，可后续添加科目、题型或成就统计。
  *
@@ -65,7 +65,7 @@ export class Scene2Exam extends BaseScene {
   /**
    * 初始化：
    *  - 设定默认内置题库（四科），结构与外部 JSON 兼容。
-   *  - 尝试加载 external questions.json（替换模式：成功后完全覆盖默认）。
+   *  - 尝试加载 external scene2_questions.json（替换模式：成功后完全覆盖默认）。
    *  - 初始化计分与统计字段。
    */
   async init(){
@@ -77,7 +77,7 @@ export class Scene2Exam extends BaseScene {
     const built = this.buildSubjectsFromExternal(data);
     if(!built.length) throw new Error('外部题库为空或无法解析');
     this.subjects = built;
-    console.info('题库加载成功：使用 external questions.json');
+    console.info('题库加载成功：使用 external scene2_questions.json');
     this.score = 0;
     this.hintsUsed = 0;
     this.skippedQuestions = 0; // 统计宠溺跳过次数
@@ -85,7 +85,7 @@ export class Scene2Exam extends BaseScene {
   }
   /**
    * 将 external JSON 数据转换为内部统一结构。
-   * @param {Object} data questions.json 解析结果
+   * @param {Object} data scene2_questions.json 解析结果
    * @returns {Array} subjects 数组
    */
   buildSubjectsFromExternal(data){
