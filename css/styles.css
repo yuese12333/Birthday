@@ -284,13 +284,21 @@ button.shake{ animation:shake .5s; }
 /* 填色出现的小动画 */
 .grid-container .cell.filled::before{content:'';position:absolute;inset:4px;border-radius:6px;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.85), rgba(255,255,255,0) 55%), var(--nonogram-cell-filled-grad, var(--nonogram-cell-filled));mix-blend-mode:screen;opacity:.85;animation:scaleIn .28s ease;}
 @keyframes scaleIn{from{transform:scale(.4);opacity:0;}to{transform:scale(1);opacity:1;}}
+/* ==== 完成动画状态 ==== */
+.grid-scroller{position:relative;}
+/* 重新定义完成动画：心跳(2s 两次) -> 网格淡出(0.6s) -> 图片淡入(0.9s) */
+.grid-scroller .nonogram-reveal-img{position:absolute;inset:0;margin:auto;max-width:100%;max-height:100%;opacity:0;object-fit:contain;image-rendering:pixelated;transition:opacity .9s linear;pointer-events:none;}
+.grid-scroller .nonogram-reveal-img.show{opacity:1;}
+.completed-locked{pointer-events:none;}
+@keyframes gridFadeOut{0%{opacity:1;}100%{opacity:0;}}
+.grid-fade-out{animation:gridFadeOut .6s linear forwards;}
 /* 暗色模式适配（已在变量中处理） */
 .scene-nonogram .controls{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
 .scene-nonogram .controls .inline.small{font-size:12px;display:flex;align-items:center;gap:4px;}
 .scene-nonogram .controls input[type=range]{vertical-align:middle;}
-.scene-nonogram .btn-next.hidden,.scene-nonogram .original-overlay.hidden,.scene-nonogram .rules-overlay.hidden{display:none;}
+.scene-nonogram .btn-next.hidden,.scene-nonogram .rules-overlay.hidden{display:none;}
 .scene-nonogram .status-msg{margin-top:8px;font-weight:bold;color:#0a7;}
-.scene-nonogram .original-overlay,.scene-nonogram .rules-overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50;}
+.scene-nonogram .rules-overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50;}
 .scene-nonogram .original-img-box,.scene-nonogram .rules-box{background:#fff;padding:16px 20px;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.4);max-width:600px;max-height:80vh;overflow:auto;}
 .scene-nonogram .original-img{max-width:60vw;max-height:70vh;image-rendering:pixelated;}
 .scene-nonogram .tips{font-size:12px;opacity:.75;margin-top:10px;}

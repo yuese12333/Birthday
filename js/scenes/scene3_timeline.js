@@ -17,11 +17,9 @@ export class Scene3Timeline extends BaseScene {
     try { audioManager.playSceneBGM('3',{ loop:true, volume:0.55, fadeIn:700 }); } catch(e) { /* ignore */ }
 
     const CONFIG = {
-  puzzleSrc: 'data/scene3_puzzles.json', // 改用手动编辑器产出的新路径
-      gridSize: 9,                          // 固定生成 9x9
-      showOriginalButton: true,
-      showRuleHelp: true,
-  // 以前的图片生成参数已移除（现在使用预生成 JSON）
+      puzzleSrc: 'data/scene3_puzzles.json', // 改用手动编辑器产出的新路径
+      gridSize: 9,
+      showRuleHelp: true
     };
 
     const root = document.createElement('div');
@@ -38,17 +36,11 @@ export class Scene3Timeline extends BaseScene {
       </div>
       <div class='controls'>
         <button class='btn-reset' data-debounce>重置</button>
-        ${CONFIG.showOriginalButton ? `<button class='btn-original' data-debounce>看原图</button>`:''}
+        <button class='btn-hint' data-debounce>提示</button>
         ${CONFIG.showRuleHelp ? `<button class='btn-rules' data-debounce>规则说明</button>`:''}
         <button class='btn-next hidden' data-debounce>进入下一幕</button>
       </div>
       <div class='status-msg'></div>
-      <div class='original-overlay hidden'>
-        <div class='original-img-box'>
-          <img class='original-img' alt='原图' />
-          <button class='close-overlay'>关闭</button>
-        </div>
-      </div>
       <div class='rules-overlay hidden'>
         <div class='rules-box'>
           <h2>数织规则</h2>
@@ -62,27 +54,27 @@ export class Scene3Timeline extends BaseScene {
               <li>相邻数字代表的填色块之间 ≥ 1 个留白。</li>
               <li>不得多出或缺少填色格。</li>
             </ul>
+            <p><strong>提示</strong>：随机点亮一个尚未点亮的正确格。</p>
             <p><strong>胜利条件</strong>：所有行与列的填色分布与各自提示数完全匹配。</p>
-            <p><strong>操作</strong>：左键=填黑/清除；右键=标记 X；拖拽连续填色或擦除。</p>
+            <p><strong>操作</strong>：左键=填色/清除；右键=标记；拖拽连续填色或擦除。</p>
           </div>
           <div class='rules-actions'><button class='close-rules'>关闭</button></div>
         </div>
       </div>
-      <p class='tips'>左键：填黑/清除；右键：标记；拖拽批量操作。</p>
+      <p class='tips'>左键：填色/清除；右键：标记；拖拽批量操作。</p>
     `;
     this.ctx.rootEl.appendChild(root);
 
-  const topCluesEl = root.querySelector('.top-clues-area .top-inner');
-  const leftCluesEl = root.querySelector('.left-clues-area .left-inner');
-  const gridContainer = root.querySelector('.grid-container');
+    const topCluesEl = root.querySelector('.top-clues-area .top-inner');
+    const leftCluesEl = root.querySelector('.left-clues-area .left-inner');
+    const gridContainer = root.querySelector('.grid-container');
+    const gridScroller = gridContainer.parentElement; // .grid-scroller
     const btnReset = root.querySelector('.btn-reset');
-    const btnOriginal = root.querySelector('.btn-original');
-  const btnRules = root.querySelector('.btn-rules');
+  const btnHint = root.querySelector('.btn-hint');
+    const btnRules = root.querySelector('.btn-rules');
     const btnNext = root.querySelector('.btn-next');
     const statusMsg = root.querySelector('.status-msg');
-    const overlay = root.querySelector('.original-overlay');
-    const overlayImg = root.querySelector('.original-img');
-  const rulesOverlay = root.querySelector('.rules-overlay');
+    const rulesOverlay = root.querySelector('.rules-overlay');
 
     // 优先尝试加载预生成 JSON；失败则回退到运行时图像生成
     let puzzles = [];
@@ -120,10 +112,22 @@ export class Scene3Timeline extends BaseScene {
       const p = puzzles[currentIndex];
       const matrix = p.matrix;
       if(!matrix) throw new Error('当前 puzzle 缺少 matrix');
+      // 清除上一题可能遗留的完成状态样式 / 标记
+      gridContainer.classList.remove('completed-locked','grid-fade-out','grid-jump','grid-heartbeat');
+      delete gridContainer.dataset.animDone;
+      gridContainer.style.opacity='';
       const h = matrix.length; const w = matrix[0].length;
       const rowClues = buildClues(matrix);
       const colClues = buildClues(transpose(matrix));
-      overlayImg.src = p.image || '';
+      // 准备揭示用图片（淡入用，不弹出 overlay）
+      let revealImg = gridScroller.querySelector('.nonogram-reveal-img');
+      if(!revealImg){
+        revealImg = document.createElement('img');
+        revealImg.className = 'nonogram-reveal-img';
+        gridScroller.insertBefore(revealImg, gridScroller.firstChild); // 放在 gridContainer 前面以便位于下层
+      }
+      revealImg.src = p.image || '';
+      revealImg.classList.remove('show');
       renderPuzzle(matrix, rowClues, colClues, w, h);
       // 更新按钮文案
       if(currentIndex < puzzles.length - 1){
@@ -136,6 +140,10 @@ export class Scene3Timeline extends BaseScene {
       if(progEl){ progEl.textContent = `(${currentIndex+1}/${puzzles.length})`; }
       btnNext.classList.add('hidden'); // 新题开始时隐藏
       statusMsg.textContent = '';
+      // 新题启用重置按钮
+      btnReset.disabled = false;
+      // 新题启用提示按钮
+      if(btnHint) btnHint.disabled = false;
     }
     // 已移除运行时图片生成功能；编辑器现在仅使用预生成的 JSON
     function runtimeImageBuild(){
@@ -155,10 +163,39 @@ export class Scene3Timeline extends BaseScene {
         if (checkComplete(matrix, gridContainer)) {
           statusMsg.textContent = '完成！';
           btnNext.classList.remove('hidden');
+          runCompletionAnimation();
         } else {
           statusMsg.textContent = '';
         }
       }, sizing.cell);
+      // 提示：随机点亮一个尚未点亮的正确格
+      function revealOneCorrect(){
+        if(checkComplete(matrix, gridContainer)) return; // 已完成无需提示
+        const candidates = [];
+        for(let y=0;y<h;y++){
+          for(let x=0;x<w;x++){
+            if(matrix[y][x]===1){
+              const cellEl = gridContainer.querySelector(`.cell[data-x='${x}'][data-y='${y}']`);
+              if(cellEl && cellEl.dataset.state !== 'filled'){
+                candidates.push({x,y,el:cellEl});
+              }
+            }
+          }
+        }
+        if(!candidates.length) return; // 没有可提示的
+        const pick = candidates[Math.floor(Math.random()*candidates.length)];
+        // 填充该格
+        pick.el.dataset.state='filled';
+        pick.el.className='cell filled';
+        // 更新线索状态
+        updateRowHighlight(pick.y);
+        updateColHighlight(pick.x);
+        if (checkComplete(matrix, gridContainer)) {
+          statusMsg.textContent = '完成！';
+          btnNext.classList.remove('hidden');
+          runCompletionAnimation();
+        }
+      }
       function updateRowHighlight(y){
         const rowRuns = extractRuns(gridContainer, y, 'row');
         const el = leftCluesEl.children[y];
@@ -181,16 +218,28 @@ export class Scene3Timeline extends BaseScene {
       for(let y=0;y<h;y++) updateRowHighlight(y);
       for(let x=0;x<w;x++) updateColHighlight(x);
       btnReset.addEventListener('click', () => {
+        // 若当前题已完成（动画已触发），重置无效
+        if(gridContainer.dataset.animDone) return;
         api.reset();
         statusMsg.textContent='';
         btnNext.classList.add('hidden');
+        // 重置动画状态（包括新规范的心跳 / 淡出 / 图片）
+  delete gridContainer.dataset.animDone;
+  gridContainer.classList.remove('completed-locked','grid-fade-out','grid-jump','grid-heartbeat');
+        gridContainer.style.opacity='';
+        const revealImg2 = gridScroller.querySelector('.nonogram-reveal-img');
+        if(revealImg2){
+          revealImg2.classList.remove('show');
+        }
         for(let y=0;y<h;y++) updateRowHighlight(y);
         for(let x=0;x<w;x++) updateColHighlight(x);
       });
-      if(btnOriginal){
-        btnOriginal.addEventListener('click', ()=> overlay.classList.remove('hidden'));
+      if(btnHint){
+        btnHint.addEventListener('click', () => {
+          revealOneCorrect();
+        });
       }
-      overlay.querySelector('.close-overlay').addEventListener('click',()=> overlay.classList.add('hidden'));
+      // 原图查看按钮与遮罩已移除
       if(btnRules){
         btnRules.addEventListener('click', ()=> rulesOverlay.classList.remove('hidden'));
       }
@@ -345,6 +394,19 @@ export class Scene3Timeline extends BaseScene {
       }
       return true;
     }
+    // 简化完成动画：锁定 -> 网格淡出(0.6s) -> 图片淡入(0.9s)
+    function runCompletionAnimation(){
+      if(gridContainer.dataset.animDone) return;
+      gridContainer.dataset.animDone='1';
+      const GRID_FADE_DURATION = 600; // ms
+      gridContainer.classList.add('completed-locked','grid-fade-out');
+      // 完成后禁用重置按钮
+      btnReset.disabled = true;
+      // 完成后禁用提示按钮
+      if(btnHint) btnHint.disabled = true;
+      const revealImg = gridScroller.querySelector('.nonogram-reveal-img');
+      setTimeout(()=>{ if(revealImg) revealImg.classList.add('show'); }, GRID_FADE_DURATION);
+    }
     // 旧的 updateClueHighlights 被拆分为局部的 updateRowHighlight / updateColHighlight
     function extractRuns(grid, index, mode){
       const cells = [];
@@ -366,16 +428,31 @@ export class Scene3Timeline extends BaseScene {
     function arraysEqual(a,b){ if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
     // 评估当前填色 runs 相对 clue 的状态: ok | over | partial
     function evaluateRuns(runs, clues){
-      // 超出判定：段数多、总和超、某段长度超
+      // 特殊：空行表示 [0]
+      if(runs.length===1 && runs[0]===0){
+        if(clues.length===1 && clues[0]===0) return 'ok';
+        return 'partial';
+      }
       const sumRuns = runs.reduce((a,b)=>a+b,0);
       const sumClues = clues.reduce((a,b)=>a+b,0);
+      // 基本超限：段过多 / 总和超
       if(runs.length > clues.length) return 'over';
       if(sumRuns > sumClues) return 'over';
-      for(let i=0;i<runs.length;i++){
-        if(i>=clues.length) return 'over';
-        if(runs[i] > clues[i]) return 'over';
-      }
+      // 若已完全匹配（顺序长度都一致）直接 ok
       if(arraysEqual(runs, clues)) return 'ok';
+      // 允许当前 runs 对应 clues 的一个保持顺序的子序列
+      // 贪心：对每个 run 找到下一个 >= run 的 clue
+      let ci = 0; // index in clues we are trying to match from
+      for(const r of runs){
+        let found = false;
+        while(ci < clues.length){
+          if(clues[ci] >= r){ found = true; ci++; break; }
+          ci++; // 跳过更短的 clue（因为该 clue 不可能再满足 r）
+        }
+        if(!found) return 'over'; // 找不到可容纳该 run 的 clue => 超出
+        if(r > Math.max(...clues)) return 'over'; // 防御：比所有 clue 都大
+      }
+      // 通过子序列匹配，尚未违规 => partial
       return 'partial';
     }
 
