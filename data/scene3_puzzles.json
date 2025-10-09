@@ -3,8 +3,9 @@
     {
       "meta": {
   "gridSize": 9,
-  "editedAt": "2025-10-09T05:26:56.509995Z",
-  "uniqueness": "none"
+  "editedAt": "2025-10-09T06:26:04.638785Z",
+  "uniqueness": "none",
+  "index": 1
 },
       "matrix": [
         [0, 0, 0, 0, 0, 0, 0, 0, 0],
@@ -22,8 +23,9 @@
     {
       "meta": {
   "gridSize": 9,
-  "editedAt": "2025-10-09T05:26:56.509995Z",
-  "uniqueness": "none"
+  "editedAt": "2025-10-09T06:26:04.638785Z",
+  "uniqueness": "none",
+  "index": 2
 },
       "matrix": [
         [0, 0, 0, 0, 1, 0, 0, 0, 0],
