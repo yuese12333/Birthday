@@ -251,6 +251,30 @@ button.shake{ animation:shake .5s; }
 .nonogram-shell .quad{position:relative;}
 .top-clues-area{overflow:hidden;}
 .left-clues-area{overflow:hidden;}
+
+/* Split overlay used to cut the reveal area into 2x2 and animate images into corners */
+.split-overlay{ position:absolute; inset:0; display:block; pointer-events:none; z-index:60; }
+.split-overlay .split-slots{ position:absolute; inset:0; display:grid; grid-template-columns:1fr 1fr; grid-template-rows:1fr 1fr; }
+.split-overlay .split-slot{ position:relative; overflow:hidden; }
+.split-overlay .split-slot img{ width:100%; height:100%; object-fit:cover; display:block; }
+.split-overlay .split-line{ position:absolute; background:rgba(255,255,255,.9); }
+.split-overlay .split-line.vline{ width:1px; top:0; bottom:0; left:50%; transform:translateX(-50%); }
+.split-overlay .split-line.hline{ height:1px; left:0; right:0; top:50%; transform:translateY(-50%); }
+.split-overlay .split-temp{
+  position:absolute;
+  inset:12px;
+  margin:auto;
+  width:calc(100% - 24px);
+  height:calc(100% - 24px);
+  object-fit:contain;
+  transition:transform .7s cubic-bezier(.2,.9,.25,1), width .45s cubic-bezier(.2,.9,.25,1), height .45s cubic-bezier(.2,.9,.25,1), opacity .3s ease;
+  border-radius:6px;
+  box-shadow:0 8px 22px rgba(0,0,0,.28);
+  transform-origin:center center;
+  transform:translate(0,0) scale(1);
+  pointer-events:none;
+}
+.split-overlay .split-slot .split-locked{ width:100%; height:100%; object-fit:cover; display:block; border-radius:6px; box-shadow:0 4px 12px rgba(0,0,0,.18); transition:opacity .35s ease; }
 :root{--nonogram-bg:#777;--nonogram-cell:#fafafa;--nonogram-cell-filled:#ff6f9d;--nonogram-cell-filled-grad:linear-gradient(135deg,#ff6f9d,#ff94b4 55%,#ffc0d4);--nonogram-cell-mark:#ff4f78;--nonogram-grid-gap:4px;--nonogram-border:#e8b9c7;--nonogram-accent:#ff6f9d;--nonogram-clue-done:#ff3f7d;--nonogram-hover:#ffe0ec;--nonogram-hover-line:rgba(255,170,200,.35);} 
 @media (prefers-color-scheme:dark){:root{--nonogram-bg:#555;--nonogram-cell:#f5f5f5;--nonogram-cell-filled:#111;--nonogram-border:#666;--nonogram-hover:#775f1a;--nonogram-hover-line:rgba(255,210,120,.25);} }
 .grid-scroller{overflow:auto;max-width:100%;max-height:70vh;border:1px solid var(--nonogram-border);background:transparent;justify-self:start;width:fit-content;/* 隐藏滚动条但保留滚动 */-ms-overflow-style:none;scrollbar-width:none;}
@@ -265,6 +289,16 @@ button.shake{ animation:shake .5s; }
 .top-inner{display:flex;}
 .col-clue span{font-size:11px;line-height:1.1;}
 .col-clue .blank{visibility:hidden;}
+.top-inner.clues-hidden,
+.left-inner.clues-hidden{
+  /* visually hide clues while collapsing their space so reveal image can occupy area */
+  opacity:0;
+  pointer-events:none;
+  height:0 !important;
+  overflow:hidden;
+  transform:translateY(-6px);
+  transition:opacity .18s ease, height .18s ease, transform .18s ease;
+}
 .nonogram-grid .cell, .grid-container .cell{background:var(--nonogram-cell);cursor:pointer;user-select:none;position:relative;outline:1px solid rgba(255,110,150,.15);transition:background .18s ease, transform .12s ease, box-shadow .25s; border-radius:8px; box-shadow:0 2px 4px -2px rgba(255,80,130,.35),0 0 0 1px rgba(255,120,160,.15) inset;}
 .grid-container .cell{box-sizing:border-box;}
 .grid-container .cell.filled{background:var(--nonogram-cell-filled-grad, var(--nonogram-cell-filled)); box-shadow:0 4px 10px -3px rgba(255,90,140,.55),0 0 0 1px rgba(255,255,255,.4) inset,0 0 0 2px rgba(255,110,150,.25) inset;}

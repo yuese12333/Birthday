@@ -8,7 +8,7 @@ import { audioManager } from '../core/audioManager.js';
  *  1. 从预先生成的 puzzle JSON 中读取 `matrix`（由离线编辑器产生）。
  *  2. 行与列分别做 run-length 编码，得到线索数组 (如 [3,1]) 表示连续块长度；空行为 [0]。
  *  3. DOM: 左上角线索区 + 交互网格 + 控制栏(重置/显示原图/下一幕按钮) + 完成状态层。
- *  4. 交互：左键(或触摸单击) 在 空(0)->填黑(1)->空 循环；右键 / 长按 标记 X(排除)；仅填黑参与判定。
+ *  4. 交互：左键(或触摸单击) 在 空(0)->填黑(1)->空 循环；右键 / 长按 标记(排除)；仅填黑参与判定。
  *  5. 每次操作快速检查：所有应填黑格均处于填黑 && 未多填 => 完成 -> 动画淡入原图与“进入下一幕”。
  */
 export class Scene3Timeline extends BaseScene {
@@ -27,9 +27,109 @@ export class Scene3Timeline extends BaseScene {
     // 使用 BaseScene 公共方法统一禁用文字选择
     this.applyNoSelect(root);
 
+  // Split-and-place helpers (persistent lines + 4 slots)
+  // 使用全局累计的 completedImages 来决定当前位置，不再在 load/reset/next 时清零
+  let completedImages = 0; // 0-based 累计完成图片数，用 completedImages % 4 取逻辑索引
+      function hideRevealImmediate(){
+        const revealImgNow = gridScroller.querySelector('.nonogram-reveal-img');
+        if(!revealImgNow) return;
+        try{
+          const prevTrans = revealImgNow.style.transition || '';
+          revealImgNow.style.transition = 'none';
+          revealImgNow.classList.remove('show');
+          revealImgNow.style.opacity = '0';
+          revealImgNow.setAttribute('aria-hidden','true');
+          try{ delete revealImgNow.dataset.splitStarted; }catch(e){}
+          void revealImgNow.offsetHeight; // force reflow
+          setTimeout(()=>{ revealImgNow.style.transition = prevTrans; }, 50);
+        }catch(e){/* ignore */}
+      }
+      function ensureSplitOverlay(){
+        let overlay = gridScroller.querySelector('.split-overlay');
+        if(overlay) return overlay;
+        overlay = document.createElement('div'); overlay.className='split-overlay';
+        // center container to host slots and lines
+        const slots = document.createElement('div'); slots.className='split-slots';
+  // create 4 slots with explicit position classes to ensure index->corner mapping
+  const slotPosClasses = ['slot-bottom-left','slot-top-left','slot-bottom-right','slot-top-right'];
+  for(let i=0;i<4;i++){ const s=document.createElement('div'); s.className='split-slot '+slotPosClasses[i]; s.dataset.idx = String(i); slots.appendChild(s); }
+        // lines
+        const vline = document.createElement('div'); vline.className='split-line vline';
+        const hline = document.createElement('div'); hline.className='split-line hline';
+        overlay.appendChild(slots); overlay.appendChild(vline); overlay.appendChild(hline);
+        gridScroller.appendChild(overlay);
+        return overlay;
+      }
+
+      function startSplitForSrc(src){
+        if(!src) return;
+        if(completedImages >= 4) { // 已放满四张，不再执行
+          hideRevealImmediate();
+          return;
+        }
+        const overlay = ensureSplitOverlay();
+        // hide the original reveal image immediately (no fade) — we'll animate a cloned temporary image
+        hideRevealImmediate();
+        // create a cloned temporary img centered in overlay; this ensures original disappears visually
+        const tmp = document.createElement('img'); tmp.className='split-temp'; tmp.src = src; tmp.alt='';
+        // place tmp as the last child of overlay for proper stacking
+        overlay.appendChild(tmp);
+        // force layout then animate to target slot
+        requestAnimationFrame(()=>{
+          // 逻辑顺序：0->左下,1->左上,2->右下,3->右上
+          // DOM 2x2 顺序：0=左上,1=右上,2=左下,3=右下
+          const logical = completedImages % 4;
+          const logicalToDom = [2,0,3,1];
+          const domIdx = logicalToDom[logical];
+          animateToSlot(tmp, domIdx, () => {
+            const slotEl = overlay.querySelector(`.split-slot[data-idx='${domIdx}']`);
+            if(slotEl){
+              // 覆盖旧内容，保持每个槽位只有一张
+              slotEl.innerHTML = '';
+              const finalImg = document.createElement('img'); finalImg.className='split-locked'; finalImg.src = src; finalImg.alt='';
+              slotEl.appendChild(finalImg);
+            }
+            if(tmp && tmp.parentElement) tmp.parentElement.removeChild(tmp);
+            completedImages++;
+          });
+        });
+      }
+
+      function animateToSlot(imgEl, slotIdx, cb){
+        const overlay = imgEl.parentElement;
+        const slot = overlay.querySelector(`.split-slot[data-idx='${slotIdx}']`);
+        if(!slot){ if(cb) cb(); return; }
+        // Ensure imgEl is absolutely positioned and centered at start via CSS '.split-temp'
+        imgEl.classList.add('animating');
+        // compute the target transform by measuring bounding boxes so we get a proper translate/scale
+        const startRect = imgEl.getBoundingClientRect();
+        const slotRect = slot.getBoundingClientRect();
+        const overlayRect = overlay.getBoundingClientRect();
+        // target center coordinates inside overlay
+        const targetCenterX = slotRect.left + slotRect.width / 2 - overlayRect.left;
+        const targetCenterY = slotRect.top + slotRect.height / 2 - overlayRect.top;
+        const startCenterX = startRect.left + startRect.width / 2 - overlayRect.left;
+        const startCenterY = startRect.top + startRect.height / 2 - overlayRect.top;
+        // compute translation delta
+        const dx = targetCenterX - startCenterX;
+        const dy = targetCenterY - startCenterY;
+        // compute scale: slot should be roughly quarter size of overlay area; measure based on widths
+        const scale = Math.min((slotRect.width / startRect.width), (slotRect.height / startRect.height));
+        // apply transform via style to trigger transition
+        imgEl.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+        // listen for transition end
+        const onEnd = (ev)=>{
+          if(ev.propertyName && (ev.propertyName === 'transform' || ev.propertyName === 'width')){
+            imgEl.removeEventListener('transitionend', onEnd);
+            if(cb) cb();
+          }
+        };
+        imgEl.addEventListener('transitionend', onEnd);
+      }
+
   // 样式已抽取至全局 css/styles.css 中的 Scene 3 Nonogram 段落，不再动态注入。
     root.innerHTML = `
-      <h1 class='title'>场景3：数织挑战 <span class='puzzle-progress' style="font-size:.6em; font-weight:500; margin-left:.6em; color:#c03; vertical-align:middle;">(0/0)</span></h1>
+      <h1 class='title'>场景3：心动瞬间 <span class='puzzle-progress' style="font-size:.6em; font-weight:500; margin-left:.6em; color:#c03; vertical-align:middle;">(0/0)</span></h1>
       <div class='nonogram-shell'>
         <div class='quad corner'></div>
         <div class='quad top-clues-area'><div class='top-inner'></div></div>
@@ -142,8 +242,13 @@ export class Scene3Timeline extends BaseScene {
         gridScroller.insertBefore(revealImg, gridScroller.firstChild); // 放在 gridContainer 前面以便位于下层
       }
       revealImg.src = p.image || '';
-      revealImg.classList.remove('show');
-      renderPuzzle(matrix, rowClues, colClues, w, h);
+        revealImg.classList.remove('show');
+        try{ delete revealImg.dataset.splitStarted; }catch(e){}
+  // Ensure clue areas are visible initially for a new puzzle
+  topCluesEl.classList.remove('clues-hidden');
+  leftCluesEl.classList.remove('clues-hidden');
+  // 保留 split-overlay 以维持已完成图片 montage（不再移除）
+  renderPuzzle(matrix, rowClues, colClues, w, h);
       // 更新按钮文案
       if(currentIndex < puzzles.length - 1){
         btnNext.textContent = '下一题';
@@ -280,7 +385,12 @@ export class Scene3Timeline extends BaseScene {
         const revealImg2 = gridScroller.querySelector('.nonogram-reveal-img');
         if(revealImg2){
           revealImg2.classList.remove('show');
+          try{ delete revealImg2.dataset.splitStarted; }catch(e){}
         }
+  // 不再移除 split overlay，保持已完成图片
+        // 重置线索高亮
+        topCluesEl.classList.remove('clues-hidden');
+        leftCluesEl.classList.remove('clues-hidden');
         for(let y=0;y<h;y++) updateRowHighlight(y);
         for(let x=0;x<w;x++) updateColHighlight(x);
       });
@@ -297,19 +407,11 @@ export class Scene3Timeline extends BaseScene {
       }
       btnNext.addEventListener('click', ()=> {
         // 点击下一题时立即移除上一题的 reveal 图片（不做淡出过渡）
-        try{
-          const revealImgNow = gridScroller.querySelector('.nonogram-reveal-img');
-          if(revealImgNow){
-            // 临时关闭 transition，直接移除 show 状态
-            const prevTrans = revealImgNow.style.transition || '';
-            revealImgNow.style.transition = 'none';
-            revealImgNow.classList.remove('show');
-            // 触发重绘以确保样式立即生效
-            void revealImgNow.offsetHeight;
-            // 还原 transition（短延时以避免影响后续动画）
-            setTimeout(()=>{ revealImgNow.style.transition = prevTrans; }, 50);
-          }
-        }catch(e){/* ignore */}
+        hideRevealImmediate();
+        // 重置状态以便下一题使用
+        topCluesEl.classList.remove('clues-hidden');
+        leftCluesEl.classList.remove('clues-hidden');
+  // 不再移除 split overlay，保持已完成图片
         if(btnNext.textContent === '下一题'){
           currentIndex++;
             if(currentIndex >= puzzles.length) currentIndex = puzzles.length-1;
@@ -469,7 +571,26 @@ export class Scene3Timeline extends BaseScene {
         const revealImg = gridScroller.querySelector('.nonogram-reveal-img');
         // 若存在图片且有 src 则淡入；若无图片，仍然保证按钮可点击
         setTimeout(()=>{ 
-          if(revealImg && revealImg.getAttribute('src')) revealImg.classList.add('show');
+          if(revealImg && revealImg.getAttribute('src')){
+            // Hide the numeric clues when showing the reveal image to emphasize the picture
+            topCluesEl.classList.add('clues-hidden');
+            leftCluesEl.classList.add('clues-hidden');
+            revealImg.classList.add('show');
+            // After the image fade-in completes, start the split-and-move animation
+            try{
+              if(!revealImg.dataset.splitStarted){
+                const onTrans = (ev)=>{
+                  if(ev.propertyName === 'opacity'){
+                    revealImg.removeEventListener('transitionend', onTrans);
+                    revealImg.dataset.splitStarted = '1';
+                    // start split animation for this image src
+                    startSplitForSrc(revealImg.getAttribute('src'));
+                  }
+                };
+                revealImg.addEventListener('transitionend', onTrans);
+              }
+            }catch(e){/* defensive */}
+          }
           // 再次显示下一题按钮（不使用 disabled）
           const btn = root.querySelector('.btn-next');
           console.debug('[Nonogram] runCompletionAnimation timeout: showing btnNext found=', !!btn, btn);
