@@ -245,3 +245,54 @@ button.shake{ animation:shake .5s; }
 @keyframes flashPulse{0%,100%{opacity:.3;}50%{opacity:.6;} }
 @keyframes scan{0%{transform:translateX(-40%);}100%{transform:translateX(40%);} }
 
+/* ======================== Scene 3: Nonogram (extracted) ============= */
+.scene-nonogram{padding:16px;font-family:inherit;}
+.nonogram-shell{display:grid;grid-template-columns:auto max-content;grid-template-rows:auto max-content;gap:4px;max-width:100%;width:fit-content;margin:0 auto;}
+.nonogram-shell .quad{position:relative;}
+.top-clues-area{overflow:hidden;}
+.left-clues-area{overflow:hidden;}
+:root{--nonogram-bg:#777;--nonogram-cell:#fafafa;--nonogram-cell-filled:#ff6f9d;--nonogram-cell-filled-grad:linear-gradient(135deg,#ff6f9d,#ff94b4 55%,#ffc0d4);--nonogram-cell-mark:#ff4f78;--nonogram-grid-gap:4px;--nonogram-border:#e8b9c7;--nonogram-accent:#ff6f9d;--nonogram-clue-done:#ff3f7d;--nonogram-hover:#ffe0ec;--nonogram-hover-line:rgba(255,170,200,.35);} 
+@media (prefers-color-scheme:dark){:root{--nonogram-bg:#555;--nonogram-cell:#f5f5f5;--nonogram-cell-filled:#111;--nonogram-border:#666;--nonogram-hover:#775f1a;--nonogram-hover-line:rgba(255,210,120,.25);} }
+.grid-scroller{overflow:auto;max-width:100%;max-height:70vh;border:1px solid var(--nonogram-border);background:transparent;justify-self:start;width:fit-content;/* 隐藏滚动条但保留滚动 */-ms-overflow-style:none;scrollbar-width:none;}
+/* WebKit 隐藏滚动条 */
+.grid-scroller::-webkit-scrollbar{display:none;}
+.grid-container{display:grid;gap:var(--nonogram-grid-gap);position:relative;}
+.left-inner .row-clue + .row-clue{margin-top:var(--nonogram-grid-gap);} /* 与网格垂直 gap 对齐 */
+.top-inner .col-clue + .col-clue{margin-left:var(--nonogram-grid-gap);} /* 与网格水平 gap 对齐 */
+.row-clue{font-size:12px;display:flex;align-items:center;justify-content:flex-end;padding:0 6px;box-sizing:border-box;white-space:nowrap;border-bottom:1px solid #ddd;border-right:1px solid #bbb;transition:background .15s,color .15s;}
+.left-inner{display:flex;flex-direction:column;}
+.col-clue{display:flex;flex-direction:column;align-items:center;justify-content:flex-end;padding:2px 0;box-sizing:border-box;border-right:1px solid #ddd;transition:background .15s,color .15s;}
+.top-inner{display:flex;}
+.col-clue span{font-size:11px;line-height:1.1;}
+.col-clue .blank{visibility:hidden;}
+.nonogram-grid .cell, .grid-container .cell{background:var(--nonogram-cell);cursor:pointer;user-select:none;position:relative;outline:1px solid rgba(255,110,150,.15);transition:background .18s ease, transform .12s ease, box-shadow .25s; border-radius:8px; box-shadow:0 2px 4px -2px rgba(255,80,130,.35),0 0 0 1px rgba(255,120,160,.15) inset;}
+.grid-container .cell{box-sizing:border-box;}
+.grid-container .cell.filled{background:var(--nonogram-cell-filled-grad, var(--nonogram-cell-filled)); box-shadow:0 4px 10px -3px rgba(255,90,140,.55),0 0 0 1px rgba(255,255,255,.4) inset,0 0 0 2px rgba(255,110,150,.25) inset;}
+.grid-container .cell.marked{background:repeating-linear-gradient(135deg,#fff,#fff 6px,#ffe3ef 6px,#ffe3ef 12px);}
+.grid-container .cell.marked::after{color:var(--nonogram-cell-mark);font-size:16px;font-weight:600;display:block;text-align:center;position:absolute;left:0;top:0;width:100%;height:100%;line-height:inherit;opacity:.9;text-shadow:0 0 4px rgba(255,255,255,.6);} 
+.grid-container .cell:hover{transform:scale(1.06); box-shadow:0 6px 16px -4px rgba(255,90,140,.55),0 0 0 1px rgba(255,140,170,.4) inset;}
+.grid-container .cell:active{transform:scale(.92);} 
+.clue-done{color:var(--nonogram-clue-done);font-weight:bold;}
+/* 新增：完成与超出提示颜色 */
+.clue-ok{ color:#0a7; font-weight:600; }
+.clue-over{ color:#d62828; font-weight:600; }
+/* Hover 行列高亮 */
+.grid-container:hover .cell{--hovered:0;}
+/* 移除悬停背景变色，仅保留轻微放大（上方统一的 :hover 规则已处理） */
+.grid-container .cell.hover-row{background:var(--nonogram-hover-line);}
+.grid-container .cell.hover-col{background:var(--nonogram-hover-line);}
+/* 填色出现的小动画 */
+.grid-container .cell.filled::before{content:'';position:absolute;inset:4px;border-radius:6px;background:radial-gradient(circle at 30% 30%, rgba(255,255,255,.85), rgba(255,255,255,0) 55%), var(--nonogram-cell-filled-grad, var(--nonogram-cell-filled));mix-blend-mode:screen;opacity:.85;animation:scaleIn .28s ease;}
+@keyframes scaleIn{from{transform:scale(.4);opacity:0;}to{transform:scale(1);opacity:1;}}
+/* 暗色模式适配（已在变量中处理） */
+.scene-nonogram .controls{margin-top:12px;display:flex;gap:12px;flex-wrap:wrap;align-items:center;}
+.scene-nonogram .controls .inline.small{font-size:12px;display:flex;align-items:center;gap:4px;}
+.scene-nonogram .controls input[type=range]{vertical-align:middle;}
+.scene-nonogram .btn-next.hidden,.scene-nonogram .original-overlay.hidden,.scene-nonogram .rules-overlay.hidden{display:none;}
+.scene-nonogram .status-msg{margin-top:8px;font-weight:bold;color:#0a7;}
+.scene-nonogram .original-overlay,.scene-nonogram .rules-overlay{position:fixed;left:0;top:0;right:0;bottom:0;background:rgba(0,0,0,.65);display:flex;align-items:center;justify-content:center;z-index:50;}
+.scene-nonogram .original-img-box,.scene-nonogram .rules-box{background:#fff;padding:16px 20px;border-radius:10px;box-shadow:0 4px 24px rgba(0,0,0,.4);max-width:600px;max-height:80vh;overflow:auto;}
+.scene-nonogram .original-img{max-width:60vw;max-height:70vh;image-rendering:pixelated;}
+.scene-nonogram .tips{font-size:12px;opacity:.75;margin-top:10px;}
+.scene-nonogram .rules-content ul{padding-left:20px;margin:6px 0 10px;}
+

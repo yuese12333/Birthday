@@ -71,7 +71,7 @@ export class Scene2Exam extends BaseScene {
   async init(){
     await super.init();
     // 不再内置默认题库：直接加载 external questions.json（若失败或为空将导致后续逻辑异常，符合“必须提供外部题库”要求）
-    const resp = await fetch('./data/questions.json');
+    const resp = await fetch('./data/scene2_questions.json');
     if(!resp.ok) throw new Error('题库加载失败 (HTTP)');
     const data = await resp.json();
     const built = this.buildSubjectsFromExternal(data);
