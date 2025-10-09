@@ -296,6 +296,20 @@ export class Scene3Timeline extends BaseScene {
         rulesOverlay.querySelector('.close-rules').addEventListener('click', ()=> rulesOverlay.classList.add('hidden'));
       }
       btnNext.addEventListener('click', ()=> {
+        // 点击下一题时立即移除上一题的 reveal 图片（不做淡出过渡）
+        try{
+          const revealImgNow = gridScroller.querySelector('.nonogram-reveal-img');
+          if(revealImgNow){
+            // 临时关闭 transition，直接移除 show 状态
+            const prevTrans = revealImgNow.style.transition || '';
+            revealImgNow.style.transition = 'none';
+            revealImgNow.classList.remove('show');
+            // 触发重绘以确保样式立即生效
+            void revealImgNow.offsetHeight;
+            // 还原 transition（短延时以避免影响后续动画）
+            setTimeout(()=>{ revealImgNow.style.transition = prevTrans; }, 50);
+          }
+        }catch(e){/* ignore */}
         if(btnNext.textContent === '下一题'){
           currentIndex++;
             if(currentIndex >= puzzles.length) currentIndex = puzzles.length-1;
@@ -510,9 +524,6 @@ export class Scene3Timeline extends BaseScene {
       // 通过子序列匹配，尚未违规 => partial
       return 'partial';
     }
-
-    // 图像生成相关函数已移除（现在使用人工/预生成的 JSON）
-
   }
   async exit(){ audioManager.stopBGM('3',{ fadeOut:500 }); }
 }
