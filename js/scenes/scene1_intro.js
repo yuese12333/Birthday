@@ -75,9 +75,9 @@ export class Scene1Intro extends BaseScene {
     // 统一使用基类提供的文字不可选封装
     this.applyNoSelect(el);
 
-  // 状态变量
-  this.tags=new Set();
-  this.titleClicks=0; this._titleBonusGiven=false;
+    // 状态变量
+    this.tags=new Set();
+    this.titleClicks=0; this._titleBonusGiven=false;
 
     // 引用
   // 已移除 vnBox 直接引用（保留 DOM 结构即可）
@@ -115,7 +115,7 @@ export class Scene1Intro extends BaseScene {
       const curFail = parseInt(m[1],10);
       return `dialogue_${curFail+1}_1`;
     };
-  let lineQueue=[];     // 当前阶段行数组
+    let lineQueue=[];     // 当前阶段行数组
     let lineIndex=0;      // 下一待渲染的行索引
     let stageDoneCallback=null; // 阶段全部行显示完后的回调
     let awaitingLine=false;     // 防止并发推进

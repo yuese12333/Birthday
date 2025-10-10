@@ -151,34 +151,34 @@ export class Scene0Register extends BaseScene {
         setTimeout(()=> this.ctx.go('intro'), 800);
       } else {
         wrongTimes++;
-  if(!bgmKilled){ audioManager.stopBGM('0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
-        const { imgRow, lines } = ensureErrorStructure();
-        if(wrongTimes < 5){
-          const angryLines = [ 
-            '不是你干什么呢？！',
-            '好好填！不许乱填！',
-            '溜溜！不许这样！',
-            '再填错我真生气了！' ];
-          // 轮播：每次只显示当前这一条，替换上一条
-          lines.innerHTML = '';
-          const span=document.createElement('span');
-          span.textContent=angryLines[(wrongTimes-1)%angryLines.length];
-          span.style.cssText='animation:pwdShake .5s;';
-          lines.appendChild(span);
-        } else if(wrongTimes === 5){
-          if(!imgRow.querySelector('.wrong-cry')){
-            const cry=document.createElement('img'); cry.src='./assets/images/cry.png'; cry.alt='cry'; cry.className='wrong-cry'; cry.style.cssText='width:70px;height:70px;animation:shakeCry .6s ease;'; imgRow.appendChild(cry);
-          }
-        } else if(wrongTimes >= 6){
-          const bye=document.createElement('span'); bye.textContent='……我不跟你玩了，退出！'; lines.appendChild(bye); setTimeout(()=>{ try{ window.close(); }catch(e){} location.href='about:blank'; }, 800);
+      if(!bgmKilled){ audioManager.stopBGM('0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
+      const { imgRow, lines } = ensureErrorStructure();
+      if(wrongTimes < 5){
+        const angryLines = [ 
+          '不是你干什么呢？！',
+          '好好填！不许乱填！',
+          '溜溜！不许这样！',
+          '再填错我真生气了！' ];
+        // 轮播：每次只显示当前这一条，替换上一条
+        lines.innerHTML = '';
+        const span=document.createElement('span');
+        span.textContent=angryLines[(wrongTimes-1)%angryLines.length];
+        span.style.cssText='animation:pwdShake .5s;';
+        lines.appendChild(span);
+      } else if(wrongTimes === 5){
+        if(!imgRow.querySelector('.wrong-cry')){
+          const cry=document.createElement('img'); cry.src='./assets/images/cry.png'; cry.alt='cry'; cry.className='wrong-cry'; cry.style.cssText='width:70px;height:70px;animation:shakeCry .6s ease;'; imgRow.appendChild(cry);
         }
+      } else if(wrongTimes >= 6){
+        const bye=document.createElement('span'); bye.textContent='……我不跟你玩了，退出！'; lines.appendChild(bye); setTimeout(()=>{ try{ window.close(); }catch(e){} location.href='about:blank'; }, 800);
       }
-    });
-    // “我忘了”按钮：1~4 次依次累加 angry.png，5 次显示 cry.png 并禁用按钮
-    this._forgotClicks = 0;
-    forgotBtn.addEventListener('click',()=>{
-      if(forgotBtn.disabled) return;
-      this._forgotClicks++;
+    }
+  });
+  // “我忘了”按钮：1~4 次依次累加 angry.png，5 次显示 cry.png 并禁用按钮
+  this._forgotClicks = 0;
+  forgotBtn.addEventListener('click',()=>{
+    if(forgotBtn.disabled) return;
+    this._forgotClicks++;
   if(!bgmKilled){ audioManager.stopBGM('0'); bgmKilled=true; bgmBtn.classList.add('muted'); }
       // 使用统一结构，避免后续密码错误覆盖表情
       const { imgRow } = ensureErrorStructure();
@@ -224,7 +224,7 @@ export class Scene0Register extends BaseScene {
     if(!document.getElementById('register-emoji-anim')){
       const style = document.createElement('style');
       style.id = 'register-emoji-anim';
-  style.textContent = `@keyframes pop{0%{transform:scale(.3);opacity:0;}60%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);} }@keyframes shakeCry{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}50%{transform:translateX(4px);}75%{transform:translateX(-3px);} }@keyframes btnShake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-5px);}40%,80%{transform:translateX(5px);} }@keyframes flashRed{0%,100%{box-shadow:0 0 0 0 rgba(255,0,60,.0);}50%{box-shadow:0 0 0 4px rgba(255,0,60,.55);} }@keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);} } .shake-once{animation:btnShake .6s ease;} .flash-red{animation:flashRed 1.3s ease-in-out infinite alternate; background:#ff5f7f !important; color:#fff !important;}`;
+      style.textContent = `@keyframes pop{0%{transform:scale(.3);opacity:0;}60%{transform:scale(1.1);opacity:1;}100%{transform:scale(1);} }@keyframes shakeCry{0%,100%{transform:translateX(0);}25%{transform:translateX(-4px);}50%{transform:translateX(4px);}75%{transform:translateX(-3px);} }@keyframes btnShake{0%,100%{transform:translateX(0);}20%,60%{transform:translateX(-5px);}40%,80%{transform:translateX(5px);} }@keyframes flashRed{0%,100%{box-shadow:0 0 0 0 rgba(255,0,60,.0);}50%{box-shadow:0 0 0 4px rgba(255,0,60,.55);} }@keyframes fadeIn{from{opacity:0;transform:translateY(4px);}to{opacity:1;transform:translateY(0);} } .shake-once{animation:btnShake .6s ease;} .flash-red{animation:flashRed 1.3s ease-in-out infinite alternate; background:#ff5f7f !important; color:#fff !important;}`;
       document.head.appendChild(style);
     }
     this.ctx.rootEl.appendChild(el);

@@ -14,8 +14,6 @@ import { audioManager } from '../core/audioManager.js';
 export class Scene3Timeline extends BaseScene {
   async init(){ await super.init(); }
   async enter(){
-    try { audioManager.playSceneBGM('3',{ loop:true, volume:0.55, fadeIn:700 }); } catch(e) { /* ignore */ }
-
     const CONFIG = {
       puzzleSrc: 'data/scene3_puzzles.json', // 改用手动编辑器产出的新路径
       gridSize: 9,
@@ -24,11 +22,11 @@ export class Scene3Timeline extends BaseScene {
     // 将本幕“写死”为 4 关，每关一张对应图片，完成后飞向四角拼贴
     const REQUIRED_LEVELS = 4;
     // 显式动画时间设定（毫秒）
-  const REVEAL_FADE_MS = 900;   // 图片淡入时长
-  const SPLIT_ANIM_MS  = 700;   // 分裂飞向角落动画时长
-  const COLLAGE_FADE_MS = 900;  // 四张拼贴淡出时长
-  const FINAL_COLLAGE_FADE_MS = 900; // 最终合集图片淡入时长
-  const FINAL_COLLAGE_SRC = 'assets/images/scene3_0.png';
+    const REVEAL_FADE_MS = 900;   // 图片淡入时长
+    const SPLIT_ANIM_MS  = 700;   // 分裂飞向角落动画时长
+    const COLLAGE_FADE_MS = 900;  // 四张拼贴淡出时长
+    const FINAL_COLLAGE_FADE_MS = 900; // 最终合集图片淡入时长
+    const FINAL_COLLAGE_SRC = 'assets/images/scene3_0.png';
 
     const root = document.createElement('div');
     root.className = 'scene scene-nonogram';
@@ -36,6 +34,8 @@ export class Scene3Timeline extends BaseScene {
     const scene = this;
     // 使用 BaseScene 公共方法统一禁用文字选择
     this.applyNoSelect(root);
+
+    // BGM: 绑定将在 DOM 插入后进行（避免引用未定义的按钮或未初始化的元素）
 
     // 分裂并定位图片的辅助工具（包含持久化的十字分割线 + 4 个固定槽位）
     // 写死逻辑：四关四图，按当前关卡索引固定映射到四角（不再使用累计计数）。
@@ -267,6 +267,7 @@ export class Scene3Timeline extends BaseScene {
         <button class='btn-hint' data-debounce>提示</button>
         ${CONFIG.showRuleHelp ? `<button class='btn-rules' data-debounce>规则说明</button>`:''}
         <button class='btn-next hidden' data-debounce>进入下一幕</button>
+        <button class='bgm-btn intro-bgm' title='好听的音乐' style='margin-left:auto;'>♪</button>
       </div>
       <div class='status-msg'></div>
       <div class='rules-overlay hidden'>
@@ -326,6 +327,23 @@ export class Scene3Timeline extends BaseScene {
     ensureBtnAccessible(btnNext);
     const statusMsg = root.querySelector('.status-msg');
     const rulesOverlay = root.querySelector('.rules-overlay');
+
+    // BGM 按钮绑定：在 DOM 插入后安全执行
+    try{
+      const btnBgm = root.querySelector('.bgm-btn');
+      if(btnBgm){
+        ensureBtnAccessible(btnBgm);
+        // 按照 Scene1 的模式延迟启动 BGM：播放并保存 audio 对象
+        let bgmAudio;
+        try{ bgmAudio = audioManager.playSceneBGM('3',{ loop:true, volume:0.55, fadeIn:700 }); }catch(e){ console.warn('[Nonogram] 播放 BGM 失败：', e); }
+        btnBgm.addEventListener('click', ()=>{
+          try{
+            if(bgmAudio && bgmAudio.paused){ bgmAudio.play().catch(()=>{}); audioManager.globalMuted=false; bgmAudio.muted=false; btnBgm.classList.remove('muted'); return; }
+            const muted = audioManager.toggleMute(); btnBgm.classList.toggle('muted', muted);
+          }catch(e){ /* defensive */ }
+        });
+      }
+    }catch(e){/* defensive */}
 
     // 优先尝试加载预生成 JSON；失败则回退到运行时图像生成
     let puzzles = [];
