@@ -146,6 +146,70 @@ export class Scene0Register extends BaseScene {
       e.preventDefault();
       const data = new FormData(form);
       const pass = (data.get('pass')||'').trim();
+      // 特殊彩蛋：如果输入为她/我的生日，显示彩蛋占位，而不是视作忘了或错误
+      if(pass === '20051210' || pass === '20051005'){
+        // 不计入 wrongTimes，也不停止 BGM
+        const eggWrap = document.createElement('div');
+        eggWrap.className = 'birthday-egg';
+        eggWrap.style.cssText = 'position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);background:rgba(255,255,255,0.98);padding:18px;border-radius:10px;box-shadow:0 12px 40px rgba(0,0,0,.35);z-index:100000;max-width:92vw;min-width:280px;text-align:center;';
+        // 为两个生日分别提供完全独立的模板与行为，便于后续各自扩展
+        if(pass === '20051210'){
+          // 她 的 彩蛋菜单（独立模板）
+          eggWrap.innerHTML = `
+            <h3 style='margin:0 0 .5rem;'>为她准备的小角落 ✨</h3>
+            <p style='margin:0 0 .6rem;color:#333;'>这是她的特别菜单（占位），包含一些回忆与互动。</p>
+            <div style='display:flex;flex-direction:column;gap:.5rem;align-items:center;'>
+              <button type='button' class='her-play' style='width:240px;padding:.5rem;'>播放那天的歌（占位）</button>
+              <button type='button' class='her-mem' style='width:240px;padding:.5rem;'>打开她的回忆（占位）</button>
+              <button type='button' class='her-write' style='width:240px;padding:.5rem;'>写一句话给她</button>
+              <div style='display:flex;gap:.6rem;margin-top:.4rem;justify-content:center;'>
+                <button type='button' class='her-close' style='padding:.45rem .8rem;background:#eee;color:#333;border:none;border-radius:6px;'>关闭</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(eggWrap);
+          const removeEgg = ()=>{ try{ eggWrap.remove(); }catch(e){} };
+          eggWrap.querySelector('.her-close').addEventListener('click',()=>{ removeEgg(); });
+          const playBtn = eggWrap.querySelector('.her-play');
+          if(playBtn){
+            playBtn.addEventListener('click',()=>{
+              try{ if(typeof audioManager?.playSound === 'function'){ audioManager.playSound('her_song'); } else if(bgmAudio){ bgmAudio.play().catch(()=>{}); } }
+              catch(e){ playBtn.style.transform='scale(.98)'; setTimeout(()=>playBtn.style.transform='',120); }
+            });
+          }
+          const memBtn = eggWrap.querySelector('.her-mem');
+          if(memBtn){ memBtn.addEventListener('click',()=>{ try{ removeEgg(); this.ctx.go('timeline'); }catch(e){ removeEgg(); } }); }
+          const writeBtn = eggWrap.querySelector('.her-write');
+          if(writeBtn){ writeBtn.addEventListener('click',()=>{ try{ const text = prompt('写给她的一句话（占位）',''); if(text){ const t = document.createElement('div'); t.textContent='已为她记录（占位）: '+(text.length>60?text.slice(0,60)+'…':text); t.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;'; document.body.appendChild(t); setTimeout(()=>{ try{ t.remove(); }catch(e){} },2400); } }catch(e){} }); }
+          // 仅保留关闭按钮，继续按钮已移除
+        } else {
+          // 你的生日 的 彩蛋菜单（独立模板）
+          eggWrap.innerHTML = `
+            <h3 style='margin:0 0 .5rem;'>给你的一点小惊喜 ✨</h3>
+            <p style='margin:0 0 .6rem;color:#333;'>这是给你的私人菜单（占位），可以留句感想或查看我们的时刻。</p>
+            <div style='display:flex;flex-direction:column;gap:.5rem;align-items:center;'>
+              <button type='button' class='you-play' style='width:240px;padding:.5rem;'>播放提示音（占位）</button>
+              <button type='button' class='you-mem' style='width:240px;padding:.5rem;'>查看我们的时光（占位）</button>
+              <button type='button' class='you-write' style='width:240px;padding:.5rem;'>写一句话给自己</button>
+              <div style='display:flex;gap:.6rem;margin-top:.4rem;justify-content:center;'>
+                <button type='button' class='you-close' style='padding:.45rem .8rem;background:#eee;color:#333;border:none;border-radius:6px;'>关闭</button>
+              </div>
+            </div>
+          `;
+          document.body.appendChild(eggWrap);
+          const removeEgg = ()=>{ try{ eggWrap.remove(); }catch(e){} };
+          eggWrap.querySelector('.you-close').addEventListener('click',()=>{ removeEgg(); });
+          const playBtn = eggWrap.querySelector('.you-play');
+          if(playBtn){ playBtn.addEventListener('click',()=>{ try{ if(typeof audioManager?.playSound === 'function'){ audioManager.playSound('ding'); } else if(bgmAudio){ bgmAudio.play().catch(()=>{}); } }catch(e){ playBtn.style.transform='scale(.98)'; setTimeout(()=>playBtn.style.transform='',120); } }); }
+          const memBtn = eggWrap.querySelector('.you-mem');
+          if(memBtn){ memBtn.addEventListener('click',()=>{ try{ removeEgg(); this.ctx.go('timeline'); }catch(e){ removeEgg(); } }); }
+          const writeBtn = eggWrap.querySelector('.you-write');
+          if(writeBtn){ writeBtn.addEventListener('click',()=>{ try{ const text = prompt('写给你自己的一句话（占位）',''); if(text){ const t = document.createElement('div'); t.textContent='已记录（占位）: '+(text.length>60?text.slice(0,60)+'…':text); t.style.cssText='position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;'; document.body.appendChild(t); setTimeout(()=>{ try{ t.remove(); }catch(e){} },2400); } }catch(e){} }); }
+          // 仅保留关闭按钮，继续按钮已移除
+        }
+        return;
+      }
+
       if(pass === '20241007'){
         msg.innerHTML = `<span class='ok'>验证成功！那天开始的一切，都继续写在下面的故事里 ❤</span>`;
         setTimeout(()=> this.ctx.go('intro'), 800);
