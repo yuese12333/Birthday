@@ -23,148 +23,237 @@ export class Scene3Timeline extends BaseScene {
     };
     // 将本幕“写死”为 4 关，每关一张对应图片，完成后飞向四角拼贴
     const REQUIRED_LEVELS = 4;
-      // 显式动画时间设定（毫秒）
-      const REVEAL_FADE_MS = 900;   // 图片淡入时长
-      const SPLIT_ANIM_MS  = 700;   // 分裂飞向角落动画时长
+    // 显式动画时间设定（毫秒）
+  const REVEAL_FADE_MS = 900;   // 图片淡入时长
+  const SPLIT_ANIM_MS  = 700;   // 分裂飞向角落动画时长
+  const COLLAGE_FADE_MS = 900;  // 四张拼贴淡出时长
+  const FINAL_COLLAGE_FADE_MS = 900; // 最终合集图片淡入时长
+  const FINAL_COLLAGE_SRC = 'assets/images/scene3_0.png';
 
-  const root = document.createElement('div');
+    const root = document.createElement('div');
     root.className = 'scene scene-nonogram';
-  // 捕获当前场景实例，供内部嵌套函数安全引用
-  const scene = this;
+    // 捕获当前场景实例，供内部嵌套函数安全引用
+    const scene = this;
     // 使用 BaseScene 公共方法统一禁用文字选择
     this.applyNoSelect(root);
 
-  // 分裂并定位图片的辅助工具（包含持久化的十字分割线 + 4 个固定槽位）
-  // 写死逻辑：四关四图，按当前关卡索引固定映射到四角（不再使用累计计数）。
-      function hideRevealImmediate(){
-        const revealImgNow = gridScroller.querySelector('.nonogram-reveal-img');
-        if(!revealImgNow) return;
-        try{
-          const prevTrans = revealImgNow.style.transition || '';
-          revealImgNow.style.transition = 'none';
-          revealImgNow.classList.remove('show');
-          revealImgNow.style.opacity = '0';
-          revealImgNow.setAttribute('aria-hidden','true');
-          revealImgNow.hidden = true;
-          // 重置层级，避免在下一题遮盖网格
-          revealImgNow.style.zIndex = '';
-          revealImgNow.style.pointerEvents = 'none';
-          try{ delete revealImgNow.dataset.splitStarted; }catch(e){}
-          void revealImgNow.offsetHeight; // force reflow
-          setTimeout(()=>{ revealImgNow.style.transition = prevTrans; }, 50);
-        }catch(e){/* ignore */}
+    // 分裂并定位图片的辅助工具（包含持久化的十字分割线 + 4 个固定槽位）
+    // 写死逻辑：四关四图，按当前关卡索引固定映射到四角（不再使用累计计数）。
+    function hideRevealImmediate(){
+      const revealImgNow = gridScroller.querySelector('.nonogram-reveal-img');
+      if(!revealImgNow) return;
+      try{
+        const prevTrans = revealImgNow.style.transition || '';
+        revealImgNow.style.transition = 'none';
+        revealImgNow.classList.remove('show');
+        revealImgNow.style.opacity = '0';
+        revealImgNow.setAttribute('aria-hidden','true');
+        revealImgNow.hidden = true;
+        // 重置层级，避免在下一题遮盖网格
+        revealImgNow.style.zIndex = '';
+        revealImgNow.style.pointerEvents = 'none';
+        try{ delete revealImgNow.dataset.splitStarted; }catch(e){}
+        void revealImgNow.offsetHeight; // force reflow
+        setTimeout(()=>{ revealImgNow.style.transition = prevTrans; }, 50);
+      }catch(e){/* ignore */}
+    }
+    function ensureSplitOverlay(){
+      let overlay = gridScroller.querySelector('.split-overlay');
+      if(overlay) return overlay;
+      overlay = document.createElement('div'); overlay.className='split-overlay';
+      // 初始隐藏 overlay（不可见），待图片淡入完成后再显示
+      overlay.hidden = true;
+      // 初始透明度为 1（可通过 fadeOutCollage 使其过渡到 0）
+      try{ overlay.style.opacity = '1'; }catch(e){}
+      // 确保分裂层不遮挡交互，且层级低于网格（由 JS 提升网格 z-index）
+      try{
+        overlay.style.pointerEvents = 'none';
+        overlay.style.zIndex = '0';
+        overlay.style.position = overlay.style.position || 'absolute';
+      }catch(e){}
+      // 中心容器：承载 4 个槽位与十字分割线
+      const slots = document.createElement('div'); slots.className='split-slots';
+      // 创建 4 个带明确定位类名的槽位，确保逻辑顺序可映射到四个角
+      const slotPosClasses = ['slot-bottom-left','slot-top-left','slot-bottom-right','slot-top-right'];
+      for(let i=0;i<4;i++){ 
+        const s=document.createElement('div'); s.className='split-slot '+slotPosClasses[i]; s.dataset.idx = String(i); slots.appendChild(s); 
       }
-      function ensureSplitOverlay(){
-        let overlay = gridScroller.querySelector('.split-overlay');
-        if(overlay) return overlay;
-        overlay = document.createElement('div'); overlay.className='split-overlay';
-        // 初始隐藏 overlay，待图片淡入完成后再显示
-        overlay.hidden = true;
-        // 确保分裂层不遮挡交互，且层级低于网格（由 JS 提升网格 z-index）
-        try{
-          overlay.style.pointerEvents = 'none';
-          overlay.style.zIndex = '0';
-          overlay.style.position = overlay.style.position || 'absolute';
-        }catch(e){}
-    // 中心容器：承载 4 个槽位与十字分割线
-        const slots = document.createElement('div'); slots.className='split-slots';
-  // 创建 4 个带明确定位类名的槽位，确保逻辑顺序可映射到四个角
-  const slotPosClasses = ['slot-bottom-left','slot-top-left','slot-bottom-right','slot-top-right'];
-  for(let i=0;i<4;i++){ const s=document.createElement('div'); s.className='split-slot '+slotPosClasses[i]; s.dataset.idx = String(i); slots.appendChild(s); }
-  // 十字分割线（纵 / 横）
-        const vline = document.createElement('div'); vline.className='split-line vline';
-        const hline = document.createElement('div'); hline.className='split-line hline';
-        overlay.appendChild(slots); overlay.appendChild(vline); overlay.appendChild(hline);
-        gridScroller.appendChild(overlay);
-        return overlay;
-      }
+      // 十字分割线（纵 / 横）
+      const vline = document.createElement('div'); vline.className='split-line vline';
+      const hline = document.createElement('div'); hline.className='split-line hline';
+      overlay.appendChild(slots); overlay.appendChild(vline); overlay.appendChild(hline);
+      gridScroller.appendChild(overlay);
+      return overlay;
+    }
 
-      function startSplitForSrc(src){
-        if(!src) return;
-        // 安全防御：仅允许前 4 关触发分裂（本幕已写死为四关）。
-        if(currentIndex < 0 || currentIndex >= 4){ hideRevealImmediate(); return; }
-        const overlay = ensureSplitOverlay();
-        // 复制后立即让绑定图片消失，避免与飞行动画重叠
-        hideRevealImmediate();
-        // 创建一个临时 <img>，初始居中摆放；原图已被隐藏从视觉上消失
-        const tmp = document.createElement('img'); tmp.className='split-temp'; tmp.src = src; tmp.alt='';
-        // 基础样式，确保可见并不拦截交互
-        try{
-          tmp.style.position = tmp.style.position || 'absolute';
-          tmp.style.pointerEvents = 'none';
-          // 提升到最上层，确保飞行动画在揭示图与控件之上可见
-          tmp.style.zIndex = '4';
-        }catch(e){}
-        // 将临时图放到 overlay 末尾，保证层级正确
-        overlay.appendChild(tmp);
-        const start = () => {
-          // 使用 requestAnimationFrame 强制一次布局后再启动动画，避免初始跳变
-          requestAnimationFrame(()=>{
-            // “写死”的四关：按当前关卡索引固定映射到四角
-            // 逻辑顺序：0->左下,1->左上,2->右下,3->右上
-            // DOM 2x2 顺序：0=左上,1=右上,2=左下,3=右下
-            const logical = (currentIndex % 4);
-            const logicalToDom = [2,0,3,1];
-            const domIdx = logicalToDom[logical];
-            animateToSlot(tmp, domIdx, () => {
-              const slotEl = overlay.querySelector(`.split-slot[data-idx='${domIdx}']`);
-              if(slotEl){
-                // 覆盖旧内容，保持每个槽位只有一张
-                slotEl.innerHTML = '';
-                const finalImg = document.createElement('img'); finalImg.className='split-locked'; finalImg.src = src; finalImg.alt='';
-                slotEl.appendChild(finalImg);
-              }
-              if(tmp && tmp.parentElement) tmp.parentElement.removeChild(tmp);
-            });
-          });
-        };
-        // 确保图片已加载后再计算位移与缩放，避免 0 宽高导致动画不可见
-        if (tmp.complete && tmp.naturalWidth > 0) {
-          start();
-        } else {
-          let started = false;
-          const once = () => { if(started) return; started = true; start(); };
-          tmp.addEventListener('load', once, { once: true });
-          // 双保险：部分情况下缓存图片不会触发 load 事件
-          setTimeout(once, 100);
+    // 显示最终拼贴大图
+    function showFinalCollageImage(){
+      try{
+        if(!FINAL_COLLAGE_SRC) return;
+        const existing = gridScroller.querySelector('.final-collage-img');
+        if(existing){
+          if(existing.dataset.visible) return;
         }
-      }
-
-      function animateToSlot(imgEl, slotIdx, cb){
-        const overlay = imgEl.parentElement;
-        const slot = overlay.querySelector(`.split-slot[data-idx='${slotIdx}']`);
-        if(!slot){ if(cb) cb(); return; }
-  // 保证 imgEl 采用 CSS '.split-temp' 绝对定位并初始居中
-        imgEl.classList.add('animating');
-          // 显式指定过渡时间，确保不同环境下一致
-          try{ imgEl.style.transition = `transform ${SPLIT_ANIM_MS}ms ease`; }catch(e){}
-  // 通过读取起点与目标槽位的矩形信息计算平移与缩放值
-        const startRect = imgEl.getBoundingClientRect();
-        const slotRect = slot.getBoundingClientRect();
-        const overlayRect = overlay.getBoundingClientRect();
-  // 计算覆盖层坐标系下：目标中心点与起始中心点
-        const targetCenterX = slotRect.left + slotRect.width / 2 - overlayRect.left;
-        const targetCenterY = slotRect.top + slotRect.height / 2 - overlayRect.top;
-        const startCenterX = startRect.left + startRect.width / 2 - overlayRect.left;
-        const startCenterY = startRect.top + startRect.height / 2 - overlayRect.top;
-  // 平移增量（向量）
-        const dx = targetCenterX - startCenterX;
-        const dy = targetCenterY - startCenterY;
-  // 缩放：根据槽位与临时图尺寸比计算（宽/高 取最小比值）
-        const scale = Math.min((slotRect.width / startRect.width), (slotRect.height / startRect.height));
-  // 应用 transform 触发过渡动画
-        imgEl.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
-  // 监听过渡结束，完成后固定在槽位
-        const onEnd = (ev)=>{
-          if(ev.propertyName && (ev.propertyName === 'transform' || ev.propertyName === 'width')){
-            imgEl.removeEventListener('transitionend', onEnd);
-            if(cb) cb();
-          }
+        const img = existing || document.createElement('img');
+        img.className = 'final-collage-img';
+        img.src = FINAL_COLLAGE_SRC;
+        img.alt = '';
+        img.dataset.visible = '0';
+        img.hidden = true;
+        try{
+          img.style.position = img.style.position || 'absolute';
+          img.style.top = '0';
+          img.style.left = '0';
+          img.style.right = '0';
+          img.style.bottom = '0';
+          img.style.margin = 'auto';
+          img.style.pointerEvents = 'none';
+          img.style.maxWidth = '100%';
+          img.style.maxHeight = '100%';
+          img.style.transition = `opacity ${FINAL_COLLAGE_FADE_MS}ms ease`;
+          img.style.opacity = '0';
+          img.style.zIndex = '2';
+        }catch(e){}
+        if(!existing) gridScroller.appendChild(img);
+        const startFade = () => {
+          img.hidden = false;
+          void img.offsetHeight;
+          try{ img.style.opacity = '1'; }catch(e){}
+          img.dataset.visible = '1';
         };
-        imgEl.addEventListener('transitionend', onEnd);
-      }
+        if (img.complete && img.naturalWidth > 0){
+          requestAnimationFrame(startFade);
+        } else {
+          img.addEventListener('load', () => requestAnimationFrame(startFade), { once:true });
+        }
+      }catch(e){/* defensive */}
+    }
 
-  // 样式已抽取至全局 css/styles.css 中的 Scene 3 Nonogram 段落，不再动态注入。
+    // 当所有槽位已有拼贴图时，淡出整个 overlay（拼接大图淡出）
+    function fadeOutCollageIfComplete(){
+      try{
+        const ov = ensureSplitOverlay();
+        if(!ov) return;
+        const slots = ov.querySelectorAll('.split-slot');
+        if(!slots || slots.length === 0) return;
+        // 检查每个槽位是否已有 .split-locked
+        let allFilled = true;
+        for(const s of slots){ if(!s.querySelector('.split-locked')){ allFilled = false; break; } }
+        if(!allFilled) return;
+        // 所有槽位已放入图片 -> 启动淡出（防止重复触发）
+        if(ov.dataset.fading) return; ov.dataset.fading = '1';
+        try{ ov.style.transition = `opacity ${COLLAGE_FADE_MS}ms ease`; }catch(e){}
+        // 触发过渡到透明
+        requestAnimationFrame(()=>{ ov.style.opacity = '0'; ov.hidden = false; });
+        const onEnd = (ev)=>{
+          if(ev && ev.propertyName && ev.propertyName !== 'opacity') return;
+          ov.removeEventListener('transitionend', onEnd);
+          try{ ov.hidden = true; }catch(e){}
+          // 可选：清空 overlay 内容以减小内存占用
+          try{ const slotsContainer = ov.querySelector('.split-slots'); if(slotsContainer) slotsContainer.innerHTML = ''; }catch(e){}
+          showFinalCollageImage();
+        };
+        ov.addEventListener('transitionend', onEnd);
+        // 兜底：如果 transitionend 未触发，仍在 COLLAGE_FADE_MS + 200ms 后强制隐藏
+        setTimeout(()=>{
+          try{
+            const wasHidden = ov.hidden;
+            if(!ov.hidden) ov.hidden = true;
+            const sc = ov.querySelector('.split-slots'); if(sc) sc.innerHTML = '';
+            if(!wasHidden) showFinalCollageImage();
+          }catch(e){}
+        }, COLLAGE_FADE_MS + 250);
+      }catch(e){/* defensive */}
+    }
+
+    function startSplitForSrc(src){
+      if(!src) return;
+      // 安全防御：仅允许前 4 关触发分裂（本幕已写死为四关）。
+      if(currentIndex < 0 || currentIndex >= 4){ hideRevealImmediate(); return; }
+      const overlay = ensureSplitOverlay();
+      // 复制后立即让绑定图片消失，避免与飞行动画重叠
+      hideRevealImmediate();
+      // 创建一个临时 <img>，初始居中摆放；原图已被隐藏从视觉上消失
+      const tmp = document.createElement('img'); tmp.className='split-temp'; tmp.src = src; tmp.alt='';
+      // 基础样式，确保可见并不拦截交互
+      try{
+        tmp.style.position = tmp.style.position || 'absolute';
+        tmp.style.pointerEvents = 'none';
+        // 提升到最上层，确保飞行动画在揭示图与控件之上可见
+        tmp.style.zIndex = '4';
+      }catch(e){}
+      // 将临时图放到 overlay 末尾，保证层级正确
+      overlay.appendChild(tmp);
+      const start = () => {
+        // 使用 requestAnimationFrame 强制一次布局后再启动动画，避免初始跳变
+        requestAnimationFrame(()=>{
+          // “写死”的四关：按当前关卡索引固定映射到四角
+          // 逻辑顺序：0->左下,1->左上,2->右下,3->右上
+          // DOM 2x2 顺序：0=左上,1=右上,2=左下,3=右下
+          const logical = (currentIndex % 4);
+          const logicalToDom = [2,0,3,1];
+          const domIdx = logicalToDom[logical];
+          animateToSlot(tmp, domIdx, () => {
+            const slotEl = overlay.querySelector(`.split-slot[data-idx='${domIdx}']`);
+            if(slotEl){
+              // 覆盖旧内容，保持每个槽位只有一张
+              slotEl.innerHTML = '';
+              const finalImg = document.createElement('img'); finalImg.className='split-locked'; finalImg.src = src; finalImg.alt='';
+              slotEl.appendChild(finalImg);
+            }
+            if(tmp && tmp.parentElement) tmp.parentElement.removeChild(tmp);
+            // 每次放入槽位后检查是否已完成四图拼接，若是则触发淡出
+            try{ fadeOutCollageIfComplete(); }catch(e){}
+          });
+        });
+      };
+      // 确保图片已加载后再计算位移与缩放，避免 0 宽高导致动画不可见
+      if (tmp.complete && tmp.naturalWidth > 0) {
+        start();
+      } else {
+        let started = false;
+        const once = () => { if(started) return; started = true; start(); };
+        tmp.addEventListener('load', once, { once: true });
+        // 双保险：部分情况下缓存图片不会触发 load 事件
+        setTimeout(once, 100);
+      }
+    }
+
+    function animateToSlot(imgEl, slotIdx, cb){
+      const overlay = imgEl.parentElement;
+      const slot = overlay.querySelector(`.split-slot[data-idx='${slotIdx}']`);
+      if(!slot){ if(cb) cb(); return; }
+      // 保证 imgEl 采用 CSS '.split-temp' 绝对定位并初始居中
+      imgEl.classList.add('animating');
+        // 显式指定过渡时间，确保不同环境下一致
+        try{ imgEl.style.transition = `transform ${SPLIT_ANIM_MS}ms ease`; }catch(e){}
+      // 通过读取起点与目标槽位的矩形信息计算平移与缩放值
+      const startRect = imgEl.getBoundingClientRect();
+      const slotRect = slot.getBoundingClientRect();
+      const overlayRect = overlay.getBoundingClientRect();
+      // 计算覆盖层坐标系下：目标中心点与起始中心点
+      const targetCenterX = slotRect.left + slotRect.width / 2 - overlayRect.left;
+      const targetCenterY = slotRect.top + slotRect.height / 2 - overlayRect.top;
+      const startCenterX = startRect.left + startRect.width / 2 - overlayRect.left;
+      const startCenterY = startRect.top + startRect.height / 2 - overlayRect.top;
+      // 平移增量（向量）
+      const dx = targetCenterX - startCenterX;
+      const dy = targetCenterY - startCenterY;
+      // 缩放：根据槽位与临时图尺寸比计算（宽/高 取最小比值）
+      const scale = Math.min((slotRect.width / startRect.width), (slotRect.height / startRect.height));
+      // 应用 transform 触发过渡动画
+      imgEl.style.transform = `translate(${dx}px, ${dy}px) scale(${scale})`;
+      // 监听过渡结束，完成后固定在槽位
+      const onEnd = (ev)=>{
+        if(ev.propertyName && (ev.propertyName === 'transform' || ev.propertyName === 'width')){
+          imgEl.removeEventListener('transitionend', onEnd);
+          if(cb) cb();
+        }
+      };
+      imgEl.addEventListener('transitionend', onEnd);
+    }
+
+    // 样式已抽取至全局 css/styles.css 中的 Scene 3 Nonogram 段落，不再动态注入。
     root.innerHTML = `
       <h1 class='title'>场景3：心动瞬间 <span class='puzzle-progress' style="font-size:.6em; font-weight:500; margin-left:.6em; color:#c03; vertical-align:middle;">(0/0)</span></h1>
       <div class='nonogram-shell'>
@@ -200,14 +289,14 @@ export class Scene3Timeline extends BaseScene {
           <div class='rules-actions'><button class='close-rules'>关闭</button></div>
         </div>
       </div>
-  <p class='tips'>左键：涂色/清除；右键：标记；拖拽批量操作。</p>
+      <p class='tips'>左键：涂色/清除；右键：标记；拖拽批量操作。</p>
     `;
     this.ctx.rootEl.appendChild(root);
 
     const topCluesEl = root.querySelector('.top-clues-area .top-inner');
     const leftCluesEl = root.querySelector('.left-clues-area .left-inner');
     const gridContainer = root.querySelector('.grid-container');
-  const gridScroller = gridContainer.parentElement; // .grid-scroller 外层滚动容器
+    const gridScroller = gridContainer.parentElement; // .grid-scroller 外层滚动容器
     // 确保网格容器层级高于分裂层，避免完成后的拼贴遮盖下一题
     try{
       gridContainer.style.position = gridContainer.style.position || 'relative';
@@ -244,42 +333,42 @@ export class Scene3Timeline extends BaseScene {
     function initPuzzle(){
       if(CONFIG.puzzleSrc){
         fetch(CONFIG.puzzleSrc, { cache:'no-store' })
-            .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
-            .then(json=>{
-              if(Array.isArray(json.puzzles) && json.puzzles.length>0){
-                // 排序确保按 meta.index 顺序
-                let list = json.puzzles.slice().sort((a,b)=>{
-                  const ia = a.meta && a.meta.index ? a.meta.index : 0;
-                  const ib = b.meta && b.meta.index ? b.meta.index : 0;
-                  return ia - ib;
-                });
-                // 将关卡数量“写死”为 4 关，多余截断；不足则报错
-                if(list.length > REQUIRED_LEVELS) list = list.slice(0, REQUIRED_LEVELS);
-                if(list.length < REQUIRED_LEVELS) {
-                  throw new Error(`[Nonogram] 本幕已固定为 4 关，但当前仅提供 ${list.length} 关。请在 data/scene3_puzzles.json 准备 4 个 puzzles。`);
-                }
-                // 强制每关必须有图片
-                if(list.some(p=> !(p.meta&&p.meta.image) && !p.image)){
-                  throw new Error('[Nonogram] 本幕每关必须包含图片字段(meta.image 或 image)。');
-                }
-                puzzles = list.map(p=>({
-                  meta: p.meta||{},
-                  matrix: p.matrix,
-                  image: (p.meta&&p.meta.image)||p.image
-                }));
-              } else if(json.matrix){
-                // 单谜题不符合“写死 4 关”需求
-                throw new Error('[Nonogram] 本幕已固定为 4 关，但当前 JSON 仅包含单个 matrix。');
-              } else {
-                throw new Error('缺少 puzzles 或 matrix');
-              }
-              currentIndex = 0;
-              loadCurrentPuzzle();
-            })
-          .catch(err=>{
-            console.warn('[Nonogram] 预生成 JSON 加载失败，回退到图片生成:', err);
-            runtimeImageBuild(err && err.message ? String(err.message) : undefined);
-          });
+        .then(r=>{ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+        .then(json=>{
+          if(Array.isArray(json.puzzles) && json.puzzles.length>0){
+            // 排序确保按 meta.index 顺序
+            let list = json.puzzles.slice().sort((a,b)=>{
+              const ia = a.meta && a.meta.index ? a.meta.index : 0;
+              const ib = b.meta && b.meta.index ? b.meta.index : 0;
+              return ia - ib;
+            });
+            // 将关卡数量“写死”为 4 关，多余截断；不足则报错
+            if(list.length > REQUIRED_LEVELS) list = list.slice(0, REQUIRED_LEVELS);
+            if(list.length < REQUIRED_LEVELS) {
+              throw new Error(`[Nonogram] 本幕已固定为 4 关，但当前仅提供 ${list.length} 关。请在 data/scene3_puzzles.json 准备 4 个 puzzles。`);
+            }
+            // 强制每关必须有图片
+            if(list.some(p=> !(p.meta&&p.meta.image) && !p.image)){
+              throw new Error('[Nonogram] 本幕每关必须包含图片字段(meta.image 或 image)。');
+            }
+            puzzles = list.map(p=>({
+              meta: p.meta||{},
+              matrix: p.matrix,
+              image: (p.meta&&p.meta.image)||p.image
+            }));
+          } else if(json.matrix){
+            // 单谜题不符合“写死 4 关”需求
+            throw new Error('[Nonogram] 本幕已固定为 4 关，但当前 JSON 仅包含单个 matrix。');
+          } else {
+            throw new Error('缺少 puzzles 或 matrix');
+          }
+          currentIndex = 0;
+          loadCurrentPuzzle();
+        })
+        .catch(err=>{
+          console.warn('[Nonogram] 预生成 JSON 加载失败，回退到图片生成:', err);
+          runtimeImageBuild(err && err.message ? String(err.message) : undefined);
+        });
       } else {
         runtimeImageBuild();
       }
@@ -289,14 +378,14 @@ export class Scene3Timeline extends BaseScene {
       const p = puzzles[currentIndex];
       const matrix = p.matrix;
       if(!matrix) throw new Error('当前 puzzle 缺少 matrix');
-  // 清除上一题残留的完成状态类与标记
+      // 清除上一题残留的完成状态类与标记
       gridContainer.classList.remove('completed-locked','grid-fade-out','grid-jump','grid-heartbeat');
       delete gridContainer.dataset.animDone;
       gridContainer.style.opacity='';
       const h = matrix.length; const w = matrix[0].length;
       const rowClues = buildClues(matrix);
       const colClues = buildClues(transpose(matrix));
-  // 准备用于完成后淡入的原始揭示图片（不触发 overlay 分裂）
+      // 准备用于完成后淡入的原始揭示图片（不触发 overlay 分裂）
       let revealImg = gridScroller.querySelector('.nonogram-reveal-img');
       if(!revealImg){
         revealImg = document.createElement('img');
@@ -312,21 +401,21 @@ export class Scene3Timeline extends BaseScene {
         }catch(e){}
       }
       revealImg.src = p.image || '';
-        // 默认隐藏图片层，待完成动画时再展示并淡入
-        revealImg.hidden = true;
-        revealImg.classList.remove('show');
-        try{ delete revealImg.dataset.splitStarted; }catch(e){}
-        // 重置样式基线，避免上一次动画残留影响下一题
-        try{
-          revealImg.style.zIndex = '';
-          revealImg.style.opacity = '0';
-          revealImg.style.transition = `opacity ${REVEAL_FADE_MS}ms ease`;
-        }catch(e){}
-  // 新题目开始时确保线索区域可见（防止上一题完成后被隐藏）
-  topCluesEl.classList.remove('clues-hidden');
-  leftCluesEl.classList.remove('clues-hidden');
-  // 保留 split-overlay 及已放入的图片，跨题累积显示
-  renderPuzzle(matrix, rowClues, colClues, w, h);
+      // 默认隐藏图片层，待完成动画时再展示并淡入
+      revealImg.hidden = true;
+      revealImg.classList.remove('show');
+      try{ delete revealImg.dataset.splitStarted; }catch(e){}
+      // 重置样式基线，避免上一次动画残留影响下一题
+      try{
+        revealImg.style.zIndex = '';
+        revealImg.style.opacity = '0';
+        revealImg.style.transition = `opacity ${REVEAL_FADE_MS}ms ease`;
+      }catch(e){}
+      // 新题目开始时确保线索区域可见（防止上一题完成后被隐藏）
+      topCluesEl.classList.remove('clues-hidden');
+      leftCluesEl.classList.remove('clues-hidden');
+      // 保留 split-overlay 及已放入的图片，跨题累积显示
+      renderPuzzle(matrix, rowClues, colClues, w, h);
       // 更新按钮文案
       if(currentIndex < puzzles.length - 1){
         btnNext.textContent = '下一题';
@@ -336,19 +425,22 @@ export class Scene3Timeline extends BaseScene {
       // 更新进度文本
       const progEl = root.querySelector('.puzzle-progress');
       if(progEl){ progEl.textContent = `(${currentIndex+1}/${puzzles.length})`; }
-  const btnNextEl = root.querySelector('.btn-next');
-  if(btnNextEl){ btnNextEl.classList.add('hidden'); }
-    statusMsg.textContent = '';
-  // 新题启用重置按钮（通过显示/隐藏控制）
-  if(btnReset) btnReset.classList.remove('hidden');
-    // 新题启用提示按钮
-    if(btnHint) btnHint.classList.remove('hidden');
+      const btnNextEl = root.querySelector('.btn-next');
+      if(btnNextEl){ btnNextEl.classList.add('hidden'); }
+      statusMsg.textContent = '';
+      // 新题启用重置按钮（通过显示/隐藏控制）
+      if(btnReset) btnReset.classList.remove('hidden');
+      // 新题启用提示按钮
+      if(btnHint) btnHint.classList.remove('hidden');
     }
+
     // 已移除运行时图片生成功能；编辑器现在仅使用预生成的 JSON
     function runtimeImageBuild(msg){
       gridContainer.textContent = msg || '本幕已固定为 4 关且每关需包含图片。请配置 data/scene3_puzzles.json（puzzles[4]，每项含 matrix 与 image）。';
     }
+
     initPuzzle();
+
     // 运行时根据图片构建数织功能已移除；仅保留通过 JSON 加载并渲染的路径。
     function renderPuzzle(matrix, rowClues, colClues, w, h){
       // 为避免多次 addEventListener 累积，克隆按钮以清除旧监听。
@@ -356,7 +448,7 @@ export class Scene3Timeline extends BaseScene {
         if(!oldBtn || !oldBtn.parentNode) return oldBtn;
         const wasDebouncing = !!oldBtn._debouncing || oldBtn.classList.contains('debouncing');
         const newBtn = oldBtn.cloneNode(true);
-  // DOM 中替换旧按钮节点，移除旧事件监听
+        // DOM 中替换旧按钮节点，移除旧事件监听
         oldBtn.parentNode.replaceChild(newBtn, oldBtn);
         // 清理防抖残留状态（避免克隆后仍然被视作正在防抖）
         try{
@@ -367,17 +459,17 @@ export class Scene3Timeline extends BaseScene {
         ensureBtnAccessible(newBtn);
         return newBtn;
       }
-  btnReset = replaceButton(btnReset);
+      btnReset = replaceButton(btnReset);
       if(btnHint) btnHint = replaceButton(btnHint);
-  if(btnRules) btnRules = replaceButton(btnRules);
-  btnNext = replaceButton(btnNext);
-  // 保证本地引用同步到最新 DOM 节点
-  btnNext = root.querySelector('.btn-next');
-  // 确保克隆后的按钮仍然具备无障碍属性
-  ensureBtnAccessible(btnNext);
-  console.debug('[Nonogram] renderPuzzle: btnNext replaced/refreshed:', btnNext);
-  // rowClues / colClues 已由上层传入，避免重复声明冲突
-  const sizing = autoCellSize(w,h, 640, 480, 32, 14); // 计算单元格像素尺寸（受最大/最小限制）
+      if(btnRules) btnRules = replaceButton(btnRules);
+      btnNext = replaceButton(btnNext);
+      // 保证本地引用同步到最新 DOM 节点
+      btnNext = root.querySelector('.btn-next');
+      // 确保克隆后的按钮仍然具备无障碍属性
+      ensureBtnAccessible(btnNext);
+      console.debug('[Nonogram] renderPuzzle: btnNext replaced/refreshed:', btnNext);
+      // rowClues / colClues 已由上层传入，避免重复声明冲突
+      const sizing = autoCellSize(w,h, 640, 480, 32, 14); // 计算单元格像素尺寸（受最大/最小限制）
       gridContainer.style.setProperty('--cell-size', sizing.cell+'px');
       renderRowClues(leftCluesEl, rowClues, sizing.cell);
       renderColClues(topCluesEl, colClues, sizing.cell);
@@ -445,7 +537,7 @@ export class Scene3Timeline extends BaseScene {
       function enableNextButton(){
         const btn = root.querySelector('.btn-next');
         console.debug('[Nonogram] enableNextButton called, btn found:', !!btn, btn);
-  if(!btn) return;
+        if(!btn) return;
         // 通过移除 hidden 让按钮可点击（不用 disabled）
         btn.classList.remove('hidden');
         ensureBtnAccessible(btn);
@@ -478,15 +570,15 @@ export class Scene3Timeline extends BaseScene {
         statusMsg.textContent='';
         btnNext.classList.add('hidden');
         // 重置动画状态（包括新规范的心跳 / 淡出 / 图片）
-  delete gridContainer.dataset.animDone;
-  gridContainer.classList.remove('completed-locked','grid-fade-out','grid-jump','grid-heartbeat');
+        delete gridContainer.dataset.animDone;
+        gridContainer.classList.remove('completed-locked','grid-fade-out','grid-jump','grid-heartbeat');
         gridContainer.style.opacity='';
         const revealImg2 = gridScroller.querySelector('.nonogram-reveal-img');
         if(revealImg2){
           revealImg2.classList.remove('show');
           try{ delete revealImg2.dataset.splitStarted; }catch(e){}
         }
-  // 不再移除 split overlay，保持已完成图片
+        // 不再移除 split overlay，保持已完成图片
         // 重置线索高亮
         topCluesEl.classList.remove('clues-hidden');
         leftCluesEl.classList.remove('clues-hidden');
@@ -587,28 +679,32 @@ export class Scene3Timeline extends BaseScene {
   let dragMode=null; // 当前拖拽模式：'fill'=填色 'erase'=清除 'mark'=标记 'unmark'=去标记
       let mouseDown=false;
       container.addEventListener('contextmenu', e=> e.preventDefault());
+      // 根据当前 dragMode 应用对应操作
       function applyAction(cDiv){
         if(!cDiv) return;
         const st=cDiv.dataset.state||'';
         if(dragMode===null){
           // 第一次按下时决定具体模式（根据起始格状态推断）
-            if(st==='filled') dragMode='erase';
-            else if(st==='marked') dragMode='unmark';
-            else dragMode='fill';
+          if(st==='filled') dragMode='erase';
+          else if(st==='marked') dragMode='unmark';
+          else dragMode='fill';
         }
         if(dragMode==='fill') setFilled(cDiv,true);
         else if(dragMode==='erase') setFilled(cDiv,false);
         else if(dragMode==='mark') setMarked(cDiv,true);
         else if(dragMode==='unmark') setMarked(cDiv,false);
       }
+      // 设置格子为填色或清除
       function setFilled(cellDiv,val){
         if(val){ cellDiv.dataset.state='filled'; cellDiv.className='cell filled'; }
         else { cellDiv.dataset.state=''; cellDiv.className='cell'; }
       }
+      // 设置格子为标记或取消标记
       function setMarked(cellDiv,val){
         if(val){ cellDiv.dataset.state='marked'; cellDiv.className='cell marked'; }
         else { cellDiv.dataset.state=''; cellDiv.className='cell'; }
       }
+      // 处理鼠标或触摸拖拽
       function handlePointer(e){
         if(!mouseDown) return;
         const target=e.target.closest('.cell');
@@ -617,7 +713,7 @@ export class Scene3Timeline extends BaseScene {
           onChange(+target.dataset.x,+target.dataset.y);
         }
       }
-  window.addEventListener('mouseup', () => { mouseDown = false; dragMode = null; });
+      window.addEventListener('mouseup', () => { mouseDown = false; dragMode = null; });
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const div=document.createElement('div');
@@ -647,11 +743,13 @@ export class Scene3Timeline extends BaseScene {
         }
       };
     }
+    // 评估当前行/列的 runs 相对 clue 的状态
     function autoCellSize(w,h, maxW, maxH, maxCell, minCell){
-  // 策略：在给定显示最大宽高范围内求单元格合适边长（夹在最小/最大像素之间）
+      // 策略：在给定显示最大宽高范围内求单元格合适边长（夹在最小/最大像素之间）
       let cell = Math.floor(Math.min(maxCell, Math.max(minCell, Math.min(maxW / w, maxH / h))));
       return { cell };
     }
+    // 检查当前填色是否完成（完全匹配 matrix）
     function checkComplete(solution, container){
       for(const cell of container.querySelectorAll('.cell')){
         const x = +cell.dataset.x, y = +cell.dataset.y;
@@ -663,61 +761,61 @@ export class Scene3Timeline extends BaseScene {
       return true;
     }
     // 简化完成动画：锁定 -> 网格淡出(0.6s) -> 图片淡入(0.9s)
-      function runCompletionAnimation(){
-        if(gridContainer.dataset.animDone) return;
-        gridContainer.dataset.animDone='1';
-  const GRID_FADE_DURATION = 600; // 网格淡出耗时（毫秒）
-        gridContainer.classList.add('completed-locked','grid-fade-out');
-  // 完成后隐藏重置和提示按钮（不再使用 disabled）
-  if(btnReset) { btnReset.classList.add('hidden'); ensureBtnAccessible(btnReset); }
-  if(btnHint) { btnHint.classList.add('hidden'); ensureBtnAccessible(btnHint); }
-        const revealImg = gridScroller.querySelector('.nonogram-reveal-img');
-  // 若存在有效图片则安排淡入，否则直接解锁“下一题”按钮
-        setTimeout(()=>{ 
-          if(revealImg && revealImg.getAttribute('src')){
-            // 显示图片时隐藏数字线索以突出图像
-            topCluesEl.classList.add('clues-hidden');
-            leftCluesEl.classList.add('clues-hidden');
-            // 提升揭示图片层级，保证淡入可见
-            try{ revealImg.style.zIndex = '2'; }catch(e){}
-            // 在开始淡入前设置过渡并取消 hidden，使其参与过渡
-            try{ revealImg.style.transition = `opacity ${REVEAL_FADE_MS}ms ease`; }catch(e){}
-            revealImg.hidden = false;
-            // 强制一次 reflow，确保接下来的 opacity 过渡不会被合并
-            void revealImg.offsetHeight;
-            revealImg.classList.add('show');
-            // 同步设置目标不透明，确保 transition 有实际变化
-            try{ revealImg.style.opacity = '1'; }catch(e){}
-            // 图片淡入结束后启动“分裂→四角缩放定位”动画
-            try{
-              if(!revealImg.dataset.splitStarted){
-                let fired = false;
-                const go = () => {
-                  if(fired) return; fired = true;
-                  try{ revealImg.dataset.splitStarted = '1'; }catch(e){}
-                  // 图片淡入完成：显示 overlay（hidden=false），随后执行分裂动画
-                  try{ const ov = ensureSplitOverlay(); if(ov) ov.hidden = false; }catch(e){}
-                  startSplitForSrc(revealImg.getAttribute('src'));
-                };
-                const onTrans = (ev)=>{
-                  if(!ev || ev.propertyName === 'opacity'){
-                    revealImg.removeEventListener('transitionend', onTrans);
-                    clearTimeout(fallbackTimer);
-                    go();
-                  }
-                };
-                revealImg.addEventListener('transitionend', onTrans);
-                // 兜底：部分设备/样式下可能不会触发 transitionend
-                const fallbackTimer = setTimeout(go, REVEAL_FADE_MS + 150);
-              }
-            }catch(e){/* defensive */}
-          }
-          // 淡出/淡入流程结束后再次显示“下一题”按钮
-          const btn = root.querySelector('.btn-next');
-          console.debug('[Nonogram] runCompletionAnimation timeout: showing btnNext found=', !!btn, btn);
-          if(btn){ btn.classList.remove('hidden'); }
-        }, GRID_FADE_DURATION);
-      }
+    function runCompletionAnimation(){
+      if(gridContainer.dataset.animDone) return;
+      gridContainer.dataset.animDone='1';
+      const GRID_FADE_DURATION = 600; // 网格淡出耗时（毫秒）
+      gridContainer.classList.add('completed-locked','grid-fade-out');
+      // 完成后隐藏重置和提示按钮（不再使用 disabled）
+      if(btnReset) { btnReset.classList.add('hidden'); ensureBtnAccessible(btnReset); }
+      if(btnHint) { btnHint.classList.add('hidden'); ensureBtnAccessible(btnHint); }
+      const revealImg = gridScroller.querySelector('.nonogram-reveal-img');
+      // 若存在有效图片则安排淡入，否则直接解锁“下一题”按钮
+      setTimeout(()=>{ 
+        if(revealImg && revealImg.getAttribute('src')){
+          // 显示图片时隐藏数字线索以突出图像
+          topCluesEl.classList.add('clues-hidden');
+          leftCluesEl.classList.add('clues-hidden');
+          // 提升揭示图片层级，保证淡入可见
+          try{ revealImg.style.zIndex = '2'; }catch(e){}
+          // 在开始淡入前设置过渡并取消 hidden，使其参与过渡
+          try{ revealImg.style.transition = `opacity ${REVEAL_FADE_MS}ms ease`; }catch(e){}
+          revealImg.hidden = false;
+          // 强制一次 reflow，确保接下来的 opacity 过渡不会被合并
+          void revealImg.offsetHeight;
+          revealImg.classList.add('show');
+          // 同步设置目标不透明，确保 transition 有实际变化
+          try{ revealImg.style.opacity = '1'; }catch(e){}
+          // 图片淡入结束后启动“分裂→四角缩放定位”动画
+          try{
+            if(!revealImg.dataset.splitStarted){
+              let fired = false;
+              const go = () => {
+                if(fired) return; fired = true;
+                try{ revealImg.dataset.splitStarted = '1'; }catch(e){}
+                // 图片淡入完成：显示 overlay（hidden=false），随后执行分裂动画
+                try{ const ov = ensureSplitOverlay(); if(ov) ov.hidden = false; }catch(e){}
+                startSplitForSrc(revealImg.getAttribute('src'));
+              };
+              const onTrans = (ev)=>{
+                if(!ev || ev.propertyName === 'opacity'){
+                  revealImg.removeEventListener('transitionend', onTrans);
+                  clearTimeout(fallbackTimer);
+                  go();
+                }
+              };
+              revealImg.addEventListener('transitionend', onTrans);
+              // 兜底：部分设备/样式下可能不会触发 transitionend
+              const fallbackTimer = setTimeout(go, REVEAL_FADE_MS + 150);
+            }
+          }catch(e){/* defensive */}
+        }
+        // 淡出/淡入流程结束后再次显示“下一题”按钮
+        const btn = root.querySelector('.btn-next');
+        console.debug('[Nonogram] runCompletionAnimation timeout: showing btnNext found=', !!btn, btn);
+        if(btn){ btn.classList.remove('hidden'); }
+      }, GRID_FADE_DURATION);
+    }
     // 旧的 updateClueHighlights 被拆分为局部的 updateRowHighlight / updateColHighlight
     function extractRuns(grid, index, mode){
       const cells = [];
@@ -753,7 +851,7 @@ export class Scene3Timeline extends BaseScene {
       if(arraysEqual(runs, clues)) return 'ok';
       // 允许当前 runs 对应 clues 的一个保持顺序的子序列
       // 贪心：对每个 run 找到下一个 >= run 的 clue
-  let ci = 0; // 线索数组当前尝试匹配的位置指针
+      let ci = 0; // 线索数组当前尝试匹配的位置指针
       for(const r of runs){
         let found = false;
         while(ci < clues.length){
