@@ -79,8 +79,8 @@ export class Scene2Exam extends BaseScene {
     this.subjects = built;
     console.info('题库加载成功：使用 external scene2_questions.json');
     this.score = 0;
-  // 每科得分统计
-  this.subjectScores = {}; // key -> score
+    // 每科得分统计
+    this.subjectScores = {}; // key -> score
     this.hintsUsed = 0;
     this.skippedQuestions = 0; // 统计宠溺跳过次数
     this.totalQuestionsCount = () => this.subjects.reduce((a,s)=> a + s.questions.length,0);
@@ -165,23 +165,23 @@ export class Scene2Exam extends BaseScene {
       </div>
       <div class='board'></div>
       <div class='status'></div>
-  <div class='summary hidden'></div>
-  <button class='finish' hidden>全部通过，进入下一阶段</button>
+      <div class='summary hidden'></div>
+      <button class='finish' hidden>全部通过，进入下一阶段</button>
     `;
     const tabsBox = el.querySelector('.tabs');
     const board = el.querySelector('.board');
     const status = el.querySelector('.status');
     const finishBtn = el.querySelector('.finish');
     const scoreEl = el.querySelector('.score');
-  const breakdownEl = document.createElement('div');
-  breakdownEl.className = 'score-breakdown';
-  // 将分数分解展示放在 meta 下
-  el.querySelector('.meta').appendChild(breakdownEl);
+    const breakdownEl = document.createElement('div');
+    breakdownEl.className = 'score-breakdown';
+    // 将分数分解展示放在 meta 下
+    el.querySelector('.meta').appendChild(breakdownEl);
     const timerEl = el.querySelector('.timer');
     const summaryEl = el.querySelector('.summary');
     const bgmBtn = el.querySelector('.bgm-btn');
     // 默认进入即尝试播放（可能被浏览器策略阻止；若阻止则第一次点击会重新尝试）
-  const bgmAudio = audioManager.playSceneBGM('2',{ loop:true, volume:0.6, fadeIn:800 });
+    const bgmAudio = audioManager.playSceneBGM('2',{ loop:true, volume:0.6, fadeIn:800 });
     bgmBtn.addEventListener('click',()=>{
       // 若因自动播放策略被拦截，click 时再尝试播放
       if(bgmAudio && bgmAudio.paused){
@@ -237,25 +237,23 @@ export class Scene2Exam extends BaseScene {
     };
     const stopBetweenTimer = ()=>{ if(this._betweenTimer){ clearInterval(this._betweenTimer); this._betweenTimer=null; } };
 
-  /**
-   * 渲染顶部科目标签；点击切换当前主科目。
-   */
-  const renderTabs = ()=>{
+    /* 渲染顶部科目标签；点击切换当前主科目。*/
+    const renderTabs = ()=>{
       // 固定科目顺序：语文、数学、理综、英语（若外部 JSON 顺序不同，按此顺序显示）
       const orderKeys = ['chinese','math','science','english'];
       const ordered = orderKeys.map(k => this.subjects.find(s => s.key === k)).filter(Boolean);
       const firstUnfinished = ordered.find(s=>!s.done);
       // 仅渲染已解锁或已完成的科目按钮，未解锁的保持隐藏
       tabsBox.innerHTML = ordered
-        .filter(s => {
-          const locked = !!(firstUnfinished && s.key !== firstUnfinished.key && !s.done);
-          return !locked || s.done || s.key === this._activeSubjectKey || s.key === this._displayedSubjectKey;
-        })
-        .map(s=>{
-          const activeCls = (s.key === this._activeSubjectKey) ? ' active' : '';
-          const dispCls = (s.key === this._displayedSubjectKey) ? ' displayed' : '';
-          return `<button class='tab${activeCls}${dispCls}' data-sub='${s.key}'>${s.title}${s.done?'✔':''}</button>`;
-        }).join('');
+      .filter(s => {
+        const locked = !!(firstUnfinished && s.key !== firstUnfinished.key && !s.done);
+        return !locked || s.done || s.key === this._activeSubjectKey || s.key === this._displayedSubjectKey;
+      })
+      .map(s=>{
+        const activeCls = (s.key === this._activeSubjectKey) ? ' active' : '';
+        const dispCls = (s.key === this._displayedSubjectKey) ? ' displayed' : '';
+        return `<button class='tab${activeCls}${dispCls}' data-sub='${s.key}'>${s.title}${s.done?'✔':''}</button>`;
+      }).join('');
       tabsBox.querySelectorAll('.tab').forEach(tb=> tb.addEventListener('click',()=>{
         const key = tb.dataset.sub;
         // 若点击当前正在显示的科目，忽略操作
@@ -279,15 +277,17 @@ export class Scene2Exam extends BaseScene {
         this._activeSubjectKey = s.key;
         this._displayedSubjectKey = s.key;
         renderTabs();
+        // 切换到未完成科目时也清空 status，以免看到之前的“已完成”提示
+        status.textContent = '';
         renderSubject(s, true);
       }));
     };
 
-  /**
-   * 渲染某科目的下一题；若该科全部完成则显示完成提示。
-   * @param {Object} subject 当前学科对象
-   */
-  const renderSubject = (subject, startTimer=false)=>{
+    /**
+     * 渲染某科目的下一题；若该科全部完成则显示完成提示。
+     * @param {Object} subject 当前学科对象
+     */
+    const renderSubject = (subject, startTimer=false)=>{
       // 找到第一道未完成的题
       const nextQ = subject.questions.find(q=>!q.solved);
       if(!nextQ){
@@ -295,7 +295,7 @@ export class Scene2Exam extends BaseScene {
         // 若当前显示的科目就是刚完成的科目，则把显示切换到该科（保持一致）
         this._displayedSubjectKey = subject.key;
         renderTabs();
-        status.textContent = subject.title + ' 已全部完成！';
+        status.textContent = subject.title + ' 已完成！';
         checkAll();
         board.innerHTML = `<div class='paper'><p>${subject.title} 全部题目完成 ✔</p></div>`;
         // 若还有下一科且未完成，显示进入下一科目的按钮
@@ -310,6 +310,8 @@ export class Scene2Exam extends BaseScene {
             this._activeSubjectKey = nextSubject.key;
             this._displayedSubjectKey = nextSubject.key;
             renderTabs();
+            // 清理完成提示，进入下一科时不应保留之前的完成文案
+            status.textContent = '';
             renderSubject(nextSubject, true);
           });
           board.appendChild(btn);
@@ -322,7 +324,7 @@ export class Scene2Exam extends BaseScene {
         return;
       }
       board.innerHTML = '';
-  const wrapper = document.createElement('div'); // 单题容器（动态重建）
+      const wrapper = document.createElement('div'); // 单题容器（动态重建）
       wrapper.className='paper';
       const diffTag = `<span class='diff diff-${nextQ.difficulty}'>${nextQ.difficulty}</span>`;
       let inputHtml='';
@@ -343,11 +345,13 @@ export class Scene2Exam extends BaseScene {
         <div class='hint-area'></div>
         <div class='progress-mini'>本科进度：${subject.questions.filter(q=>q.solved).length}/${subject.questions.length}</div>
       `;
-  board.appendChild(wrapper);
+      board.appendChild(wrapper);
       if(startTimer){
         // 进入新科目：清理可能残留的懒散彩蛋提示
         const bh = status.querySelector('.between-hint');
         if(bh) bh.remove();
+        // 进入下一科目时清空 status 文本，避免保留「已完成」等提示
+        status.textContent = '';
         startSubjectTimer();
       }
       // 切换到某科目进行答题时，更新当前显示科目 key
@@ -358,8 +362,8 @@ export class Scene2Exam extends BaseScene {
       const skipBtn = wrapper.querySelector('.skip-love-btn');
       const hintArea = wrapper.querySelector('.hint-area');
 
-  // 提示按钮逻辑：前两次依次显示 JSON 中的 hints[0], hints[1]；第三次自动给答案
-  hintBtn.addEventListener('click',()=>{
+      // 提示按钮逻辑：前两次依次显示 JSON 中的 hints[0], hints[1]；第三次自动给答案
+      hintBtn.addEventListener('click',()=>{
         if(nextQ.solved) return; // 已完成无需提示
         nextQ.hintCount = (nextQ.hintCount||0) + 1;
         this.hintsUsed++;
@@ -395,11 +399,11 @@ export class Scene2Exam extends BaseScene {
         }
       });
 
-  // 提交按钮：判断正误；正确=加分；错误=宠溺满分 + 答案展示
-  submitBtn.addEventListener('click',()=>{
+      // 提交按钮：判断正误；正确=加分；错误=宠溺满分 + 答案展示
+      submitBtn.addEventListener('click',()=>{
         if(wrapper._locked) return; // 操作锁
         let userAns='';
-  userAns = extractUserAnswer(wrapper, nextQ);
+        userAns = extractUserAnswer(wrapper, nextQ);
         // 空输入/未选择：不给分也不判错，给予轻提示
         const isEmpty = (nextQ.type==='fill' && userAns==='') || (nextQ.type==='select' && userAns==='');
         if(isEmpty){
@@ -408,7 +412,7 @@ export class Scene2Exam extends BaseScene {
           setTimeout(()=> wrapper.classList.remove('shake-mini'),400);
           return;
         }
-  const correct = isAnswerCorrect(nextQ, userAns);
+        const correct = isAnswerCorrect(nextQ, userAns);
         if(correct){
           nextQ.solved = true;
           const base = 2; // 基础分
@@ -448,17 +452,17 @@ export class Scene2Exam extends BaseScene {
       });
 
       // 宠溺跳过，给分，显示暖心话
-  // 跳过按钮：视为“宠溺跳过”满分通过
-  skipBtn.addEventListener('click',()=>{
+      // 跳过按钮：视为“宠溺跳过”满分通过
+      skipBtn.addEventListener('click',()=>{
         if(wrapper._locked) return; // 操作锁
         if(nextQ.solved) return;
         nextQ.solved = true;
         nextQ._skipped = true; // 标记此题由跳过获得
-  // 跳过算正确答题
+        // 跳过算正确答题
         const base = 2;
         const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
         const gained = base * weight; 
-  addScoreToSubject(subject.key, gained);
+        addScoreToSubject(subject.key, gained);
         this.skippedQuestions++;
         const pamperLines = [
           '不会也没关系，我负责所有你不会的部分。',
@@ -473,10 +477,10 @@ export class Scene2Exam extends BaseScene {
         submitBtn.disabled = true; skipBtn.disabled = true; hintBtn.disabled = true;
         setTimeout(()=> renderSubject(subject), 500);
       });
-    };
+      };
 
-  /** 更新 HUD（目前只有分数，可扩展显示提示次数等） */
-  const updateHUD = ()=>{
+    /** 更新 HUD（目前只有分数，可扩展显示提示次数等） */
+    const updateHUD = ()=>{
       scoreEl.textContent = this.score;
       // 更新分科统计显示
       const parts = (this.subjects||[]).map(s=>{
@@ -493,20 +497,20 @@ export class Scene2Exam extends BaseScene {
       updateHUD();
     };
 
-  /** 检查所有科目是否完成，用于激活 “进入下一阶段” 按钮 */
-  const checkAll = ()=>{
-      if(this.subjects.every(s=>s.done)){
-        finishBtn.hidden = false;
-        renderSummary();
-      }
-    };
+    /** 检查所有科目是否完成，用于激活 “进入下一阶段” 按钮 */
+    const checkAll = ()=>{
+        if(this.subjects.every(s=>s.done)){
+          finishBtn.hidden = false;
+          renderSummary();
+        }
+      };
 
-  /**
-   * 渲染总结：
-   *  - 统计总题数 / 得分 / 动态评价。
-   *  - 计算彩蛋（互斥优先级）。
-   */
-  const renderSummary = ()=>{
+    /**
+     * 渲染总结：
+     *  - 统计总题数 / 得分 / 动态评价。
+     *  - 计算彩蛋（互斥优先级）。
+     */
+    const renderSummary = ()=>{
       const totalQuestions = this.subjects.reduce((a,s)=> a + s.questions.length,0);
       summaryEl.classList.remove('hidden');
       const allSkipped = this.skippedQuestions === totalQuestions;
@@ -553,14 +557,14 @@ export class Scene2Exam extends BaseScene {
       `;
     };
 
-  renderTabs();
-  // 自动进入第一科并启动计时
-  // 初始化 active subject（默认按顺序：语文、数学、理综、英语）
-  this._activeSubjectKey = this.subjects[0] && this.subjects[0].key;
-  renderSubject(this.subjects[0], true);
+    renderTabs();
+    // 自动进入第一科并启动计时
+    // 初始化 active subject（默认按顺序：语文、数学、理综、英语）
+    this._activeSubjectKey = this.subjects[0] && this.subjects[0].key;
+    renderSubject(this.subjects[0], true);
 
-    finishBtn.addEventListener('click',()=> this.ctx.go('timeline'));
-    this.ctx.rootEl.appendChild(el);
+      finishBtn.addEventListener('click',()=> this.ctx.go('timeline'));
+      this.ctx.rootEl.appendChild(el);
   }
   /**
    * 场景退出：清理倒计时 interval，防止脱离场景仍继续执行。

@@ -19,11 +19,11 @@ export class Scene0Register extends BaseScene {
       <form class='reg-form'>
         <label>用户名<input name='user' placeholder='请输入用户名' autocomplete='off'/></label>
         <label>密码（纪念日）<input name='pass' type='password' placeholder='请输入密码' autocomplete='off' /></label>
-  <div style='display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;'>
-    <button type='submit' data-debounce='800'>进入旅程</button>
-    <button type='button' class='bgm-btn reg-bgm' title='好听的音乐' data-debounce style='background:#ffb3c4;width:46px;height:36px;font-size:.85rem;'>♪</button>
-    <button type='button' class='forgot-btn' title='我忘了' data-debounce='600' style='margin-left:auto;'>我忘了</button>
-  </div>
+        <div style='display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;'>
+          <button type='submit' data-debounce='800'>进入旅程</button>
+          <button type='button' class='bgm-btn reg-bgm' title='好听的音乐' data-debounce style='background:#ffb3c4;width:46px;height:36px;font-size:.85rem;'>♪</button>
+          <button type='button' class='forgot-btn' title='我忘了' data-debounce='600' style='margin-left:auto;'>我忘了</button>
+        </div>
         <div class='msg'></div>
       </form>
 
