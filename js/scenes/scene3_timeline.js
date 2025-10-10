@@ -8,8 +8,8 @@ import { audioManager } from '../core/audioManager.js';
  *  1. 从预先生成的 puzzle JSON 中读取 `matrix`（由离线编辑器产生）。
  *  2. 行与列分别做 run-length 编码，得到线索数组 (如 [3,1]) 表示连续块长度；空行为 [0]。
  *  3. DOM: 左上角线索区 + 交互网格 + 控制栏(重置/显示原图/下一幕按钮) + 完成状态层。
- *  4. 交互：左键(或触摸单击) 在 空(0)->填黑(1)->空 循环；右键 / 长按 标记(排除)；仅填黑参与判定。
- *  5. 每次操作快速检查：所有应填黑格均处于填黑 && 未多填 => 完成 -> 动画淡入原图与“进入下一幕”。
+ *  4. 交互：左键(或触摸单击) 在 留白(0)->涂色(1)->留白 循环；右键 / 长按 标记(排除，特殊颜色)；仅涂色参与判定。
+ *  5. 每次操作快速检查：所有应涂色的格均处于涂色 && 未多涂 => 完成 -> 动画淡入原图与“进入下一幕”。
  */
 export class Scene3Timeline extends BaseScene {
   async init(){ await super.init(); }
@@ -21,6 +21,11 @@ export class Scene3Timeline extends BaseScene {
       gridSize: 9,
       showRuleHelp: true
     };
+    // 将本幕“写死”为 4 关，每关一张对应图片，完成后飞向四角拼贴
+    const REQUIRED_LEVELS = 4;
+      // 显式动画时间设定（毫秒）
+      const REVEAL_FADE_MS = 900;   // 图片淡入时长
+      const SPLIT_ANIM_MS  = 700;   // 分裂飞向角落动画时长
 
     const root = document.createElement('div');
     root.className = 'scene scene-nonogram';
@@ -28,8 +33,7 @@ export class Scene3Timeline extends BaseScene {
     this.applyNoSelect(root);
 
   // 分裂并定位图片的辅助工具（包含持久化的十字分割线 + 4 个固定槽位）
-  // 使用全局累计 completedImages 来决定放入的槽位，不在 加载/重置/下一题 时清零
-  let completedImages = 0; // 基于 0 的累计完成图片数，槽位索引 = completedImages % 4
+  // 写死逻辑：四关四图，按当前关卡索引固定映射到四角（不再使用累计计数）。
       function hideRevealImmediate(){
         const revealImgNow = gridScroller.querySelector('.nonogram-reveal-img');
         if(!revealImgNow) return;
@@ -39,6 +43,10 @@ export class Scene3Timeline extends BaseScene {
           revealImgNow.classList.remove('show');
           revealImgNow.style.opacity = '0';
           revealImgNow.setAttribute('aria-hidden','true');
+          revealImgNow.hidden = true;
+          // 重置层级，避免在下一题遮盖网格
+          revealImgNow.style.zIndex = '';
+          revealImgNow.style.pointerEvents = 'none';
           try{ delete revealImgNow.dataset.splitStarted; }catch(e){}
           void revealImgNow.offsetHeight; // force reflow
           setTimeout(()=>{ revealImgNow.style.transition = prevTrans; }, 50);
@@ -48,6 +56,14 @@ export class Scene3Timeline extends BaseScene {
         let overlay = gridScroller.querySelector('.split-overlay');
         if(overlay) return overlay;
         overlay = document.createElement('div'); overlay.className='split-overlay';
+        // 初始隐藏 overlay，待图片淡入完成后再显示
+        overlay.hidden = true;
+        // 确保分裂层不遮挡交互，且层级低于网格（由 JS 提升网格 z-index）
+        try{
+          overlay.style.pointerEvents = 'none';
+          overlay.style.zIndex = '0';
+          overlay.style.position = overlay.style.position || 'absolute';
+        }catch(e){}
     // 中心容器：承载 4 个槽位与十字分割线
         const slots = document.createElement('div'); slots.className='split-slots';
   // 创建 4 个带明确定位类名的槽位，确保逻辑顺序可映射到四个角
@@ -63,36 +79,53 @@ export class Scene3Timeline extends BaseScene {
 
       function startSplitForSrc(src){
         if(!src) return;
-        if(completedImages >= 4) { // 4 个槽位已全部占满，后续图片直接隐藏不再参与动画
-          hideRevealImmediate();
-          return;
-        }
+        // 安全防御：仅允许前 4 关触发分裂（本幕已写死为四关）。
+        if(currentIndex < 0 || currentIndex >= 4){ hideRevealImmediate(); return; }
         const overlay = ensureSplitOverlay();
-        // 立即隐藏原始展示图（无淡出），改为对克隆的临时图执行收缩移动动画
+        // 复制后立即让绑定图片消失，避免与飞行动画重叠
         hideRevealImmediate();
         // 创建一个临时 <img>，初始居中摆放；原图已被隐藏从视觉上消失
         const tmp = document.createElement('img'); tmp.className='split-temp'; tmp.src = src; tmp.alt='';
+        // 基础样式，确保可见并不拦截交互
+        try{
+          tmp.style.position = tmp.style.position || 'absolute';
+          tmp.style.pointerEvents = 'none';
+          // 提升到最上层，确保飞行动画在揭示图与控件之上可见
+          tmp.style.zIndex = '4';
+        }catch(e){}
         // 将临时图放到 overlay 末尾，保证层级正确
         overlay.appendChild(tmp);
-        // 使用 requestAnimationFrame 强制一次布局后再启动动画，避免初始跳变
-        requestAnimationFrame(()=>{
-          // 逻辑顺序：0->左下,1->左上,2->右下,3->右上
-          // DOM 2x2 顺序：0=左上,1=右上,2=左下,3=右下
-          const logical = completedImages % 4;
-          const logicalToDom = [2,0,3,1];
-          const domIdx = logicalToDom[logical];
-          animateToSlot(tmp, domIdx, () => {
-            const slotEl = overlay.querySelector(`.split-slot[data-idx='${domIdx}']`);
-            if(slotEl){
-              // 覆盖旧内容，保持每个槽位只有一张
-              slotEl.innerHTML = '';
-              const finalImg = document.createElement('img'); finalImg.className='split-locked'; finalImg.src = src; finalImg.alt='';
-              slotEl.appendChild(finalImg);
-            }
-            if(tmp && tmp.parentElement) tmp.parentElement.removeChild(tmp);
-            completedImages++;
+        const start = () => {
+          // 使用 requestAnimationFrame 强制一次布局后再启动动画，避免初始跳变
+          requestAnimationFrame(()=>{
+            // “写死”的四关：按当前关卡索引固定映射到四角
+            // 逻辑顺序：0->左下,1->左上,2->右下,3->右上
+            // DOM 2x2 顺序：0=左上,1=右上,2=左下,3=右下
+            const logical = (currentIndex % 4);
+            const logicalToDom = [2,0,3,1];
+            const domIdx = logicalToDom[logical];
+            animateToSlot(tmp, domIdx, () => {
+              const slotEl = overlay.querySelector(`.split-slot[data-idx='${domIdx}']`);
+              if(slotEl){
+                // 覆盖旧内容，保持每个槽位只有一张
+                slotEl.innerHTML = '';
+                const finalImg = document.createElement('img'); finalImg.className='split-locked'; finalImg.src = src; finalImg.alt='';
+                slotEl.appendChild(finalImg);
+              }
+              if(tmp && tmp.parentElement) tmp.parentElement.removeChild(tmp);
+            });
           });
-        });
+        };
+        // 确保图片已加载后再计算位移与缩放，避免 0 宽高导致动画不可见
+        if (tmp.complete && tmp.naturalWidth > 0) {
+          start();
+        } else {
+          let started = false;
+          const once = () => { if(started) return; started = true; start(); };
+          tmp.addEventListener('load', once, { once: true });
+          // 双保险：部分情况下缓存图片不会触发 load 事件
+          setTimeout(once, 100);
+        }
       }
 
       function animateToSlot(imgEl, slotIdx, cb){
@@ -101,6 +134,8 @@ export class Scene3Timeline extends BaseScene {
         if(!slot){ if(cb) cb(); return; }
   // 保证 imgEl 采用 CSS '.split-temp' 绝对定位并初始居中
         imgEl.classList.add('animating');
+          // 显式指定过渡时间，确保不同环境下一致
+          try{ imgEl.style.transition = `transform ${SPLIT_ANIM_MS}ms ease`; }catch(e){}
   // 通过读取起点与目标槽位的矩形信息计算平移与缩放值
         const startRect = imgEl.getBoundingClientRect();
         const slotRect = slot.getBoundingClientRect();
@@ -148,22 +183,22 @@ export class Scene3Timeline extends BaseScene {
           <h2>数织规则</h2>
           <div class='rules-content'>
             <p><strong>核心元素</strong></p>
-            <p>网格由固定行列组成；每格最终状态：填色 或 留白(可标记)。</p>
-            <p><strong>行 / 列提示数</strong>：每个数字表示一段连续填色块的长度；多个数字之间至少有 1 个留白格隔开。提示“0” 表示该行 / 列全部留白。</p>
+            <p>网格由固定行列组成；每格最终状态：涂色 或 留白（可标记为特殊颜色）。</p>
+            <p><strong>行 / 列提示数</strong>：每个数字表示一段连续涂色块的长度；多个数字之间至少有 1 个留白格隔开。提示“0” 表示该行 / 列全部留白。</p>
             <p><strong>规则</strong></p>
             <ul>
-              <li>提示顺序 = 填色块出现顺序。</li>
-              <li>相邻数字代表的填色块之间 ≥ 1 个留白。</li>
-              <li>不得多出或缺少填色格。</li>
+              <li>提示顺序 = 涂色块出现顺序。</li>
+              <li>相邻数字代表的涂色块之间 ≥ 1 个留白。</li>
+              <li>不得多出或缺少涂色格。</li>
             </ul>
-            <p><strong>提示</strong>：随机点亮一个尚未点亮的正确格。</p>
-            <p><strong>胜利条件</strong>：所有行与列的填色分布与各自提示数完全匹配。</p>
-            <p><strong>操作</strong>：左键=填色/清除；右键=标记；拖拽连续填色或擦除。</p>
+            <p><strong>提示</strong>：随机点亮一个尚未涂色的正确格；若已涂满所有应涂色格但仍未完成（说明存在多涂），随机取消一个错涂并以特殊颜色标记。</p>
+            <p><strong>胜利条件</strong>：所有行与列的涂色分布与各自提示数完全匹配。</p>
+            <p><strong>操作</strong>：左键=涂色/清除；右键=标记；拖拽连续涂色或擦除。</p>
           </div>
           <div class='rules-actions'><button class='close-rules'>关闭</button></div>
         </div>
       </div>
-      <p class='tips'>左键：填色/清除；右键：标记；拖拽批量操作。</p>
+  <p class='tips'>左键：涂色/清除；右键：标记；拖拽批量操作。</p>
     `;
     this.ctx.rootEl.appendChild(root);
 
@@ -171,6 +206,19 @@ export class Scene3Timeline extends BaseScene {
     const leftCluesEl = root.querySelector('.left-clues-area .left-inner');
     const gridContainer = root.querySelector('.grid-container');
   const gridScroller = gridContainer.parentElement; // .grid-scroller 外层滚动容器
+    // 确保网格容器层级高于分裂层，避免完成后的拼贴遮盖下一题
+    try{
+      gridContainer.style.position = gridContainer.style.position || 'relative';
+      gridContainer.style.zIndex = '1';
+    }catch(e){}
+    // 确保控件始终在最上层，避免被图片/拼贴遮挡
+    try{
+      const controls = root.querySelector('.controls');
+      if(controls){
+        controls.style.position = controls.style.position || 'relative';
+        controls.style.zIndex = '3';
+      }
+    }catch(e){}
     let btnReset = root.querySelector('.btn-reset');
     let btnHint = root.querySelector('.btn-hint');
     let btnRules = root.querySelector('.btn-rules');
@@ -198,13 +246,28 @@ export class Scene3Timeline extends BaseScene {
             .then(json=>{
               if(Array.isArray(json.puzzles) && json.puzzles.length>0){
                 // 排序确保按 meta.index 顺序
-                puzzles = json.puzzles.slice().sort((a,b)=>{
+                let list = json.puzzles.slice().sort((a,b)=>{
                   const ia = a.meta && a.meta.index ? a.meta.index : 0;
                   const ib = b.meta && b.meta.index ? b.meta.index : 0;
                   return ia - ib;
                 });
+                // 将关卡数量“写死”为 4 关，多余截断；不足则报错
+                if(list.length > REQUIRED_LEVELS) list = list.slice(0, REQUIRED_LEVELS);
+                if(list.length < REQUIRED_LEVELS) {
+                  throw new Error(`[Nonogram] 本幕已固定为 4 关，但当前仅提供 ${list.length} 关。请在 data/scene3_puzzles.json 准备 4 个 puzzles。`);
+                }
+                // 强制每关必须有图片
+                if(list.some(p=> !(p.meta&&p.meta.image) && !p.image)){
+                  throw new Error('[Nonogram] 本幕每关必须包含图片字段(meta.image 或 image)。');
+                }
+                puzzles = list.map(p=>({
+                  meta: p.meta||{},
+                  matrix: p.matrix,
+                  image: (p.meta&&p.meta.image)||p.image
+                }));
               } else if(json.matrix){
-                puzzles = [{ meta: json.meta||{}, matrix: json.matrix, image: (json.meta&&json.meta.image)||json.image||null }];
+                // 单谜题不符合“写死 4 关”需求
+                throw new Error('[Nonogram] 本幕已固定为 4 关，但当前 JSON 仅包含单个 matrix。');
               } else {
                 throw new Error('缺少 puzzles 或 matrix');
               }
@@ -213,7 +276,7 @@ export class Scene3Timeline extends BaseScene {
             })
           .catch(err=>{
             console.warn('[Nonogram] 预生成 JSON 加载失败，回退到图片生成:', err);
-            runtimeImageBuild();
+            runtimeImageBuild(err && err.message ? String(err.message) : undefined);
           });
       } else {
         runtimeImageBuild();
@@ -240,10 +303,23 @@ export class Scene3Timeline extends BaseScene {
         revealImg.alt = p.meta && p.meta.title ? p.meta.title : (p.image ? 'nonogram reveal' : '');
         revealImg.title = p.meta && p.meta.title ? p.meta.title : '';
         gridScroller.insertBefore(revealImg, gridScroller.firstChild); // 放在 gridContainer 前面以便位于下层
+        // 基础样式：不拦截点击，绝对定位
+        try{
+          revealImg.style.position = revealImg.style.position || 'absolute';
+          revealImg.style.pointerEvents = 'none';
+        }catch(e){}
       }
       revealImg.src = p.image || '';
+        // 默认隐藏图片层，待完成动画时再展示并淡入
+        revealImg.hidden = true;
         revealImg.classList.remove('show');
         try{ delete revealImg.dataset.splitStarted; }catch(e){}
+        // 重置样式基线，避免上一次动画残留影响下一题
+        try{
+          revealImg.style.zIndex = '';
+          revealImg.style.opacity = '0';
+          revealImg.style.transition = `opacity ${REVEAL_FADE_MS}ms ease`;
+        }catch(e){}
   // 新题目开始时确保线索区域可见（防止上一题完成后被隐藏）
   topCluesEl.classList.remove('clues-hidden');
   leftCluesEl.classList.remove('clues-hidden');
@@ -267,8 +343,8 @@ export class Scene3Timeline extends BaseScene {
     if(btnHint) btnHint.classList.remove('hidden');
     }
     // 已移除运行时图片生成功能；编辑器现在仅使用预生成的 JSON
-    function runtimeImageBuild(){
-      gridContainer.textContent = '未配置预生成谜题（puzzleSrc）且运行时图片生成已被移除。';
+    function runtimeImageBuild(msg){
+      gridContainer.textContent = msg || '本幕已固定为 4 关且每关需包含图片。请配置 data/scene3_puzzles.json（puzzles[4]，每项含 matrix 与 image）。';
     }
     initPuzzle();
     // 运行时根据图片构建数织功能已移除；仅保留通过 JSON 加载并渲染的路径。
@@ -314,28 +390,49 @@ export class Scene3Timeline extends BaseScene {
           statusMsg.textContent = '';
         }
       }, sizing.cell);
-      // 提示：随机点亮一个尚未点亮的正确格
+      // 提示：
+      // - 若未涂满所有“应涂色”的格：随机点亮一个仍需涂色的正确格；
+      // - 若已涂满所有应涂色格但仍未完成（说明存在多涂）：随机取消一个错涂并以特殊颜色“标记”。
       function revealOneCorrect(){
-  if(checkComplete(matrix, gridContainer)) return; // 已完成则不再提供提示
-        const candidates = [];
+        if(checkComplete(matrix, gridContainer)) return; // 已完成则不再提供提示
+
+        const missing = [];   // 需要涂色但尚未涂的格（matrix=1 且 未 filled）
+        const overfills = []; // 错涂的格（matrix=0 却 filled）
+
         for(let y=0;y<h;y++){
           for(let x=0;x<w;x++){
-            if(matrix[y][x]===1){
-              const cellEl = gridContainer.querySelector(`.cell[data-x='${x}'][data-y='${y}']`);
-              if(cellEl && cellEl.dataset.state !== 'filled'){
-                candidates.push({x,y,el:cellEl});
-              }
+            const shouldFill = matrix[y][x] === 1;
+            const cellEl = gridContainer.querySelector(`.cell[data-x='${x}'][data-y='${y}']`);
+            if(!cellEl) continue;
+            const isFilled = cellEl.dataset.state === 'filled';
+            if(shouldFill && !isFilled){
+              missing.push({x,y,el:cellEl});
+            } else if(!shouldFill && isFilled){
+              overfills.push({x,y,el:cellEl});
             }
           }
         }
-  if(!candidates.length) return; // 无可用候选格
-        const pick = candidates[Math.floor(Math.random()*candidates.length)];
-        // 填充该格
-        pick.el.dataset.state='filled';
-        pick.el.className='cell filled';
-        // 更新线索状态
-        updateRowHighlight(pick.y);
-        updateColHighlight(pick.x);
+
+        if(missing.length > 0){
+          // 优先帮助玩家“补齐”一个正确格
+          const pick = missing[Math.floor(Math.random()*missing.length)];
+          pick.el.dataset.state = 'filled';
+          pick.el.className = 'cell filled';
+          updateRowHighlight(pick.y);
+          updateColHighlight(pick.x);
+        } else if(overfills.length > 0){
+          // 全部正确格已填满，但仍未完成：说明存在多填 → 随机清除一个错填并标记为 X
+          const pick = overfills[Math.floor(Math.random()*overfills.length)];
+          // 取消填色并标记
+          pick.el.dataset.state = 'marked';
+          pick.el.className = 'cell marked';
+          updateRowHighlight(pick.y);
+          updateColHighlight(pick.x);
+        } else {
+          // 理论上不会进入此分支（既无缺失也无多填但未完成），稳妥返回
+          return;
+        }
+
         if (checkComplete(matrix, gridContainer)) {
           statusMsg.textContent = '完成！';
           enableNextButton();
@@ -408,6 +505,8 @@ export class Scene3Timeline extends BaseScene {
       btnNext.addEventListener('click', ()=> {
         // 点击下一题时立即移除上一题的 reveal 图片（不做淡出过渡）
         hideRevealImmediate();
+        // 点击下一题时隐藏 overlay
+        try{ const ov = gridScroller.querySelector('.split-overlay'); if(ov) ov.hidden = true; }catch(e){}
         // 重置状态以便下一题使用
         topCluesEl.classList.remove('clues-hidden');
         leftCluesEl.classList.remove('clues-hidden');
@@ -575,19 +674,37 @@ export class Scene3Timeline extends BaseScene {
             // 显示图片时隐藏数字线索以突出图像
             topCluesEl.classList.add('clues-hidden');
             leftCluesEl.classList.add('clues-hidden');
+            // 提升揭示图片层级，保证淡入可见
+            try{ revealImg.style.zIndex = '2'; }catch(e){}
+            // 在开始淡入前设置过渡并取消 hidden，使其参与过渡
+            try{ revealImg.style.transition = `opacity ${REVEAL_FADE_MS}ms ease`; }catch(e){}
+            revealImg.hidden = false;
+            // 强制一次 reflow，确保接下来的 opacity 过渡不会被合并
+            void revealImg.offsetHeight;
             revealImg.classList.add('show');
+            // 同步设置目标不透明，确保 transition 有实际变化
+            try{ revealImg.style.opacity = '1'; }catch(e){}
             // 图片淡入结束后启动“分裂→四角缩放定位”动画
             try{
               if(!revealImg.dataset.splitStarted){
+                let fired = false;
+                const go = () => {
+                  if(fired) return; fired = true;
+                  try{ revealImg.dataset.splitStarted = '1'; }catch(e){}
+                  // 图片淡入完成：显示 overlay（hidden=false），随后执行分裂动画
+                  try{ const ov = ensureSplitOverlay(); if(ov) ov.hidden = false; }catch(e){}
+                  startSplitForSrc(revealImg.getAttribute('src'));
+                };
                 const onTrans = (ev)=>{
-                  if(ev.propertyName === 'opacity'){
+                  if(!ev || ev.propertyName === 'opacity'){
                     revealImg.removeEventListener('transitionend', onTrans);
-                    revealImg.dataset.splitStarted = '1';
-                    // 针对当前图片 src 触发分裂动画
-                    startSplitForSrc(revealImg.getAttribute('src'));
+                    clearTimeout(fallbackTimer);
+                    go();
                   }
                 };
                 revealImg.addEventListener('transitionend', onTrans);
+                // 兜底：部分设备/样式下可能不会触发 transitionend
+                const fallbackTimer = setTimeout(go, REVEAL_FADE_MS + 150);
               }
             }catch(e){/* defensive */}
           }
