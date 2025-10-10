@@ -79,6 +79,8 @@ export class Scene2Exam extends BaseScene {
     this.subjects = built;
     console.info('题库加载成功：使用 external scene2_questions.json');
     this.score = 0;
+  // 每科得分统计
+  this.subjectScores = {}; // key -> score
     this.hintsUsed = 0;
     this.skippedQuestions = 0; // 统计宠溺跳过次数
     this.totalQuestionsCount = () => this.subjects.reduce((a,s)=> a + s.questions.length,0);
@@ -89,55 +91,56 @@ export class Scene2Exam extends BaseScene {
    * @returns {Array} subjects 数组
    */
   buildSubjectsFromExternal(data){
-    const subjects = [];
+    // 先按科目 key 分别生成（可能为 undefined），最后按固定顺序组装返回
+    const byKey = {};
     // 语文（填空）
     if(Array.isArray(data.chinesePoemFill) && data.chinesePoemFill.length){
-      subjects.push({
+      byKey.chinese = {
         key:'chinese', title:'语文', done:false,
         questions: data.chinesePoemFill.map(item=>({
-          // 支持外部指定 questionType / difficulty（兼容旧字段）
           type: item.questionType || item.type || 'fill',
           difficulty: item.difficulty || 'easy',
           prompt: item.question.includes('_____') ? item.question.replace('_____','') : item.question,
           answer: item.answer, placeholder:'_____', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
-      });
+      };
     }
     // 数学（填空）
     if(Array.isArray(data.mathPuzzles) && data.mathPuzzles.length){
-      subjects.push({
+      byKey.math = {
         key:'math', title:'数学', done:false,
         questions: data.mathPuzzles.map(item=>({
           type: item.questionType || item.type || 'fill',
           difficulty: item.difficulty || 'medium', prompt:item.question, answer:(item.answer||'').split(' ')[0], placeholder:'答案', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
-      });
+      };
     }
     // 英语（匹配 → 填空）
     if(Array.isArray(data.englishMatch) && data.englishMatch.length){
-      subjects.push({
+      byKey.english = {
         key:'english', title:'英语', done:false,
         questions: data.englishMatch.map(item=>({
           type: item.questionType || item.type || 'fill',
           difficulty: item.difficulty || 'easy', prompt:`${item.word} 的中文是？`, answer:item.match, placeholder:'中文', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
-      });
+      };
     }
     // 理综（选择）
     if(Array.isArray(data.scienceQuiz) && data.scienceQuiz.length){
-      subjects.push({
+      byKey.science = {
         key:'science', title:'理综', done:false,
         questions: data.scienceQuiz.map(item=>({
           type: item.questionType || item.type || 'select',
           difficulty: item.difficulty || 'medium', prompt:item.question, options:item.options, answerIndex:item.answer, hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
-      });
+      };
     }
-    return subjects;
+    const order = ['chinese','math','science','english'];
+    return order.map(k => byKey[k]).filter(Boolean);
   }
   /**
    * 场景进入：
@@ -162,14 +165,18 @@ export class Scene2Exam extends BaseScene {
       </div>
       <div class='board'></div>
       <div class='status'></div>
-      <div class='summary hidden'></div>
-      <button class='finish' disabled>全部通过，进入下一阶段</button>
+  <div class='summary hidden'></div>
+  <button class='finish' hidden>全部通过，进入下一阶段</button>
     `;
     const tabsBox = el.querySelector('.tabs');
     const board = el.querySelector('.board');
     const status = el.querySelector('.status');
     const finishBtn = el.querySelector('.finish');
     const scoreEl = el.querySelector('.score');
+  const breakdownEl = document.createElement('div');
+  breakdownEl.className = 'score-breakdown';
+  // 将分数分解展示放在 meta 下
+  el.querySelector('.meta').appendChild(breakdownEl);
     const timerEl = el.querySelector('.timer');
     const summaryEl = el.querySelector('.summary');
     const bgmBtn = el.querySelector('.bgm-btn');
@@ -234,25 +241,44 @@ export class Scene2Exam extends BaseScene {
    * 渲染顶部科目标签；点击切换当前主科目。
    */
   const renderTabs = ()=>{
-      // 顺序锁：只有第一个未完成科目可以点击；已完成的仍可回顾但不再计时（此处阻止回顾刷时间）
-      const firstUnfinished = this.subjects.find(s=>!s.done);
-      tabsBox.innerHTML = this.subjects.map(s=>{
-        const locked = firstUnfinished && s.key !== firstUnfinished.key && !s.done;
-        return `<button class='tab ${locked?'locked':''}' data-sub='${s.key}' ${locked?'disabled':''}>${s.title}${s.done?'✔':''}</button>`;
-      }).join('');
+      // 固定科目顺序：语文、数学、理综、英语（若外部 JSON 顺序不同，按此顺序显示）
+      const orderKeys = ['chinese','math','science','english'];
+      const ordered = orderKeys.map(k => this.subjects.find(s => s.key === k)).filter(Boolean);
+      const firstUnfinished = ordered.find(s=>!s.done);
+      // 仅渲染已解锁或已完成的科目按钮，未解锁的保持隐藏
+      tabsBox.innerHTML = ordered
+        .filter(s => {
+          const locked = !!(firstUnfinished && s.key !== firstUnfinished.key && !s.done);
+          return !locked || s.done || s.key === this._activeSubjectKey || s.key === this._displayedSubjectKey;
+        })
+        .map(s=>{
+          const activeCls = (s.key === this._activeSubjectKey) ? ' active' : '';
+          const dispCls = (s.key === this._displayedSubjectKey) ? ' displayed' : '';
+          return `<button class='tab${activeCls}${dispCls}' data-sub='${s.key}'>${s.title}${s.done?'✔':''}</button>`;
+        }).join('');
       tabsBox.querySelectorAll('.tab').forEach(tb=> tb.addEventListener('click',()=>{
-        const s = this.subjects.find(x=>x.key===tb.dataset.sub);
-        // 只允许点击当前待完成科目；已完成科目点击仅展示完成信息不重启计时
-        const first = this.subjects.find(ss=>!ss.done);
-        if(s.done){ // 查看完成状态（不重启计时）
+        const key = tb.dataset.sub;
+        // 若点击当前正在显示的科目，忽略操作
+        if(key === this._displayedSubjectKey) return;
+        const s = this.subjects.find(x=>x.key===key);
+        if(!s) return;
+        // 点击已完成科目：仅作为查看（不重启计时），但会切换显示
+        if(s.done){
           stopSubjectTimer();
           stopBetweenTimer();
+          this._displayedSubjectKey = s.key;
+          renderTabs();
           board.innerHTML = `<div class='paper'><p>${s.title} 已完成 ✔</p></div>`;
-          status.textContent = `${s.title} 已完成，可以继续下一科~`;
           return;
         }
-        if(first && s.key !== first.key) return; // 保护性判定
+        // 只允许点击第一个未完成科目以开始它；未解锁则不允许
+        const first = ordered.find(ss=>!ss.done);
+        if(first && s.key !== first.key) return;
         stopBetweenTimer();
+        // 标记为当前活动科目并启动计时
+        this._activeSubjectKey = s.key;
+        this._displayedSubjectKey = s.key;
+        renderTabs();
         renderSubject(s, true);
       }));
     };
@@ -266,14 +292,30 @@ export class Scene2Exam extends BaseScene {
       const nextQ = subject.questions.find(q=>!q.solved);
       if(!nextQ){
         subject.done = true;
+        // 若当前显示的科目就是刚完成的科目，则把显示切换到该科（保持一致）
+        this._displayedSubjectKey = subject.key;
         renderTabs();
         status.textContent = subject.title + ' 已全部完成！';
         checkAll();
         board.innerHTML = `<div class='paper'><p>${subject.title} 全部题目完成 ✔</p></div>`;
-        // 停止当前科目计时，启动科目间等待计时（若还有下一科）
-        stopSubjectTimer();
+        // 若还有下一科且未完成，显示进入下一科目的按钮
         const idx = this.subjects.findIndex(s=> s.key===subject.key);
         const nextSubject = this.subjects[idx+1];
+        if(nextSubject && !nextSubject.done){
+          const btn = document.createElement('button');
+          btn.className = 'next-subject-btn';
+          btn.textContent = `进入下一科：${nextSubject.title}`;
+          btn.addEventListener('click',()=>{
+            // 切换到下一科并开始计时
+            this._activeSubjectKey = nextSubject.key;
+            this._displayedSubjectKey = nextSubject.key;
+            renderTabs();
+            renderSubject(nextSubject, true);
+          });
+          board.appendChild(btn);
+        }
+        // 停止当前科目计时，启动科目间等待计时（若还有下一科）
+        stopSubjectTimer();
         if(nextSubject){
           startBetweenTimer(nextSubject);
         }
@@ -308,6 +350,8 @@ export class Scene2Exam extends BaseScene {
         if(bh) bh.remove();
         startSubjectTimer();
       }
+      // 切换到某科目进行答题时，更新当前显示科目 key
+      this._displayedSubjectKey = subject.key;
 
       const hintBtn = wrapper.querySelector('.hint-btn');
       const submitBtn = wrapper.querySelector('.submit-btn');
@@ -338,7 +382,7 @@ export class Scene2Exam extends BaseScene {
           const base = 2;
           const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
           const gained = base * weight;
-          this.score += gained;
+          addScoreToSubject(subject.key, gained);
           const answerReveal = nextQ.type==='fill' ? nextQ.answer : (nextQ.options?.[nextQ.answerIndex] || '');
           // 覆盖之前的提示行
           hintArea.innerHTML = `<span class='auto-answer'>直接送你答案：<strong>${answerReveal}</strong></span>`;
@@ -370,7 +414,7 @@ export class Scene2Exam extends BaseScene {
           const base = 2; // 基础分
           const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
           const gained = base*weight; // 不再因提示扣分
-          this.score += gained;
+          addScoreToSubject(subject.key, gained);
           status.innerHTML = `<span class='ok'>${nextQ.correctMsg || '太棒啦！'}</span> <em>+${gained} 分</em>`;
           updateHUD();
           wrapper._locked = true;
@@ -384,7 +428,7 @@ export class Scene2Exam extends BaseScene {
             const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
             // 按正确答题同一公式给予完整分数（不因提示减少，体现“被宠”）
             const gained = base * weight;
-            this.score += gained;
+            addScoreToSubject(subject.key, gained);
             const answerReveal = nextQ.type==='fill' ? nextQ.answer : (nextQ.options?.[nextQ.answerIndex] || '');
             const pamperWrongLines = [
               '答错也没关系，我在乎的是你陪我玩。',
@@ -414,7 +458,7 @@ export class Scene2Exam extends BaseScene {
         const base = 2;
         const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
         const gained = base * weight; 
-        this.score += gained;
+  addScoreToSubject(subject.key, gained);
         this.skippedQuestions++;
         const pamperLines = [
           '不会也没关系，我负责所有你不会的部分。',
@@ -434,12 +478,25 @@ export class Scene2Exam extends BaseScene {
   /** 更新 HUD（目前只有分数，可扩展显示提示次数等） */
   const updateHUD = ()=>{
       scoreEl.textContent = this.score;
+      // 更新分科统计显示
+      const parts = (this.subjects||[]).map(s=>{
+        const sc = this.subjectScores[s.key] || 0;
+        return `<span class='sb-item' data-sub='${s.key}'>${s.title}: ${sc}</span>`;
+      }).join(' ');
+      breakdownEl.innerHTML = parts;
+    };
+
+    // helper: 给某科目和总分添加分数
+    const addScoreToSubject = (subjectKey, amount)=>{
+      this.score = (this.score||0) + amount;
+      this.subjectScores[subjectKey] = (this.subjectScores[subjectKey]||0) + amount;
+      updateHUD();
     };
 
   /** 检查所有科目是否完成，用于激活 “进入下一阶段” 按钮 */
   const checkAll = ()=>{
       if(this.subjects.every(s=>s.done)){
-        finishBtn.disabled = false;
+        finishBtn.hidden = false;
         renderSummary();
       }
     };
@@ -487,6 +544,9 @@ export class Scene2Exam extends BaseScene {
           <h3>阶段成绩</h3>
           <p>总题数：${totalQuestions}</p>
           <p>总得分：${this.score}</p>
+          <div class='subject-breakdown'>
+            ${(this.subjects||[]).map(s=>`<div class='sb-line'>${s.title}: ${this.subjectScores[s.key]||0}</div>`).join('')}
+          </div>
           <p>评价：${this.score >= totalQuestions*4 ? '学霸模式开启！' : this.score >= totalQuestions*3 ? '很棒的默契～' : '分数不是全部，心意最重要'}</p>
           ${easterHTML}
         </div>
@@ -495,6 +555,8 @@ export class Scene2Exam extends BaseScene {
 
   renderTabs();
   // 自动进入第一科并启动计时
+  // 初始化 active subject（默认按顺序：语文、数学、理综、英语）
+  this._activeSubjectKey = this.subjects[0] && this.subjects[0].key;
   renderSubject(this.subjects[0], true);
 
     finishBtn.addEventListener('click',()=> this.ctx.go('timeline'));
