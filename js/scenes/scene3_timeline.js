@@ -27,8 +27,10 @@ export class Scene3Timeline extends BaseScene {
       const REVEAL_FADE_MS = 900;   // 图片淡入时长
       const SPLIT_ANIM_MS  = 700;   // 分裂飞向角落动画时长
 
-    const root = document.createElement('div');
+  const root = document.createElement('div');
     root.className = 'scene scene-nonogram';
+  // 捕获当前场景实例，供内部嵌套函数安全引用
+  const scene = this;
     // 使用 BaseScene 公共方法统一禁用文字选择
     this.applyNoSelect(root);
 
@@ -503,20 +505,22 @@ export class Scene3Timeline extends BaseScene {
         rulesOverlay.querySelector('.close-rules').addEventListener('click', ()=> rulesOverlay.classList.add('hidden'));
       }
       btnNext.addEventListener('click', ()=> {
-        // 点击下一题时立即移除上一题的 reveal 图片（不做淡出过渡）
+        // 点击下一题或进入下一幕时的通用处理：立即移除上一题的 reveal 图片（不做淡出过渡）
         hideRevealImmediate();
-        // 点击下一题时隐藏 overlay
+        // 点击时隐藏 overlay（若存在）
         try{ const ov = gridScroller.querySelector('.split-overlay'); if(ov) ov.hidden = true; }catch(e){}
         // 重置状态以便下一题使用
         topCluesEl.classList.remove('clues-hidden');
         leftCluesEl.classList.remove('clues-hidden');
-  // 不再移除 split overlay，保持已完成图片
-        if(btnNext.textContent === '下一题'){
+
+        // 如果当前不是最后一题，则前往下一题；否则进入下一幕场景
+        if (typeof currentIndex === 'number' && typeof puzzles !== 'undefined' && currentIndex < puzzles.length - 1) {
           currentIndex++;
-            if(currentIndex >= puzzles.length) currentIndex = puzzles.length-1;
+          if(currentIndex >= puzzles.length) currentIndex = puzzles.length - 1;
           loadCurrentPuzzle();
         } else {
-          this.ctx.go('confession');
+          // 使用上面捕获的 scene 引用，确保 this 指向正确
+          try{ scene.ctx.go('confession'); }catch(e){ console.warn('[Nonogram] 无法跳转到 confession：', e); }
         }
       });
     }
