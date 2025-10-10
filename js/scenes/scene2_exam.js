@@ -36,8 +36,30 @@ const DIFFICULTY_WEIGHT = { easy: 1, medium: 2, hard: 3 };
 // handler 接口：({q, wrapper}) => { 返回需要的 input/select DOM 字符串或直接操作 wrapper }
 const QUESTION_TYPE_REGISTRY = {
   fill: (q)=> `<input class='q-input' data-qtype='fill' placeholder='${q.placeholder||''}' />`,
-  select: (q)=> `<select class='q-select' data-qtype='select'><option value=''>选择</option>${(q.options||[]).map((o,i)=>`<option value='${i}'>${o}</option>`).join('')}</select>`
-  // 预留：multiSelect / dragMatch / order / audio 等
+  // 单选：显示所有选项，左侧为可点击的勾选框（单选时只允许选中一个）
+  single_select: (q)=> `
+    <div class='q-opts' data-qtype='single_select'>
+      ${(q.options||[]).map((o,i)=>`
+        <label class='q-opt' data-index='${i}'>
+          <input type='checkbox' class='q-opt-input' name='qopt' value='${i}' />
+          <span class='q-opt-label'>${o}</span>
+        </label>
+      `).join('')}
+    </div>
+  `,
+  // 多选：显示所有选项，左侧为复选框，可多选
+  multi_select: (q)=> `
+    <div class='q-opts' data-qtype='multi_select'>
+      ${(q.options||[]).map((o,i)=>`
+        <label class='q-opt' data-index='${i}'>
+          <input type='checkbox' class='q-opt-input' name='qopt' value='${i}' />
+          <span class='q-opt-label'>${o}</span>
+        </label>
+      `).join('')}
+    </div>
+  `,
+  // 不再支持旧别名 'select'，只保留 single_select 与 multi_select
+  // 预留：dragMatch / order / audio 等
 };
 
 /**
@@ -46,8 +68,17 @@ const QUESTION_TYPE_REGISTRY = {
 function extractUserAnswer(wrapper, q){
   switch(q.type){
     case 'fill': return wrapper.querySelector('.q-input')?.value.trim();
-    case 'select': return wrapper.querySelector('.q-select')?.value;
-    // case 'multiSelect': return [...wrapper.querySelectorAll('input[type=checkbox]:checked')].map(n=>n.value)
+    case 'single_select': {
+      const el = wrapper.querySelector('.q-opts');
+      if(!el) return '';
+      const checked = el.querySelector('.q-opt-input:checked');
+      return checked ? checked.value : '';
+    }
+    case 'multi_select': {
+      const el = wrapper.querySelector('.q-opts');
+      if(!el) return [];
+      return [...el.querySelectorAll('.q-opt-input:checked')].map(n=>parseInt(n.value,10));
+    }
     default: return '';
   }
 }
@@ -57,8 +88,36 @@ function extractUserAnswer(wrapper, q){
  */
 function isAnswerCorrect(q, userAns){
   if(q.type==='fill') return userAns === q.answer;
-  if(q.type==='select') return parseInt(userAns,10) === q.answerIndex;
+  if(q.type==='single_select'){
+    const correctIndex = (typeof q.answerIndex !== 'undefined') ? q.answerIndex : q.answer;
+    return parseInt(userAns,10) === parseInt(correctIndex,10);
+  }
+  if(q.type==='multi_select'){
+    // q.answerIndex expected to be an array of indices
+    const correctArr = Array.isArray(q.answerIndex) ? q.answerIndex : (Array.isArray(q.answer) ? q.answer : null);
+    if(!Array.isArray(correctArr)) return false;
+    if(!Array.isArray(userAns)) return false;
+    // compare as sets (order-insensitive)
+    const a = [...new Set(userAns)].sort();
+    const b = [...new Set(correctArr)].sort();
+    if(a.length !== b.length) return false;
+    for(let i=0;i<a.length;i++) if(a[i] !== b[i]) return false;
+    return true;
+  }
   return false; // 未知题型默认 false（或可改为 true 宽松模式）
+}
+
+function getAnswerReveal(q){
+  if(q.type === 'fill') return q.answer;
+  if(q.type === 'single_select'){
+    const idx = (typeof q.answerIndex !== 'undefined') ? q.answerIndex : q.answer;
+    return q.options?.[idx] || '';
+  }
+  if(q.type === 'multi_select'){
+    const arr = Array.isArray(q.answerIndex) ? q.answerIndex : (Array.isArray(q.answer) ? q.answer : []);
+    return arr.map(i=> q.options?.[i]).filter(Boolean).join(', ');
+  }
+  return '';
 }
 
 export class Scene2Exam extends BaseScene {
@@ -101,7 +160,9 @@ export class Scene2Exam extends BaseScene {
           type: item.questionType || item.type || 'fill',
           difficulty: item.difficulty || 'easy',
           prompt: item.question.includes('_____') ? item.question.replace('_____','') : item.question,
-          answer: item.answer, placeholder:'_____', hints: item.hints || [], solved:false,
+          answer: item.answer,
+          options: item.options || [],
+          placeholder:'_____', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       };
@@ -110,11 +171,29 @@ export class Scene2Exam extends BaseScene {
     if(Array.isArray(data.mathPuzzles) && data.mathPuzzles.length){
       byKey.math = {
         key:'math', title:'数学', done:false,
-        questions: data.mathPuzzles.map(item=>({
-          type: item.questionType || item.type || 'fill',
-          difficulty: item.difficulty || 'medium', prompt:item.question, answer:(item.answer||'').split(' ')[0], placeholder:'答案', hints: item.hints || [], solved:false,
-          correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
-        }))
+        questions: data.mathPuzzles.map(item=>{
+          const base = {
+            type: item.questionType || item.type || 'fill',
+            difficulty: item.difficulty || 'medium',
+            prompt: item.question,
+            hints: item.hints || [], solved:false,
+            correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
+          };
+          // if options present, keep them and preserve answer as-is (for select types)
+          if(Array.isArray(item.options) && item.options.length){
+            return Object.assign({}, base, { options: item.options, answer: item.answer, placeholder:'答案' });
+          }
+          // otherwise treat as fill and coerce answer to string safely
+          let ans = '';
+          if(typeof item.answer === 'string'){
+            ans = item.answer.split(' ')[0];
+          }else if(Array.isArray(item.answer) && item.answer.length){
+            ans = String(item.answer[0]);
+          }else if(item.answer != null){
+            ans = String(item.answer);
+          }
+          return Object.assign({}, base, { answer: ans, placeholder:'答案' });
+        })
       };
     }
     // 英语（匹配 → 填空）
@@ -123,7 +202,11 @@ export class Scene2Exam extends BaseScene {
         key:'english', title:'英语', done:false,
         questions: data.englishMatch.map(item=>({
           type: item.questionType || item.type || 'fill',
-          difficulty: item.difficulty || 'easy', prompt:`${item.word} 的中文是？`, answer:item.match, placeholder:'中文', hints: item.hints || [], solved:false,
+          difficulty: item.difficulty || item.difficulty || 'easy',
+          prompt: item.question || `${item.word} 的中文是？`,
+          answer: item.match || item.answer,
+          options: item.options || [],
+          placeholder:'中文', hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
       };
@@ -133,7 +216,7 @@ export class Scene2Exam extends BaseScene {
       byKey.science = {
         key:'science', title:'理综', done:false,
         questions: data.scienceQuiz.map(item=>({
-          type: item.questionType || item.type || 'select',
+          type: item.questionType || item.type || 'single_select',
           difficulty: item.difficulty || 'medium', prompt:item.question, options:item.options, answerIndex:item.answer, hints: item.hints || [], solved:false,
           correctMsg: item.encourageCorrect, wrongMsg: item.encourageWrong
         }))
@@ -157,6 +240,8 @@ export class Scene2Exam extends BaseScene {
     el.className='scene scene-exam';
     // 统一通过 BaseScene 公共方法禁用文字选择
     this.applyNoSelect(el);
+    // Styles for Scene 2 have been moved to the central stylesheet: css/styles.css
+    // Please ensure <link rel="stylesheet" href="./css/styles.css"> is included in the host HTML.
     el.innerHTML = `
       <h1>场景2：高考小考站</h1>
       <div class='exam-top'>
@@ -334,8 +419,16 @@ export class Scene2Exam extends BaseScene {
         // 未知题型：提示并降级为填空
         inputHtml = QUESTION_TYPE_REGISTRY.fill({placeholder:'(未知题型降级为填空)'});
       }
+      // 如果是 single_select，需要把默认生成的 checkbox inputs 改为 radio 并赋予一个题目唯一 name
+      if(nextQ.type === 'single_select'){
+        const uniqueName = `q_${subject.key}_${Math.floor(Math.random()*1000000)}`;
+        // 将所有 input[type=checkbox] 替换为 input[type=radio] 并注入 name
+        inputHtml = inputHtml.replace(/type='checkbox'/g, `type='radio' name='${uniqueName}'`);
+        inputHtml = inputHtml.replace(/type=\"checkbox\"/g, `type=\"radio\" name=\"${uniqueName}\"`);
+      }
+      const typeLabel = (nextQ.type === 'fill') ? '填空题' : (nextQ.type === 'single_select' ? '单选题' : (nextQ.type === 'multi_select' ? '多选题' : nextQ.type));
       wrapper.innerHTML = `
-        <p>${diffTag} ${nextQ.prompt}</p>
+        <p>${diffTag} <span class='q-type-label'>${typeLabel}</span> ${nextQ.prompt}</p>
         <div class='q-box'>${inputHtml}</div>
         <div class='actions'>
           <button class='hint-btn'>提示</button>
@@ -346,6 +439,10 @@ export class Scene2Exam extends BaseScene {
         <div class='progress-mini'>本科进度：${subject.questions.filter(q=>q.solved).length}/${subject.questions.length}</div>
       `;
       board.appendChild(wrapper);
+      const optsContainer = wrapper.querySelector('.q-opts');
+      if((nextQ.type === 'single_select' || nextQ.type === 'multi_select') && !optsContainer){
+        console.warn('select type but .q-opts missing for question:', nextQ);
+      }
       if(startTimer){
         // 进入新科目：清理可能残留的懒散彩蛋提示
         const bh = status.querySelector('.between-hint');
@@ -387,7 +484,7 @@ export class Scene2Exam extends BaseScene {
           const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
           const gained = base * weight;
           addScoreToSubject(subject.key, gained);
-          const answerReveal = nextQ.type==='fill' ? nextQ.answer : (nextQ.options?.[nextQ.answerIndex] || '');
+          const answerReveal = getAnswerReveal(nextQ);
           // 覆盖之前的提示行
           hintArea.innerHTML = `<span class='auto-answer'>直接送你答案：<strong>${answerReveal}</strong></span>`;
           status.innerHTML = `<span class='ok'>第三次提示：我直接把答案告诉你啦~</span> <em>+${gained} 分</em>`;
@@ -405,7 +502,9 @@ export class Scene2Exam extends BaseScene {
         let userAns='';
         userAns = extractUserAnswer(wrapper, nextQ);
         // 空输入/未选择：不给分也不判错，给予轻提示
-        const isEmpty = (nextQ.type==='fill' && userAns==='') || (nextQ.type==='select' && userAns==='');
+        const isEmpty = (nextQ.type==='fill' && userAns==='') 
+          || ((nextQ.type==='select' || nextQ.type==='single_select') && (userAns === '' || userAns == null))
+          || (nextQ.type==='multi_select' && Array.isArray(userAns) && userAns.length === 0);
         if(isEmpty){
           status.innerHTML = `<span class='err'>先填写/选择一个答案再提交哦~</span>`;
           wrapper.classList.add('shake-mini');
@@ -433,7 +532,7 @@ export class Scene2Exam extends BaseScene {
             // 按正确答题同一公式给予完整分数（不因提示减少，体现“被宠”）
             const gained = base * weight;
             addScoreToSubject(subject.key, gained);
-            const answerReveal = nextQ.type==='fill' ? nextQ.answer : (nextQ.options?.[nextQ.answerIndex] || '');
+            const answerReveal = getAnswerReveal(nextQ);
             const pamperWrongLines = [
               '答错也没关系，我在乎的是你陪我玩。',
               '错了？那我补一个正确答案给你，再顺便奖励你。',

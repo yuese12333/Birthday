@@ -57,6 +57,27 @@ button.shake{ animation:shake .5s; }
 @keyframes shakeMini{10%,90%{transform:translateX(-2px);}20%,80%{transform:translateX(3px);}30%,50%,70%{transform:translateX(-5px);}40%,60%{transform:translateX(5px);} }
 /* 试卷中的交互控件 */
 .paper input, .paper select { padding:.4rem .6rem; border:1px solid #ff9fb1; border-radius:6px; font-size:1rem; }
+
+/* Additional extracted styles from js/scenes/scene2_exam.js */
+.scene-exam .q-opts { display:block; margin:6px 0; }
+.scene-exam .q-opts .q-opt { display:block; margin:8px 0; cursor:pointer; }
+.scene-exam .q-opt-label { margin-left:10px; vertical-align:middle; }
+/* checkbox styled as circular control to match radio */
+.scene-exam .q-opt-input[type=checkbox]{
+  appearance:none; -webkit-appearance:none; width:18px; height:18px; border-radius:50%; display:inline-block; border:2px solid #888; vertical-align:middle; position:relative; background-clip:content-box; padding:0; margin:0;
+}
+.scene-exam .q-opt-input[type=checkbox]:checked{ background-color:#4a90e2; border-color:#4a90e2; }
+.scene-exam .q-opt-input[type=radio]{ vertical-align:middle; }
+.scene-exam .q-opt { user-select:none; }
+
+/* difficulty badges (compact variant) */
+.scene-exam .diff { display:inline-block; margin-right:8px; padding:3px 8px; border-radius:10px; font-size:0.85em; color:#1b1b1b; background:#f3f3f3; }
+.scene-exam .diff.diff-easy { background:#e6f9ec; color:#1b6f2b; }
+.scene-exam .diff.diff-medium { background:#fff6e6; color:#b46a00; }
+.scene-exam .diff.diff-hard { background:#fdecea; color:#a32020; }
+
+/* question type label */
+.scene-exam .q-type-label { display:inline-block; margin:0 8px; padding:3px 8px; border-radius:12px; background:#eef4ff; color:#1e57d8; font-size:0.9em; }
 /* ======================== Scene 3: 大学时间线排序 ==================== */
 .scene-timeline ul{ list-style:none; padding:0; margin:0 0 1rem; display:flex; flex-direction:column; gap:.6rem; }
 .scene-timeline li{ background:rgba(255,255,255,.5); padding:.8rem 1rem; border-radius:14px; box-shadow:0 2px 6px rgba(0,0,0,.08); }

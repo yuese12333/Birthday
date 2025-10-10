@@ -259,7 +259,7 @@ README.md
     { "questionType": "fill", "difficulty": "easy", "word": "forever", "match": "永远", "hints": ["for + ever"], "encourageCorrect": "Forever = 永远爱你", "encourageWrong": "我们常说的那个‘永**’" }
   ],
   "scienceQuiz": [
-    { "questionType": "select", "difficulty": "easy", "question": "彩虹形成主要和什么光学现象有关？", "options": ["折射","衍射","干涉"], "answer": 0, "hints": ["光进水又出"], "encourageCorrect": "彩虹为你弯下腰~", "encourageWrong": "想想光进水再出来会怎样~" }
+  { "questionType": "single_select", "difficulty": "easy", "question": "彩虹形成主要和什么光学现象有关？", "options": ["折射","衍射","干涉"], "answer": 0, "hints": ["光进水又出"], "encourageCorrect": "彩虹为你弯下腰~", "encourageWrong": "想想光进水再出来会怎样~" }
   ]
 }
 ```

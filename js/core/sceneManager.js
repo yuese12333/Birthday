@@ -92,15 +92,31 @@ export class SceneManager {
       this.rootEl.innerHTML='';
       try { this.current.destroy(); } catch(e){ console.warn('scene destroy error', e); }
     }
-    const scene = this.registry.get(name)();
-    this.current = scene;
-    if(!scene.initialized) await scene.init();
-    await scene.enter(data);
-    // 小延迟再移除遮罩，避免闪烁
-    setTimeout(()=>{
-      this._overlay.style.opacity='0';
-      this._overlay.style.pointerEvents='none';
-    }, 250);
-    this._transitioning = false;
+    let scene = null;
+    try{
+      scene = this.registry.get(name)();
+      this.current = scene;
+      if(!scene.initialized) await scene.init();
+      await scene.enter(data);
+      // 小延迟再移除遮罩，避免闪烁
+      setTimeout(()=>{
+        this._overlay.style.opacity='0';
+        this._overlay.style.pointerEvents='none';
+      }, 250);
+    }catch(err){
+      // 记录错误，防止因未捕获异常导致 _transitioning/overlay 永远处于阻塞状态
+      console.error('scene init/enter error', err);
+      try{
+        // 给用户短暂的反馈（不阻塞）
+        this._overlay.textContent = '切换失败，查看控制台日志';
+        setTimeout(()=>{
+          this._overlay.style.opacity='0';
+          this._overlay.style.pointerEvents='none';
+          this._overlay.textContent = '正在切换...';
+        }, 1200);
+      }catch(e){ /* ignore */ }
+    }finally{
+      this._transitioning = false;
+    }
   }
 }

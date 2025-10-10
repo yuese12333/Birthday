@@ -105,6 +105,26 @@
         {
           "speaker": "her",
           "text": "你要怎么证明？"
+        },
+        {
+          "speaker": "me",
+          "text": "你就不好奇溜溜是谁吗"
+        },
+        {
+          "speaker": "her",
+          "text": "……你姐姐的小名？"
+        },
+        {
+          "speaker": "system",
+          "text": "（哈哈哈，你姐的小名？你在家胆子这么大吗？）"
+        },
+        {
+          "speaker": "me",
+          "text": "（闭嘴！）不是不是，溜溜就是你呀。"
+        },
+        {
+          "speaker": "her",
+          "text": "我？没人叫过我溜溜啊，你是不是弄错了？"
         }
       ],
       "choices": [
