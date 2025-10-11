@@ -16,12 +16,7 @@ export class Scene7Future extends BaseScene {
       <h1>场景7：未来愿望（占位）</h1>
       <p class='placeholder-tip'>未来这里会是“写下愿望·点亮星空”的互动。
         当前为占位，为了不打断整条旅程流程，先直接进入最终祝福。</p>
-      <button class='go-final' data-debounce='700'>进入最终祝福 →</button>
-      <div class='final-box hidden'>
-        <h2>生日快乐 🎂</h2>
-        <p class='message'>感谢我们把那些零碎的时间拼成了故事。<br/>过去已经很可爱，未来会更可爱。<br/>我会继续把喜欢变成更具象的陪伴。</p>
-        <p class='note'>( 完整愿望玩法 / 个性化引用统计 将在后续版本呈现 )</p>
-      </div>
+      <button class='go-final' data-debounce='700'>通关游戏 →</button>
     `;
 
     // 统一使用基类提供的文字不可选封装

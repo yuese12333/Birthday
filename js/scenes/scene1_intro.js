@@ -237,13 +237,22 @@ export class Scene1Intro extends BaseScene {
         }
         if(vnBox){
           const winText = (script.meta && script.meta.winText) || '她终于相信了你。\n（这里可以写更走心的过渡文案）';
+          const isCompleted = (typeof localStorage !== 'undefined' && localStorage.getItem && localStorage.getItem('birthday_completed_mark') === 'true');
+          const finalBtnHtml = isCompleted ? `<button class='btn-go-final' style='margin-left:.6rem;padding:.65rem 1.2rem;font-size:.95rem;border:none;border-radius:8px;background:#6ab04c;color:#fff;cursor:pointer;'>回到通关页面</button>` : '';
           vnBox.innerHTML=`<div class='win-final' style="animation:fadeIn .35s ease;white-space:pre-line;line-height:1.6;min-height:4.5rem;display:flex;flex-direction:column;justify-content:center;">${winText}</div>
           <div style='text-align:center;margin-top:1rem;'>
             <button class='btn-go-exam' style='padding:.65rem 1.2rem;font-size:.95rem;border:none;border-radius:8px;background:#ff4d84;color:#fff;cursor:pointer;'>进入下一段记忆 →</button>
+            ${finalBtnHtml}
           </div>`;
           vnBox.querySelector('.btn-go-exam').addEventListener('click',()=>{
             this.ctx.go('transition',{next:'exam',style:'flash12'});
           });
+          const btnFinal = vnBox.querySelector('.btn-go-final');
+          if(btnFinal){
+            btnFinal.addEventListener('click',()=>{
+              try{ this.ctx.go('final'); }catch(e){ console.warn('跳转到 final 失败：', e); }
+            });
+          }
         }
         return;
       }

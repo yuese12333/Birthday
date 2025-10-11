@@ -25,10 +25,11 @@
  */
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
+import { achievements } from '../core/achievements.js';
 
-// 难度权重：影响统一得分（当前统一公式：2 * weight）
-// 可扩展：在外部 JSON 的题目里声明 difficulty（若缺省按科目默认 / easy）
-const DIFFICULTY_WEIGHT = { easy: 1, medium: 2, hard: 3 };
+// 计分说明：当前采用「按题型」的分值表（POINTS_BY_TYPE），保留题目难度字段仅供展示或未来扩展使用。
+// 若需调整分值，可直接修改 POINTS_BY_TYPE 中的数值。
+const POINTS_BY_TYPE = { fill: 3, single_select: 4, multi_select: 5 };
 
 // 题型渲染/输入注册表：未来添加新题型时只需 push 一个 handler
 // handler 接口：({q, wrapper}) => { 返回需要的 input/select DOM 字符串或直接操作 wrapper }
@@ -484,9 +485,8 @@ export class Scene2Exam extends BaseScene {
           // 第三次：直接送答案并判定通过
           nextQ.solved = true;
           nextQ._autoHint = true;
-          const base = 2;
-          const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
-          const gained = base * weight;
+          // 按题型计算得分（替代原先基于难度的计算）
+          const gained = POINTS_BY_TYPE[nextQ.type] || 2;
           addScoreToSubject(subject.key, gained);
           const answerReveal = getAnswerReveal(nextQ);
           // 覆盖之前的提示行
@@ -518,9 +518,8 @@ export class Scene2Exam extends BaseScene {
         const correct = isAnswerCorrect(nextQ, userAns);
         if(correct){
           nextQ.solved = true;
-          const base = 2; // 基础分
-          const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
-          const gained = base*weight; // 不再因提示扣分
+          // 正确提交按题型计分
+          const gained = POINTS_BY_TYPE[nextQ.type] || 2;
           addScoreToSubject(subject.key, gained);
           status.innerHTML = `<span class='ok'>${nextQ.correctMsg || '太棒啦！'}</span> <em>+${gained} 分</em>`;
           updateHUD();
@@ -531,10 +530,8 @@ export class Scene2Exam extends BaseScene {
           // 宠溺错误模式：也判定通过，并给予“完整得分”且展示正确答案
           nextQ.solved = true;
           nextQ._pamperedWrong = true;
-          const base = 2;
-            const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
-            // 按正确答题同一公式给予完整分数（不因提示减少，体现“被宠”）
-            const gained = base * weight;
+          // 宠溺错误也按题型给予完整分数
+            const gained = POINTS_BY_TYPE[nextQ.type] || 2;
             addScoreToSubject(subject.key, gained);
             const answerReveal = getAnswerReveal(nextQ);
             const pamperWrongLines = [
@@ -561,11 +558,9 @@ export class Scene2Exam extends BaseScene {
         if(nextQ.solved) return;
         nextQ.solved = true;
         nextQ._skipped = true; // 标记此题由跳过获得
-        // 跳过算正确答题
-        const base = 2;
-        const weight = DIFFICULTY_WEIGHT[nextQ.difficulty] || 1;
-        const gained = base * weight; 
-        addScoreToSubject(subject.key, gained);
+  // 跳过按题型计分
+  const gained = POINTS_BY_TYPE[nextQ.type] || 2;
+  addScoreToSubject(subject.key, gained);
         this.skippedQuestions++;
         const pamperLines = [
           '不会也没关系，我负责所有你不会的部分。',
@@ -605,6 +600,25 @@ export class Scene2Exam extends BaseScene {
         if(this.subjects.every(s=>s.done)){
           finishBtn.hidden = false;
           renderSummary();
+          try{
+            // 如果存在全局通关印记，则在“进入下一阶段”按钮旁显示“回到通关页面”按钮
+            const completed = (typeof localStorage !== 'undefined' && localStorage.getItem && localStorage.getItem('birthday_completed_mark') === 'true');
+            if(completed){
+              // 避免重复创建
+              if(!el.querySelector('.btn-go-final')){
+                const btnFinal = document.createElement('button');
+                btnFinal.className = 'btn-go-final';
+                btnFinal.textContent = '回到通关页面';
+                // 采用内联样式以与现有快速样式一致
+                btnFinal.style.cssText = 'margin-left:.6rem;padding:.5rem .9rem;border-radius:6px;background:#6ab04c;color:#fff;border:none;cursor:pointer;';
+                btnFinal.addEventListener('click', ()=>{
+                  try{ this.ctx.go('final'); }catch(e){ console.warn('跳转到 final 失败：', e); }
+                });
+                // 将按钮插入在 finishBtn 之后
+                finishBtn.insertAdjacentElement('afterend', btnFinal);
+              }
+            }
+          }catch(e){ console.warn('检查通关印记时出错', e); }
         }
       };
 
@@ -658,6 +672,17 @@ export class Scene2Exam extends BaseScene {
           ${easterHTML}
         </div>
       `;
+      // 发出考试总结事件，供成就系统判断（payload 包含关键统计）
+      try{
+        achievements.recordEvent('scene2:exam_summary', {
+          hintsUsed: this.hintsUsed || 0,
+          skippedQuestions: this.skippedQuestions || 0,
+          pamperedWrongCount: pamperedWrongCount || 0,
+          autoHintCount: autoHintCount || 0,
+          totalQuestions: totalQuestions || 0,
+          score: this.score || 0
+        });
+      }catch(e){ console.warn('emit exam summary err', e); }
     };
 
     renderTabs();

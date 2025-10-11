@@ -481,6 +481,8 @@ export class Scene3Timeline extends BaseScene {
       if(progEl){ progEl.textContent = `(${currentIndex+1}/${puzzles.length})`; }
       const btnNextEl = root.querySelector('.btn-next'); // 下一题按钮
       if(btnNextEl){ btnNextEl.classList.add('hidden'); }
+      // 移除可能残留的“回到通关页面”按钮（避免重复或旧按钮在新题加载时残留）
+      try{ const oldFinal = root.querySelector('.btn-go-final'); if(oldFinal) oldFinal.remove(); }catch(e){}
       statusMsg.textContent = '';
       // 新题启用重置按钮（通过显示/隐藏控制）
       if(btnReset) btnReset.classList.remove('hidden');
@@ -596,6 +598,25 @@ export class Scene3Timeline extends BaseScene {
         // 通过移除 hidden 让按钮可点击（不用 disabled）
         btn.classList.remove('hidden');
         ensureBtnAccessible(btn);
+        // 若存在全局通关印记，创建并显示“回到通关页面”按钮（避免重复创建）
+        try{
+          const completed = (typeof localStorage !== 'undefined' && localStorage.getItem && localStorage.getItem('birthday_completed_mark') === 'true');
+          if(completed){
+            if(!root.querySelector('.btn-go-final')){
+              const btnFinal = document.createElement('button');
+              btnFinal.className = 'btn-go-final';
+              btnFinal.textContent = '回到通关页面';
+              btnFinal.style.cssText = 'margin-left:.6rem;padding:.5rem .9rem;border-radius:6px;background:#6ab04c;color:#fff;border:none;cursor:pointer;';
+              btnFinal.addEventListener('click', ()=>{
+                try{ scene.ctx.go('final'); }catch(e){ console.warn('[Nonogram] 跳转到 final 失败：', e); }
+              });
+              btn.insertAdjacentElement('afterend', btnFinal);
+              ensureBtnAccessible(btnFinal);
+            }
+          } else {
+            const old = root.querySelector('.btn-go-final'); if(old) old.remove();
+          }
+        }catch(e){ console.warn('[Nonogram] 检查通关印记时出错', e); }
       }
 
       // 完成时的动画效果（淡出 + 心跳 + 揭示图片淡入 + 分裂飞散）

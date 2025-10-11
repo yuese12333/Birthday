@@ -10,7 +10,9 @@
     "./assets/images/scene3_1.png",
     "./assets/images/scene3_2.png",
     "./assets/images/scene3_3.png",
-    "./assets/images/scene3_4.png"
+    "./assets/images/scene3_4.png",
+    "./assets/images/lock.png",
+    "./assets/images/unlock.png"
   ],
   "audio": [
     "./assets/audio/scene_0.mp3",

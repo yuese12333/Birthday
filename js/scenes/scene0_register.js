@@ -39,6 +39,7 @@ export class Scene0Register extends BaseScene {
           <button type='button' data-jump='date' style='background:#bbb;'>Date</button>
           <button type='button' data-jump='scarf' style='background:#bbb;'>Scarf</button>
           <button type='button' data-jump='future' style='background:#bbb;'>Future</button>
+          <button type='button' data-jump='final' style='background:#bbb;'>Final</button>
           <!-- DEV-ONLY: 清空本地成就按钮，发布前可整体删除 DEV-ONLY START -->
           <button type='button' data-clear-achievements style='background:#faa;color:#700;border:1px dashed #f55;padding:.35rem .6rem;border-radius:6px;'>清空成就</button>
           <!-- DEV-ONLY END -->
@@ -218,6 +219,8 @@ export class Scene0Register extends BaseScene {
 
       if(pass === '20241007'){
         msg.innerHTML = `<span class='ok'>验证成功！那天开始的一切，都继续写在下面的故事里 ❤</span>`;
+        // 记录全局注册成功事件（供成就计时器使用）
+        try{ achievements.recordEvent('player:registered', { pass }); }catch(e){}
         setTimeout(()=> this.ctx.go('intro'), 800);
       } else {
         wrongTimes++;

@@ -1,35 +1,5 @@
-# Python typical ignores
-__pycache__/
-*.py[cod]
-*$py.class
-
-# Virtual environments
-.env/
-.venv/
-venv/
-ENV/
-
-# Distribution / packaging
-build/
-dist/
-*.egg-info/
-
-# Logs / coverage
-*.log
-.coverage*
-htmlcov/
-
-# OS
-.DS_Store
-Thumbs.db
-
-# IDE / Editor
+# IDE
 .vscode/
-.idea/
-*.swp
 
-# Local tool script not to commit
-scene1_script_editor.py
-
-# Ignore entire local editor tools directory
+# 整个编辑器工具目录
 editor/
