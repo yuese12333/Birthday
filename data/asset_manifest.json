@@ -18,6 +18,7 @@
     "./assets/audio/scene_2.mp3",
     "./assets/audio/scene_3.mp3",
     "./assets/audio/scene_4.mp3",
-    "./assets/audio/scene_45.wav"
+    "./assets/audio/scene_45.wav",
+    "./assets/audio/Achievement.wav"
   ]
 }

@@ -250,7 +250,7 @@ export class Scene0Register extends BaseScene {
         const bye=document.createElement('span'); bye.textContent='……我不跟你玩了，退出！'; lines.appendChild(bye);
         // 记录成就事件：连续 6 次密码错误
         try{ achievements.recordEvent('scene0:failed_six', { count: wrongTimes }); }catch(e){}
-        // 第6次错误：禁用整个页面的交互，等待成就 '2' 已解锁后退出。
+        // 第6次错误：禁用整个页面的交互，等待成就 '0-2' 已解锁后退出。
         (function waitForAchievementThenExit(){
           const timeout = 4500; // ms
           let done = false;
@@ -268,13 +268,13 @@ export class Scene0Register extends BaseScene {
             }
           }catch(e){}
 
-          // 若成就 '2' 已存在，立即退出（无需等待）
+          // 若成就 '0-2' 已存在，立即退出（无需等待）
           let already = false;
-          try{ already = achievements && typeof achievements.getUnlocked === 'function' && achievements.getUnlocked().has('2'); }catch(e){ already = false; }
+          try{ already = achievements && typeof achievements.getUnlocked === 'function' && achievements.getUnlocked().has('0-2'); }catch(e){ already = false; }
           if(already){ finish(); return; }
 
           const onUnlock = (ev)=>{
-            try{ const did = String(ev.detail?.id); if(did === '2'){ window.removeEventListener('achievement:unlocked', onUnlock); finish(); } }catch(e){}
+            try{ const did = String(ev.detail?.id); if(did === '0-2'){ window.removeEventListener('achievement:unlocked', onUnlock); finish(); } }catch(e){}
           };
           window.addEventListener('achievement:unlocked', onUnlock);
           // 兜底超时

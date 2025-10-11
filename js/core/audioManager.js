@@ -9,6 +9,8 @@ class AudioManager {
     this.bgms = new Map(); // key -> { audio, targetVolume }
     this.globalMuted = false;
     this.currentSceneBGM = null;
+    // 全局 SFX 音量比例（0.0 - 1.0），影响所有短音效
+    this.sfxVolume = 1.0;
   }
   /** 通用场景 BGM 播放辅助：sceneId -> assets/audio/scene_x.mp3，自动停止前一个 */
   playSceneBGM(sceneId, { loop=true, volume=0.7, fadeIn=700 }={}){
@@ -67,6 +69,39 @@ class AudioManager {
   stopAll({ fadeOut=0 }={}){
     [...this.bgms.keys()].forEach(k=> this.stopBGM(k,{ fadeOut }));
   }
+
+  /**
+   * 播放短音效（SFX）。尊重 globalMuted 状态并在 play 被浏览器阻止时静默失败。
+   * @param {string} src 音频文件路径
+   * @param {{volume?:number, loop?:boolean, preload?:string}} opts
+   */
+  playSound(src, { volume=1.0, loop=false, preload='auto' }={}){
+    if(!src) return null;
+    try{
+      const audio = new Audio(src);
+      audio.loop = !!loop;
+      // 实际音量受参数 volume 与全局 sfxVolume 共同影响
+      const vol = Math.max(0, Math.min(1, volume)) * Math.max(0, Math.min(1, this.sfxVolume));
+      audio.volume = vol;
+      audio.preload = preload;
+      audio.muted = this.globalMuted;
+      const p = audio.play();
+      if(p && typeof p.catch === 'function') p.catch(()=>{});
+      return audio;
+    }catch(e){ console.warn('playSound err', e); return null; }
+  }
+
+  /**
+   * 设置全局 SFX 音量比例（0-1），返回设置后的值
+   */
+  setSFXVolume(v){
+    const nv = Math.max(0, Math.min(1, Number(v) || 0));
+    this.sfxVolume = nv;
+    return nv;
+  }
+
+  /** 获取当前 SFX 音量比例 */
+  getSFXVolume(){ return this.sfxVolume; }
 }
 
 export const audioManager = new AudioManager();

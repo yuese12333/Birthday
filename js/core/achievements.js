@@ -5,6 +5,8 @@
 // - 持久化：将已解锁的成就保存到 localStorage
 // - 通知：当成就达成时显示小弹窗（toast）提示
 
+import { audioManager } from './audioManager.js';
+
 const STORAGE_KEY = 'birthday_unlocked_achievements_v1';
 
 class Achievements {
@@ -106,6 +108,8 @@ class Achievements {
       if(ok){
         this.unlocked.add(id);
         this._save();
+        // 使用 audioManager 播放成就音效（遵循全局静音设置）
+        try{ if(audioManager && typeof audioManager.playSound === 'function') audioManager.playSound('./assets/audio/Achievement.wav', { volume: 0.35 }); }catch(e){}
         this._showToast(item.meta);
         // 全局派发已解锁事件，方便页面或其它模块监听（DEV-friendly）
         try{ window.dispatchEvent(new CustomEvent('achievement:unlocked', { detail: { id: String(id), meta: item.meta } })); }catch(e){}
@@ -148,6 +152,7 @@ class Achievements {
     this.unlocked.add(id);
     this._save();
     const meta = this.achievements.get(id).meta;
+    try{ if(audioManager && typeof audioManager.playSound === 'function') audioManager.playSound('./assets/audio/Achievement.wav', { volume: 1.0 }); }catch(e){}
     this._showToast(meta);
     return true;
   }
@@ -184,23 +189,24 @@ export const achievements = new Achievements();
 export default achievements;
 
 // 成就 0 —— 在注册页面输入生日密码
-achievements.register('0', {
+// 成就 0-0 —— 在注册页面输入生日密码
+achievements.register('0-0', {
   title: '发现生日彩蛋',
   desc: '在注册页面输入了特别的生日作为密码（发现了彩蛋）'
 }, (events)=>{
   return events.some(ev => ev && ev.name === 'scene0:entered_birthday' && ev.payload && (ev.payload.pass === '20051210' || ev.payload.pass === '20051005'));
 });
 
-// 成就 1：在注册页面多次点击“我忘了”并触发哭脸
-achievements.register('1', {
+// 成就 0-1：在注册页面多次点击“我忘了”并触发哭脸
+achievements.register('0-1', {
   title: '记性真差',
   desc: '在注册页多次忘记，直到显示哭脸并被禁用'
 }, (events)=>{
   return events.some(ev => ev && ev.name === 'scene0:forgot_cry');
 });
 
-// 成就 2：密码错误达到 6 次（连续错误导致退出）
-achievements.register('2', {
+// 成就 0-2：密码错误达到 6 次（连续错误导致退出）
+achievements.register('0-2', {
   title: '执着的尝试',
   desc: '连续多次尝试错误密码直到被动退出'
 }, (events)=>{
