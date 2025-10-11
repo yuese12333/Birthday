@@ -138,7 +138,7 @@ function openAchievementsModal(){
       if(it.meta && it.meta.descriptionVisible){
         body.innerHTML = `<div class='ach-title' style='color:#666'>${escapeHtml(it.meta.title||'未知成就')}</div><div class='ach-desc' style='color:#888'>${escapeHtml(it.meta.desc||'暂无描述')}</div>`;
       } else {
-        body.innerHTML = `<div class='ach-title' style='color:#bbb'>未达成</div>`;
+        body.innerHTML = `<div class='ach-title' style='color:#bbb'>锁定的成就</div>`;
       }
     }
     row.appendChild(icon); row.appendChild(body); listEl.appendChild(row);
