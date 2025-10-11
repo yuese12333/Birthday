@@ -7,6 +7,7 @@
  */
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
+import { achievements } from '../core/achievements.js';
 
 export class Scene0Register extends BaseScene {
   async enter(){
@@ -38,6 +39,9 @@ export class Scene0Register extends BaseScene {
           <button type='button' data-jump='date' style='background:#bbb;'>Date</button>
           <button type='button' data-jump='scarf' style='background:#bbb;'>Scarf</button>
           <button type='button' data-jump='future' style='background:#bbb;'>Future</button>
+          <!-- DEV-ONLY: 清空本地成就按钮，发布前可整体删除 DEV-ONLY START -->
+          <button type='button' data-clear-achievements style='background:#faa;color:#700;border:1px dashed #f55;padding:.35rem .6rem;border-radius:6px;'>清空成就</button>
+          <!-- DEV-ONLY END -->
         </div>
         <p style='margin:.6rem 0 0; line-height:1.4;'>说明：
           1) 按钮直接调用 sceneManager.go；2) 不做状态校验；3) 若需完全移除，删除本 details 块与下方相关监听即可。</p>
@@ -148,6 +152,8 @@ export class Scene0Register extends BaseScene {
       const pass = (data.get('pass')||'').trim();
       // 特殊彩蛋：如果输入为她/我的生日，显示彩蛋占位，而不是视作忘了或错误
       if(pass === '20051210' || pass === '20051005'){
+        // 记录成就事件：在注册页面输入生日作为密码（供成就系统检测）
+        try{ achievements.recordEvent('scene0:entered_birthday', { pass }); }catch(e){}
         // 不计入 wrongTimes，也不停止 BGM
         const eggWrap = document.createElement('div');
         eggWrap.className = 'birthday-egg';
@@ -233,8 +239,47 @@ export class Scene0Register extends BaseScene {
         if(!imgRow.querySelector('.wrong-cry')){
           const cry=document.createElement('img'); cry.src='./assets/images/cry.png'; cry.alt='cry'; cry.className='wrong-cry'; cry.style.cssText='width:70px;height:70px;animation:shakeCry .6s ease;'; imgRow.appendChild(cry);
         }
+        // 隐藏之前显示的生气文字区域，避免与哭脸同时出现
+        try{
+          const lines = imgRow.closest('.err-wrap')?.querySelector('.err-lines');
+          if(lines){ lines.innerHTML = ''; lines.style.display = 'none'; }
+        }catch(e){}
       } else if(wrongTimes >= 6){
-        const bye=document.createElement('span'); bye.textContent='……我不跟你玩了，退出！'; lines.appendChild(bye); setTimeout(()=>{ try{ window.close(); }catch(e){} location.href='about:blank'; }, 800);
+        // 恢复错误文字容器的显示（可能在第5次时被隐藏），确保退出文本可见
+        try{ if(lines && lines.style){ lines.style.display = ''; } }catch(e){}
+        const bye=document.createElement('span'); bye.textContent='……我不跟你玩了，退出！'; lines.appendChild(bye);
+        // 记录成就事件：连续 6 次密码错误
+        try{ achievements.recordEvent('scene0:failed_six', { count: wrongTimes }); }catch(e){}
+        // 第6次错误：禁用整个页面的交互，等待成就 '2' 已解锁后退出。
+        (function waitForAchievementThenExit(){
+          const timeout = 4500; // ms
+          let done = false;
+          const finish = ()=>{
+            if(done) return; done = true;
+            setTimeout(()=>{ try{ window.close(); }catch(e){} location.href='about:blank'; }, 900);
+          };
+          // 在页面上放一个透明覆盖层以阻止所有点击交互
+          try{
+            if(!document.getElementById('page-disable-overlay')){
+              const ov = document.createElement('div');
+              ov.id = 'page-disable-overlay';
+              ov.style.cssText = 'position:fixed;left:0;top:0;width:100%;height:100%;z-index:100000;background:transparent;cursor:default;pointer-events:auto;';
+              document.body.appendChild(ov);
+            }
+          }catch(e){}
+
+          // 若成就 '2' 已存在，立即退出（无需等待）
+          let already = false;
+          try{ already = achievements && typeof achievements.getUnlocked === 'function' && achievements.getUnlocked().has('2'); }catch(e){ already = false; }
+          if(already){ finish(); return; }
+
+          const onUnlock = (ev)=>{
+            try{ const did = String(ev.detail?.id); if(did === '2'){ window.removeEventListener('achievement:unlocked', onUnlock); finish(); } }catch(e){}
+          };
+          window.addEventListener('achievement:unlocked', onUnlock);
+          // 兜底超时
+          setTimeout(()=>{ try{ window.removeEventListener('achievement:unlocked', onUnlock); }catch(e){} finish(); }, timeout);
+        })();
       }
     }
   });
@@ -282,6 +327,8 @@ export class Scene0Register extends BaseScene {
         setTimeout(()=> forgotBtn.classList.remove('shake-once'), 600);
         const passInput = form.querySelector('input[name="pass"]');
         setTimeout(()=>{ if(!passInput.value.trim()) passInput.placeholder='快输入！'; },2000);
+        // 成就触发点：当忘记按钮达到第5次并显示哭脸时，记录事件供成就检测
+        try{ achievements.recordEvent('scene0:forgot_cry', { count: this._forgotClicks }); }catch(e){}
       }
     });
     // 简单弹出/哭泣动画（内联追加一次）
@@ -305,6 +352,22 @@ export class Scene0Register extends BaseScene {
             this.ctx.go(target);
         });
       });
+      // DEV-ONLY: 清空成就按钮事件绑定（方便开发调试；上线前可整体删除） DEV-ONLY START
+      const clearBtn = debugPanel.querySelector('button[data-clear-achievements]');
+      if(clearBtn){
+        clearBtn.addEventListener('click', ()=>{
+          try{
+            if(!confirm('确定要清空本地成就数据吗？该操作不可恢复（仅用于开发调试）。')) return;
+            // 首选调用成就模块提供的清空接口，由它负责内存与本地存储的清理
+            try{ if(typeof achievements?.clearAll === 'function'){ achievements.clearAll(); } else { const KEY = 'birthday_unlocked_achievements_v1'; try{ localStorage.removeItem(KEY); }catch(e){} } }catch(e){}
+            // 显示短提示
+            const t = document.createElement('div'); t.textContent='已清空成就并刷新页面'; t.style.cssText='position:fixed;left:50%;top:18px;transform:translateX(-50%);background:#111;color:#fff;padding:.45rem .8rem;border-radius:8px;z-index:100001;'; document.body.appendChild(t);
+            setTimeout(()=>{ try{ t.remove(); }catch(e){} },1200);
+            setTimeout(()=>{ location.reload(); }, 900);
+          }catch(e){ console.warn('clear achievements failed', e); alert('清空失败，请在控制台查看错误'); }
+        });
+      }
+      // DEV-ONLY END
     }
   }
 

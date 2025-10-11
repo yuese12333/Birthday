@@ -1,29 +1,27 @@
 /**
- * 场景2：高考四科小游戏（语/数/英/理综）
- * 设计理念：
- *  - 零挫败：答错也给满分（标记 _pamperedWr    // 不再内置默认题库：直接加载 external scene2_questions.json（若失败或为空将导致后续逻辑异常，符合"必须提供外部题库"要求）ng），跳过也给分（_skipped），第三次提示直接送答案。
- *  - 情感陪伴：所有“失败路径”都会输出宠溺 / 鼓励话语，维持轻松甜蜜氛围。
- *  - 数据驱动：题库优先从 external JSON (scene2_questions.json) 替换加载；失败则使用内置 fallback。
- *  - 防并发/稳态：通过场景管理器 + 本地 DOM 清理，避免重复渲染；按钮加 _locked 防连击。
- *  - 可扩展：score 公式集中、题目对象字段统一，可后续添加科目、题型或成就统计。
+ * Scene2 — 四科小游戏 (语 / 数 / 英 / 理综)
  *
- * 主要机制概览：
- *  1. 得分：正确 = 2 * 难度权重；跳过 = 同上；错误 = 同上（满分宠溺）；提示不扣分。
- *  2. 提示：一题可按下至多 3 次（hintCount）。前两次显示提示文本，第 3 次直接自动判定正确 + 给答案 + 给分。
- *  3. 彩蛋：全跳过 / 全错误宠溺 / ≥50% 跳过（互斥优先级：全跳过 > 全错误宠溺 > 半数跳过）。
- *  4. 计时：改为“单科独立计时”——进入科目启动 5 分钟倒计时；该科完成即停止；30 秒内未开始下一科触发彩蛋提醒。
+ * 目标与设计要点
+ * - 零挫败体验：无论答错或跳过都尽量给分（错误标记为 _pamperedWrong，跳过标记为 _skipped），鼓励探索与陪伴感。
+ * - 数据驱动：题库由外部文件 `data/scene2_questions.json` 提供并完全替换内置数据；外部文件缺失或为空时会抛错（项目要求必须提供题库）。
+ * - 稳定性：通过场景管理器与 DOM 清理避免重复渲染；按钮使用 _locked 属性防止连击。
+ * - 可扩展：题型、计分、成就等在集中位置可扩展。
  *
- * 关键字段：
- *   question: {
- *     type: 'fill' | 'select', difficulty: 'easy' | 'medium' | 'hard',
- *     prompt, answer / answerIndex, options?, placeholder?, hint,
- *     solved (是否完成), hintCount (提示次数), _skipped, _pamperedWrong
- *   }
+ * 主要规则
+ * - 得分：每题基础分 2 × 难度权重（easy=1, medium=2, hard=3）。正确 / 跳过 / 宠溺错误均按此给分。
+ * - 提示：每题最多 3 次提示（hintCount）。前两次展示提示文本，第 3 次自动判定为通过并展示答案。
+ * - 彩蛋判定（互斥优先级）：全跳过 > 全自动提示（第三次）> 全错误宠溺；另有半数跳过的计算但不优先触发。
+ * - 计时：按科目独立计时，进入科目启动 5 分钟倒计时；完成后停止；科目间若 30 秒未开始下一科会触发过渡提示。
  *
- * 可扩展建议：
- *  - seriousMode: 切换关闭跳过加分 / 错误满分。
- *  - achievements: 根据 _skipped/_pamperedWrong/hintsUsed 派生成就称号。
- *  - 题目类型扩展：拖拽 / 配对，可在 renderSubject 内按 type 分支拆分组件化。
+ * 数据契约（question 对象）
+ * {
+ *   type: 'fill' | 'single_select' | 'multi_select',
+ *   difficulty: 'easy' | 'medium' | 'hard',
+ *   prompt, answer / answerIndex, options?, placeholder?, hints?: [],
+ *   solved?: bool, hintCount?: number, _skipped?: bool, _pamperedWrong?: bool
+ * }
+ *
+ * 可扩展方向示例：seriousMode（关闭宠溺规则）、成就系统、更多题型（拖拽/配对/听力）等。
  */
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
@@ -391,6 +389,8 @@ export class Scene2Exam extends BaseScene {
           btn.className = 'next-subject-btn';
           btn.textContent = `进入下一科：${nextSubject.title}`;
           btn.addEventListener('click',()=>{
+            // 用户选择立即进入下一科：清理任何等待计时器，避免在切换后仍触发懒散提示
+            stopBetweenTimer();
             // 切换到下一科并开始计时
             this._activeSubjectKey = nextSubject.key;
             this._displayedSubjectKey = nextSubject.key;
@@ -400,11 +400,15 @@ export class Scene2Exam extends BaseScene {
             renderSubject(nextSubject, true);
           });
           board.appendChild(btn);
-        }
-        // 停止当前科目计时，启动科目间等待计时（若还有下一科）
-        stopSubjectTimer();
-        if(nextSubject){
-          startBetweenTimer(nextSubject);
+          // 停止当前科目计时，启动科目间等待计时（若还有下一科）
+          stopSubjectTimer();
+          // 仅在按钮已展示后才启动 between 计时器；若用户点击按钮我们在处理器中会清理计时器
+          if(nextSubject){
+            startBetweenTimer(nextSubject);
+          }
+        } else {
+          // 无下一科：依旧停止科目计时
+          stopSubjectTimer();
         }
         return;
       }

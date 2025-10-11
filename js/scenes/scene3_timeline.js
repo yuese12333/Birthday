@@ -2,14 +2,27 @@ import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
 
 /**
- * 场景3：数织 / Picross / Nonogram
- * 说明：本场景使用手工/预生成的 puzzle JSON（由离线编辑器产生），渲染并交互玩家解题流程。
- * 实现策略：
- *  1. 从预先生成的 puzzle JSON 中读取 `matrix`（由离线编辑器产生）。
- *  2. 行与列分别做 run-length 编码，得到线索数组 (如 [3,1]) 表示连续块长度；空行为 [0]。
- *  3. DOM: 左上角线索区 + 交互网格 + 控制栏(重置/显示原图/下一幕按钮) + 完成状态层。
- *  4. 交互：左键(或触摸单击) 在 留白(0)->涂色(1)->留白 循环；右键 / 长按 标记(排除，特殊颜色)；仅涂色参与判定。
- *  5. 每次操作快速检查：所有应涂色的格均处于涂色 && 未多涂 => 完成 -> 动画淡入原图与“进入下一幕”。
+ * Scene3 — Nonogram / Picross
+ *
+ * Purpose
+ *  - 从预生成的 puzzles JSON 加载若干关（本实现写死为 4 关），每关包含：
+ *      { meta: { index, title, image }, matrix: number[][] }
+ *  - matrix 为 0/1 二值矩阵，1 表示应涂色的格子；矩阵尺寸可变但每项必须为相同宽度。
+ *
+ * Data contract / constraints
+ *  - 文件路径：默认从 `data/scene3_puzzles.json` 加载，期望形如 { puzzles: [ ... ] }。
+ *  - 每个 puzzle 必须包含 matrix 和 image（或 meta.image）。
+ *  - 本场景强制使用 EXACT_LEVELS = 4（REQUIRED_LEVELS），多余项会被截断，不足则报错。
+ *
+ * Key behavior
+ *  - 渲染：根据 matrix 生成行/列线索（run-length），渲染线索区与交互网格。
+ *  - 交互：左键/触摸 = 涂色或擦除（拖拽支持）；右键/长按 = 标记。
+ *  - 判定：当每个格子的涂色状态严格匹配 matrix（无缺漏且无多涂）时判定为完成。
+ *
+ * Completion animation / collage
+ *  - 完成时将淡入该关的原始图片（reveal image），随后图片会"分裂"并飞入四个角的槽位。
+ *  - 当四个槽位均被填入图片后，overlay 将淡出并显示最终拼贴图像（由常量 FINAL_COLLAGE_SRC 指定）。
+ *  - 关键常量：REVEAL_FADE_MS, SPLIT_ANIM_MS, COLLAGE_FADE_MS, FINAL_COLLAGE_FADE_MS, FINAL_COLLAGE_SRC
  */
 export class Scene3Timeline extends BaseScene {
   async init(){ await super.init(); }
@@ -19,6 +32,7 @@ export class Scene3Timeline extends BaseScene {
       gridSize: 9,
       showRuleHelp: true
     };
+
     // 将本幕“写死”为 4 关，每关一张对应图片，完成后飞向四角拼贴
     const REQUIRED_LEVELS = 4;
     // 显式动画时间设定（毫秒）
@@ -34,8 +48,6 @@ export class Scene3Timeline extends BaseScene {
     const scene = this;
     // 使用 BaseScene 公共方法统一禁用文字选择
     this.applyNoSelect(root);
-
-    // BGM: 绑定将在 DOM 插入后进行（避免引用未定义的按钮或未初始化的元素）
 
     // 分裂并定位图片的辅助工具（包含持久化的十字分割线 + 4 个固定槽位）
     // 写死逻辑：四关四图，按当前关卡索引固定映射到四角（不再使用累计计数）。
@@ -57,14 +69,16 @@ export class Scene3Timeline extends BaseScene {
         setTimeout(()=>{ revealImgNow.style.transition = prevTrans; }, 50);
       }catch(e){/* ignore */}
     }
+
+    // 确保存在分裂 overlay，若已存在则复用
     function ensureSplitOverlay(){
       let overlay = gridScroller.querySelector('.split-overlay');
       if(overlay) return overlay;
       overlay = document.createElement('div'); overlay.className='split-overlay';
       // 初始隐藏 overlay（不可见），待图片淡入完成后再显示
       overlay.hidden = true;
-      // 初始透明度为 1（可通过 fadeOutCollage 使其过渡到 0）
-      try{ overlay.style.opacity = '1'; }catch(e){}
+      // 初始透明度设为 0，配合 hidden 属性彻底隐藏
+      try{ overlay.style.opacity = '0'; }catch(e){}
       // 确保分裂层不遮挡交互，且层级低于网格（由 JS 提升网格 z-index）
       try{
         overlay.style.pointerEvents = 'none';
@@ -84,6 +98,17 @@ export class Scene3Timeline extends BaseScene {
       overlay.appendChild(slots); overlay.appendChild(vline); overlay.appendChild(hline);
       gridScroller.appendChild(overlay);
       return overlay;
+    }
+
+    function hideSplitOverlay(){
+      const overlay = gridScroller.querySelector('.split-overlay');
+      if(!overlay) return;
+      try{
+        overlay.hidden = true;
+        overlay.style.opacity = '0';
+        overlay.style.transition = '';
+        delete overlay.dataset.fading;
+      }catch(e){/* defensive */}
     }
 
     // 显示最终拼贴大图
@@ -142,7 +167,7 @@ export class Scene3Timeline extends BaseScene {
         if(!allFilled) return;
         // 所有槽位已放入图片 -> 启动淡出（防止重复触发）
         if(ov.dataset.fading) return; ov.dataset.fading = '1';
-        try{ ov.style.transition = `opacity ${COLLAGE_FADE_MS}ms ease`; }catch(e){}
+  try{ ov.style.transition = `opacity ${COLLAGE_FADE_MS}ms ease`; }catch(e){}
         // 触发过渡到透明
         requestAnimationFrame(()=>{ ov.style.opacity = '0'; ov.hidden = false; });
         const onEnd = (ev)=>{
@@ -166,11 +191,18 @@ export class Scene3Timeline extends BaseScene {
       }catch(e){/* defensive */}
     }
 
+    // 启动图片分裂飞向角落动画
     function startSplitForSrc(src){
       if(!src) return;
       // 安全防御：仅允许前 4 关触发分裂（本幕已写死为四关）。
       if(currentIndex < 0 || currentIndex >= 4){ hideRevealImmediate(); return; }
       const overlay = ensureSplitOverlay();
+      try{
+        overlay.hidden = false;
+        requestAnimationFrame(()=>{
+          try{ overlay.style.opacity = '1'; overlay.style.transition = ''; }catch(e){}
+        });
+      }catch(e){/* defensive */}
       // 复制后立即让绑定图片消失，避免与飞行动画重叠
       hideRevealImmediate();
       // 创建一个临时 <img>，初始居中摆放；原图已被隐藏从视觉上消失
@@ -219,6 +251,7 @@ export class Scene3Timeline extends BaseScene {
       }
     }
 
+    // 将 imgEl 分裂并飞向指定槽位（slotIdx 0-3），完成后调用 cb
     function animateToSlot(imgEl, slotIdx, cb){
       const overlay = imgEl.parentElement;
       const slot = overlay.querySelector(`.split-slot[data-idx='${slotIdx}']`);
@@ -294,9 +327,9 @@ export class Scene3Timeline extends BaseScene {
     `;
     this.ctx.rootEl.appendChild(root);
 
-    const topCluesEl = root.querySelector('.top-clues-area .top-inner');
-    const leftCluesEl = root.querySelector('.left-clues-area .left-inner');
-    const gridContainer = root.querySelector('.grid-container');
+    const topCluesEl = root.querySelector('.top-clues-area .top-inner'); // 上提示数
+    const leftCluesEl = root.querySelector('.left-clues-area .left-inner'); // 左提示数
+    const gridContainer = root.querySelector('.grid-container'); // 交互网格
     const gridScroller = gridContainer.parentElement; // .grid-scroller 外层滚动容器
     // 确保网格容器层级高于分裂层，避免完成后的拼贴遮盖下一题
     try{
@@ -311,10 +344,11 @@ export class Scene3Timeline extends BaseScene {
         controls.style.zIndex = '3';
       }
     }catch(e){}
-    let btnReset = root.querySelector('.btn-reset');
-    let btnHint = root.querySelector('.btn-hint');
-    let btnRules = root.querySelector('.btn-rules');
-    let btnNext = root.querySelector('.btn-next');
+    let btnReset = root.querySelector('.btn-reset'); // 重置按钮
+    let btnHint = root.querySelector('.btn-hint'); // 提示按钮
+    let btnRules = root.querySelector('.btn-rules'); // 规则说明按钮
+    let btnNext = root.querySelector('.btn-next'); // 下一题(下一幕)按钮
+
     // 无障碍兼容：确保按钮元素具有正确的 role/tabindex
     function ensureBtnAccessible(btn){
       if(!btn) return;
@@ -325,12 +359,12 @@ export class Scene3Timeline extends BaseScene {
       }catch(e){ /* defensive */ }
     }
     ensureBtnAccessible(btnNext);
-    const statusMsg = root.querySelector('.status-msg');
-    const rulesOverlay = root.querySelector('.rules-overlay');
+    const statusMsg = root.querySelector('.status-msg'); // 状态消息
+    const rulesOverlay = root.querySelector('.rules-overlay'); // 规则说明遮罩
 
     // BGM 按钮绑定：在 DOM 插入后安全执行
     try{
-      const btnBgm = root.querySelector('.bgm-btn');
+      const btnBgm = root.querySelector('.bgm-btn'); // BGM 切换按钮
       if(btnBgm){
         ensureBtnAccessible(btnBgm);
         // 按照 Scene1 的模式延迟启动 BGM：播放并保存 audio 对象
@@ -348,6 +382,7 @@ export class Scene3Timeline extends BaseScene {
     // 优先尝试加载预生成 JSON；失败则回退到运行时图像生成
     let puzzles = [];
   let currentIndex = 0; // 基于 0 的当前谜题索引
+    // 初始化谜题数据
     function initPuzzle(){
       if(CONFIG.puzzleSrc){
         fetch(CONFIG.puzzleSrc, { cache:'no-store' })
@@ -356,8 +391,8 @@ export class Scene3Timeline extends BaseScene {
           if(Array.isArray(json.puzzles) && json.puzzles.length>0){
             // 排序确保按 meta.index 顺序
             let list = json.puzzles.slice().sort((a,b)=>{
-              const ia = a.meta && a.meta.index ? a.meta.index : 0;
-              const ib = b.meta && b.meta.index ? b.meta.index : 0;
+              const ia = a.meta && a.meta.index ? a.meta.index : 0; // 默认 0，放前面
+              const ib = b.meta && b.meta.index ? b.meta.index : 0; // 默认 0，放前面
               return ia - ib;
             });
             // 将关卡数量“写死”为 4 关，多余截断；不足则报错
@@ -393,16 +428,17 @@ export class Scene3Timeline extends BaseScene {
     }
     function loadCurrentPuzzle(){
       if(!puzzles.length) return;
-      const p = puzzles[currentIndex];
+      const p = puzzles[currentIndex]; // 当前谜题
       const matrix = p.matrix;
       if(!matrix) throw new Error('当前 puzzle 缺少 matrix');
+  hideSplitOverlay();
       // 清除上一题残留的完成状态类与标记
       gridContainer.classList.remove('completed-locked','grid-fade-out','grid-jump','grid-heartbeat');
       delete gridContainer.dataset.animDone;
       gridContainer.style.opacity='';
-      const h = matrix.length; const w = matrix[0].length;
-      const rowClues = buildClues(matrix);
-      const colClues = buildClues(transpose(matrix));
+      const h = matrix.length; const w = matrix[0].length; // 高度与宽度
+      const rowClues = buildClues(matrix); // 行线索
+      const colClues = buildClues(transpose(matrix)); // 列线索
       // 准备用于完成后淡入的原始揭示图片（不触发 overlay 分裂）
       let revealImg = gridScroller.querySelector('.nonogram-reveal-img');
       if(!revealImg){
@@ -441,9 +477,9 @@ export class Scene3Timeline extends BaseScene {
         btnNext.textContent = '进入下一幕';
       }
       // 更新进度文本
-      const progEl = root.querySelector('.puzzle-progress');
+      const progEl = root.querySelector('.puzzle-progress'); // 谜题进度文本
       if(progEl){ progEl.textContent = `(${currentIndex+1}/${puzzles.length})`; }
-      const btnNextEl = root.querySelector('.btn-next');
+      const btnNextEl = root.querySelector('.btn-next'); // 下一题按钮
       if(btnNextEl){ btnNextEl.classList.add('hidden'); }
       statusMsg.textContent = '';
       // 新题启用重置按钮（通过显示/隐藏控制）
@@ -551,6 +587,7 @@ export class Scene3Timeline extends BaseScene {
           runCompletionAnimation();
         }
       }
+
       // 统一启用进入下一幕按钮的方法，防止被克隆或属性残留导致禁用
       function enableNextButton(){
         const btn = root.querySelector('.btn-next');
@@ -560,6 +597,8 @@ export class Scene3Timeline extends BaseScene {
         btn.classList.remove('hidden');
         ensureBtnAccessible(btn);
       }
+
+      // 完成时的动画效果（淡出 + 心跳 + 揭示图片淡入 + 分裂飞散）
       function updateRowHighlight(y){
         const rowRuns = extractRuns(gridContainer, y, 'row');
         const el = leftCluesEl.children[y];
@@ -569,6 +608,8 @@ export class Scene3Timeline extends BaseScene {
         if(status==='ok') el.classList.add('clue-ok');
         else if(status==='over') el.classList.add('clue-over');
       }
+
+      // 列线索高亮更新
       function updateColHighlight(x){
         const colRuns = extractRuns(gridContainer, x, 'col');
         const el = topCluesEl.children[x];
@@ -618,7 +659,7 @@ export class Scene3Timeline extends BaseScene {
         // 点击下一题或进入下一幕时的通用处理：立即移除上一题的 reveal 图片（不做淡出过渡）
         hideRevealImmediate();
         // 点击时隐藏 overlay（若存在）
-        try{ const ov = gridScroller.querySelector('.split-overlay'); if(ov) ov.hidden = true; }catch(e){}
+  hideSplitOverlay();
         // 重置状态以便下一题使用
         topCluesEl.classList.remove('clues-hidden');
         leftCluesEl.classList.remove('clues-hidden');
@@ -647,12 +688,15 @@ export class Scene3Timeline extends BaseScene {
         return clues.length? clues : [0];
       });
     }
+
+    // 矩阵转置
     function transpose(m){
       const h = m.length, w = m[0].length;
       const out = Array.from({length:w},()=>Array(h).fill(0));
       for(let y=0;y<h;y++) for(let x=0;x<w;x++) out[x][y]=m[y][x];
       return out;
     }
+
     // ===== 新线索渲染 =====
     function renderRowClues(container, clues, cell){
       container.innerHTML='';
@@ -664,6 +708,8 @@ export class Scene3Timeline extends BaseScene {
         container.appendChild(div);
       });
     }
+
+    // 列线索渲染
     function renderColClues(container, clues, cell){
       container.innerHTML='';
       const maxLen = Math.max(...clues.map(c=>c.length));
@@ -683,6 +729,7 @@ export class Scene3Timeline extends BaseScene {
         container.appendChild(col);
       }
     }
+
     // ===== 新网格构建 & 交互 =====
     function buildGrid(container, matrix, onChange, cell){
       container.innerHTML='';
@@ -692,15 +739,16 @@ export class Scene3Timeline extends BaseScene {
       container.style.gridTemplateColumns = `repeat(${w}, ${cell}px)`;
       container.style.gridTemplateRows = `repeat(${h}, ${cell}px)`;
       container.classList.add('nonogram-grid');
-  // 二维 cells 数组，用于内部引用（不强制预填充）
-  const cells = Array.from({ length: h }, () => new Array(w));
-  let dragMode=null; // 当前拖拽模式：'fill'=填色 'erase'=清除 'mark'=标记 'unmark'=去标记
+      // 二维 cells 数组，用于内部引用（不强制预填充）
+      const cells = Array.from({ length: h }, () => new Array(w));
+      let dragMode=null; // 当前拖拽模式：'fill'=填色 'erase'=清除 'mark'=标记 'unmark'=去标记
       let mouseDown=false;
       container.addEventListener('contextmenu', e=> e.preventDefault());
+
       // 根据当前 dragMode 应用对应操作
       function applyAction(cDiv){
         if(!cDiv) return;
-        const st=cDiv.dataset.state||'';
+        const st=cDiv.dataset.state||''; // 当前格状态
         if(dragMode===null){
           // 第一次按下时决定具体模式（根据起始格状态推断）
           if(st==='filled') dragMode='erase';
@@ -712,16 +760,19 @@ export class Scene3Timeline extends BaseScene {
         else if(dragMode==='mark') setMarked(cDiv,true);
         else if(dragMode==='unmark') setMarked(cDiv,false);
       }
+
       // 设置格子为填色或清除
       function setFilled(cellDiv,val){
         if(val){ cellDiv.dataset.state='filled'; cellDiv.className='cell filled'; }
         else { cellDiv.dataset.state=''; cellDiv.className='cell'; }
       }
+
       // 设置格子为标记或取消标记
       function setMarked(cellDiv,val){
         if(val){ cellDiv.dataset.state='marked'; cellDiv.className='cell marked'; }
         else { cellDiv.dataset.state=''; cellDiv.className='cell'; }
       }
+      
       // 处理鼠标或触摸拖拽
       function handlePointer(e){
         if(!mouseDown) return;
@@ -761,12 +812,14 @@ export class Scene3Timeline extends BaseScene {
         }
       };
     }
+
     // 评估当前行/列的 runs 相对 clue 的状态
     function autoCellSize(w,h, maxW, maxH, maxCell, minCell){
       // 策略：在给定显示最大宽高范围内求单元格合适边长（夹在最小/最大像素之间）
       let cell = Math.floor(Math.min(maxCell, Math.max(minCell, Math.min(maxW / w, maxH / h))));
       return { cell };
     }
+
     // 检查当前填色是否完成（完全匹配 matrix）
     function checkComplete(solution, container){
       for(const cell of container.querySelectorAll('.cell')){
@@ -778,7 +831,8 @@ export class Scene3Timeline extends BaseScene {
       }
       return true;
     }
-    // 简化完成动画：锁定 -> 网格淡出(0.6s) -> 图片淡入(0.9s)
+
+    // 简化完成动画：锁定 -> 网格淡出 -> 图片淡入
     function runCompletionAnimation(){
       if(gridContainer.dataset.animDone) return;
       gridContainer.dataset.animDone='1';
@@ -812,7 +866,15 @@ export class Scene3Timeline extends BaseScene {
                 if(fired) return; fired = true;
                 try{ revealImg.dataset.splitStarted = '1'; }catch(e){}
                 // 图片淡入完成：显示 overlay（hidden=false），随后执行分裂动画
-                try{ const ov = ensureSplitOverlay(); if(ov) ov.hidden = false; }catch(e){}
+                try{
+                  const ov = ensureSplitOverlay();
+                  if(ov){
+                    ov.hidden = false;
+                    requestAnimationFrame(()=>{
+                      try{ ov.style.opacity = '1'; ov.style.transition = ''; }catch(e){}
+                    });
+                  }
+                }catch(e){}
                 startSplitForSrc(revealImg.getAttribute('src'));
               };
               const onTrans = (ev)=>{
@@ -834,7 +896,8 @@ export class Scene3Timeline extends BaseScene {
         if(btn){ btn.classList.remove('hidden'); }
       }, GRID_FADE_DURATION);
     }
-    // 旧的 updateClueHighlights 被拆分为局部的 updateRowHighlight / updateColHighlight
+
+    // 提取当前行/列的填色 runs 数组
     function extractRuns(grid, index, mode){
       const cells = [];
       if(mode==='row'){
@@ -852,6 +915,7 @@ export class Scene3Timeline extends BaseScene {
       if(run>0) runs.push(run);
       return runs.length? runs : [0];
     }
+    // 数组内容完全相等（长度与每项均相等）
     function arraysEqual(a,b){ if(a.length!==b.length) return false; for(let i=0;i<a.length;i++) if(a[i]!==b[i]) return false; return true; }
     // 评估当前填色 runs 相对 clue 的状态: ok | over | partial
     function evaluateRuns(runs, clues){
