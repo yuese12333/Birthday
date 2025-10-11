@@ -616,10 +616,12 @@ export class Scene3Timeline extends BaseScene {
   // 显示时机由 runCompletionAnimation 在图片淡入后统一控制。
   try{ btn.dataset.ready = '1'; }catch(e){}
   ensureBtnAccessible(btn);
-        // 若存在全局通关印记，创建并显示“回到通关页面”按钮（避免重复创建）
+        // 若存在全局通关印记且当前按钮为“进入下一幕”（即最后一题），在按钮旁创建并显示“回到通关页面”
         try{
           const completed = (typeof localStorage !== 'undefined' && localStorage.getItem && localStorage.getItem('birthday_completed_mark') === 'true');
-          if(completed){
+          // 仅当 btn 的文本为 '进入下一幕' 时才显示快速回到通关页面的按钮
+          const isEnterNextScene = (btn && btn.textContent && btn.textContent.trim() === '进入下一幕');
+          if(completed && isEnterNextScene){
             if(!root.querySelector('.btn-go-final')){
               const btnFinal = document.createElement('button');
               btnFinal.className = 'btn-go-final';
@@ -632,6 +634,7 @@ export class Scene3Timeline extends BaseScene {
               ensureBtnAccessible(btnFinal);
             }
           } else {
+            // 非最后一题或未通关印记时移除可能存在的快速跳转按钮
             const old = root.querySelector('.btn-go-final'); if(old) old.remove();
           }
         }catch(e){ console.warn('[Nonogram] 检查通关印记时出错', e); }

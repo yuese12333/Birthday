@@ -8,6 +8,7 @@
 import { audioManager } from './audioManager.js';
 
 const STORAGE_KEY = 'birthday_unlocked_achievements_v1';
+const RECENT_TOASTS_KEY = 'birthday_recent_toasts_v1';
 
 class Achievements {
   constructor(){
@@ -20,10 +21,16 @@ class Achievements {
     // toast 队列，保证不会重叠显示
     this._toastQueue = [];
     this._toastBusy = false;
+    // 正在检查的成就 id 集合，防止并发检查导致重复解锁
+    this._checking = new Set();
+    // 最近显示过的吐司 id 集合，用于短期去重
+    this._recentToasts = new Set();
+  // 尝试加载之前的短期吐司记录（持久化），以便跨页面刷新仍能短期去重
+  this._loadRecentToasts();
     // 注册时间（由场景注册成功时触发 player:registered 事件写入）
     this._registeredAt = null;
-    // 极速通关时间窗口（ms），默认 10 分钟
-    this.quickFinishWindow = 10 * 60 * 1000;
+    // 极速通关时间窗口（ms）
+    this.quickFinishWindow = 10 * 60 * 1000; // 十分钟
     // 成就描述初始可见性默认值（可通过 setDefaultDescriptionVisible 修改）
     this._defaultDescriptionVisible = true;
   }
@@ -43,54 +50,93 @@ class Achievements {
   }
 
   _showToast(meta){
-    // 入队并尝试显示
-    this._toastQueue.push(meta);
+    // 入队并尝试显示（批量渲染策略）
+    // 支持传入 { id, meta } 或仅 meta（兼容旧调用）
+    const item = (meta && meta.id) ? meta : { id: meta && meta._id ? meta._id : null, meta };
+    // 去重：若最近已显示过相同 id 的吐司则跳过（不要基于 this.unlocked 判断，否则会阻止刚解锁时的吐司）
+    try{
+      if(item.id && this._recentToasts.has(String(item.id))) return;
+    }catch(e){}
+    this._toastQueue.push(item);
     this._drainToastQueue();
   }
 
   _drainToastQueue(){
     if(this._toastBusy) return;
-    const next = this._toastQueue.shift();
-    if(!next) return;
+    // 批量取出当前队列中的所有待显示项
+    if(this._toastQueue.length === 0) return;
     this._toastBusy = true;
     try{
       const c = document.getElementById('ach-toast-container');
       if(!c){ this._toastBusy = false; return; }
-      const el = document.createElement('div');
-      el.className = 'ach-toast';
-      el.style.fontSize = '13px';
-      el.style.opacity = '0';
-      el.style.transition = 'opacity .25s ease, transform .25s ease';
-      el.style.transform = 'translateY(6px)';
-      const title = next.title || '成就解锁';
-      const desc = next.desc || '';
-      // 使用图片图标替代文本星号，保持可访问性
-      const iconHtml = `<div class="ach-icon"><img src='./assets/images/unlock.png' alt='成就已解锁' style='width:100%;height:100%;object-fit:cover' /></div>`;
-      el.innerHTML = `
-        ${iconHtml}
-        <div class="ach-body">
-          <strong>${title}</strong>
-          <div>${desc}</div>
-        </div>
-      `;
-      c.appendChild(el);
-      requestAnimationFrame(()=>{
-        el.style.opacity = '1';
-        el.style.transform = 'translateY(0)';
-      });
-      const duration = Math.max(2800, next.duration || 3000);
-      setTimeout(()=>{
+  // 取出所有当前排队项
+  let batch = this._toastQueue.splice(0, this._toastQueue.length);
+      const els = [];
+      let maxDuration = 0;
+      for(const next of batch){
+        const meta = next && next.meta ? next.meta : next;
+        const id = next && next.id ? next.id : (meta && meta._id ? meta._id : null);
+  // 记录最近已显示的吐司 id（短期去重），统一为字符串
+    try{ if(id){ this._recentToasts.add(String(id)); this._saveRecentToasts(); } }catch(e){}
+        const el = document.createElement('div');
+        el.className = 'ach-toast';
+        el.style.fontSize = '13px';
         el.style.opacity = '0';
-        el.style.transform = 'translateY(6px)';
-        setTimeout(()=>{ try{ el.remove(); }catch(e){} this._toastBusy = false; this._drainToastQueue(); }, 300);
-      }, duration);
+        el.style.transition = 'opacity .28s ease, transform .28s ease';
+        el.style.transform = 'translateY(24px)';
+        const title = meta && meta.title ? meta.title : '成就解锁';
+        const desc = meta && meta.desc ? meta.desc : '';
+        const iconHtml = `<div class="ach-icon"><img src='./assets/images/unlock.png' alt='成就已解锁' style='width:100%;height:100%;object-fit:cover' /></div>`;
+        el.innerHTML = `
+          ${iconHtml}
+          <div class="ach-body">
+            <strong>${title}</strong>
+            <div>${desc}</div>
+          </div>
+        `;
+        c.appendChild(el);
+        els.push(el);
+        const duration = Math.max(2800, next.duration || 3000);
+        if(duration > maxDuration) maxDuration = duration;
+      }
+      // 同时显示所有批次元素
+      requestAnimationFrame(()=>{
+        for(const el of els){ el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }
+      });
+      // 在最长的持续时间后同时隐藏所有元素
+      setTimeout(()=>{
+        for(const el of els){ el.style.opacity = '0'; el.style.transform = 'translateY(24px)'; }
+        setTimeout(()=>{
+          try{ for(const el of els) el.remove(); }catch(e){}
+          // 不执行短期清理：recentToasts 为永久记录（持久化），首次显示后将不再重复显示该成就的吐司
+          this._toastBusy = false; this._drainToastQueue();
+        }, 300);
+      }, maxDuration);
     }catch(e){ console.warn('ach toast err', e); this._toastBusy = false; this._drainToastQueue(); }
   }
 
   _save(){
     try{
-      localStorage.setItem(STORAGE_KEY, JSON.stringify([...this.unlocked]));
+      // 确保以字符串数组形式持久化，避免数字/字符串 id 类型不一致
+      localStorage.setItem(STORAGE_KEY, JSON.stringify([...this.unlocked].map(id=>String(id))));
     }catch(e){ console.warn('ach save err', e); }
+  }
+
+  // 持久化 recent toasts（短期去重记录），以便在页面刷新中短期保持去重
+  _saveRecentToasts(){
+    try{
+      const arr = [...this._recentToasts].map(id=>String(id));
+      localStorage.setItem(RECENT_TOASTS_KEY, JSON.stringify(arr));
+    }catch(e){ /* 非阻塞 */ }
+  }
+
+  _loadRecentToasts(){
+    try{
+      const raw = localStorage.getItem(RECENT_TOASTS_KEY);
+      if(!raw) return;
+      const arr = JSON.parse(raw);
+      if(Array.isArray(arr)) arr.forEach(id=> this._recentToasts.add(String(id)));
+    }catch(e){ /* 非阻塞 */ }
   }
 
   _load(){
@@ -98,7 +144,7 @@ class Achievements {
       const raw = localStorage.getItem(STORAGE_KEY);
       if(!raw) return;
       const arr = JSON.parse(raw);
-      if(Array.isArray(arr)) arr.forEach(id=> this.unlocked.add(id));
+      if(Array.isArray(arr)) arr.forEach(id=> this.unlocked.add(String(id)));
     }catch(e){ console.warn('ach load err', e); }
   }
 
@@ -117,8 +163,10 @@ class Achievements {
   }
 
   async _checkOne(id){
-    // 若已解锁则跳过
+    // 若已解锁或正在检查则跳过（防止并发导致重复解锁）
     if(this.unlocked.has(id)) return false;
+    if(this._checking.has(id)) return false;
+    this._checking.add(id);
     const item = this.achievements.get(id);
     if(!item || typeof item.predicate !== 'function') return false;
     try{
@@ -126,18 +174,23 @@ class Achievements {
       const res = item.predicate(this.events.slice(), (ev)=> this._recordForPredicate(ev));
       const ok = (res instanceof Promise) ? await res : res;
       if(ok){
-        this.unlocked.add(id);
-        this._save();
+        // 再次校验避免 race：若在等待期间其他线程已解锁则不重复处理
+        if(!this.unlocked.has(id)){
+          this.unlocked.add(id);
+          this._save();
+        }
         // 使用 audioManager 播放成就音效（遵循全局静音设置）
         try{ if(audioManager && typeof audioManager.playSound === 'function') audioManager.playSound('./assets/audio/Achievement.wav', { volume: 0.35 }); }catch(e){}
         // 标记解锁后可见描述
         try{ item.meta.descriptionVisible = true; }catch(e){}
-        this._showToast(item.meta);
+        // 将 id 附带以便吐司层做去重
+        try{ this._showToast({ id, meta: item.meta }); }catch(e){ this._showToast(item.meta); }
         // 全局派发已解锁事件，方便页面或其它模块监听（DEV-friendly）
         try{ window.dispatchEvent(new CustomEvent('achievement:unlocked', { detail: { id: String(id), meta: item.meta } })); }catch(e){}
         return true;
       }
     }catch(e){ console.warn('achievement check err', e); }
+    finally{ try{ this._checking.delete(id); }catch(e){} }
     return false;
   }
 
@@ -178,7 +231,7 @@ class Achievements {
     const meta = this.achievements.get(id).meta;
     try{ if(audioManager && typeof audioManager.playSound === 'function') audioManager.playSound('./assets/audio/Achievement.wav', { volume: 1.0 }); }catch(e){}
     try{ meta.descriptionVisible = true; }catch(e){}
-    this._showToast(meta);
+    try{ this._showToast({ id, meta }); }catch(e){ this._showToast(meta); }
     return true;
   }
 
@@ -187,7 +240,9 @@ class Achievements {
     try{
       this.unlocked.clear();
       this.events = [];
+      try{ this._recentToasts.clear(); this._saveRecentToasts(); }catch(e){}
       try{ localStorage.removeItem(STORAGE_KEY); }catch(e){}
+  try{ localStorage.removeItem(RECENT_TOASTS_KEY); }catch(e){}
       // 移除页面上残留的 toast 容器内容
       const c = document.getElementById('ach-toast-container');
       if(c){ c.innerHTML = ''; }
@@ -329,9 +384,9 @@ achievements.register('2-3', {
   }catch(e){ return false; }
 });
 
-// 成就 3-0：数织高手——完成第 3 幕的最后一张数织图且未使用提示
+// 成就 3-0：心灵手巧——完成第 3 幕的最后一张数织图且未使用提示
 achievements.register('3-0', {
-  title: '数织高手',
+  title: '心灵手巧',
   desc: '在数织的最后一关中未使用提示完成拼图',
   descriptionVisible: true
 }, (events)=>{

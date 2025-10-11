@@ -149,6 +149,18 @@ export class Scene0Register extends BaseScene {
     let wrongTimes = 0;
     form.addEventListener('submit',(e)=>{
       e.preventDefault();
+      // 用户名非空校验：若未填写则提示并阻止进入
+      const username = (form.querySelector('input[name="user"]')?.value || '').trim();
+      if(!username){
+        const { lines } = ensureErrorStructure();
+        // 显示专用提示
+        lines.innerHTML = '';
+        const span = document.createElement('span');
+        span.textContent = '请填写用户名';
+        span.style.cssText = 'animation:pwdShake .38s; color:#b3002c;';
+        lines.appendChild(span);
+        return; // 阻止继续处理
+      }
       const data = new FormData(form);
       const pass = (data.get('pass')||'').trim();
       // 特殊彩蛋：如果输入为她/我的生日，显示彩蛋占位，而不是视作忘了或错误
