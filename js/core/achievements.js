@@ -329,6 +329,20 @@ achievements.register('2-3', {
   }catch(e){ return false; }
 });
 
+// 成就 3-0：数织高手——完成第 3 幕的最后一张数织图且未使用提示
+achievements.register('3-0', {
+  title: '数织高手',
+  desc: '在数织的最后一关中未使用提示完成拼图',
+  descriptionVisible: true
+}, (events)=>{
+  try{
+    const e = events.find(ev => ev && ev.name === 'scene3:final_complete');
+    if(!e || !e.payload) return false;
+    const { hintUse=0 } = e.payload;
+    return hintUse === 0;
+  }catch(e){ return false; }
+});
+
 // 成就 8-0：进入第八幕（终章）——完成游戏
 achievements.register('8-0', {
   title: '完成旅程',
@@ -354,4 +368,3 @@ achievements.register('8-1', {
     return (e.ts - start) <= achievements.quickFinishWindow;
   }catch(e){ return false; }
 });
-

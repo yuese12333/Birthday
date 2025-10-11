@@ -355,9 +355,6 @@ export class Scene1Intro extends BaseScene {
     window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); advanceHandler(e); } });
     el.addEventListener('click', advanceHandler);
 
-    // 标题点击彩蛋：第 6 次出现提示；第 10 次给隐藏文案，仅一次
-    title.addEventListener('click',()=>{ this.titleClicks++; if(this.titleClicks===6){ titleEgg.textContent='（再点几下也许会有点什么~）'; titleEgg.classList.remove('hidden'); } if(this.titleClicks===10 && !this._titleBonusGiven){ this._titleBonusGiven=true; titleEgg.textContent='（给你一个看不见的勇气 buff！）'; }});
-
   // 起始阶段选择策略：优先 dialogue_0_1；否则使用脚本第一条；再否则提示无阶段
   // 这样旧脚本/实验脚本可以不用写 fail 体系的 0 号入口也能调试。
   const startId = findStage('dialogue_0_1')? 'dialogue_0_1' : (script.stages[0]?.id || null);

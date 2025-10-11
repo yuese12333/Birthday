@@ -1,5 +1,6 @@
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
+import { achievements } from '../core/achievements.js';
 
 /**
  * Scene3 — Nonogram / Picross
@@ -192,7 +193,9 @@ export class Scene3Timeline extends BaseScene {
     }
 
     // 启动图片分裂飞向角落动画
-    function startSplitForSrc(src){
+    // now accepts an optional callback doneCb which will be called after the
+    // temporary image finishes animating into its slot (i.e. the "move to corner" finished).
+    function startSplitForSrc(src, doneCb){
       if(!src) return;
       // 安全防御：仅允许前 4 关触发分裂（本幕已写死为四关）。
       if(currentIndex < 0 || currentIndex >= 4){ hideRevealImmediate(); return; }
@@ -236,6 +239,16 @@ export class Scene3Timeline extends BaseScene {
             if(tmp && tmp.parentElement) tmp.parentElement.removeChild(tmp);
             // 每次放入槽位后检查是否已完成四图拼接，若是则触发淡出
             try{ fadeOutCollageIfComplete(); }catch(e){}
+            // Notify caller that the "move to corner" animation for this reveal has completed
+            try{ if(typeof doneCb === 'function') doneCb(); }catch(e){}
+            // 如果当前是最后一题（第四题），在分裂动画完成后记录成就事件供判定
+            try{
+              const isFinal = (typeof puzzles !== 'undefined' && Array.isArray(puzzles) && (currentIndex === (puzzles.length - 1)));
+              if(isFinal){
+                const payload = { hintUse: (hintUses[currentIndex]||0), index: currentIndex };
+                try{ achievements.recordEvent('scene3:final_complete', payload); }catch(e){}
+              }
+            }catch(e){}
           });
         });
       };
@@ -382,6 +395,8 @@ export class Scene3Timeline extends BaseScene {
     // 优先尝试加载预生成 JSON；失败则回退到运行时图像生成
     let puzzles = [];
   let currentIndex = 0; // 基于 0 的当前谜题索引
+  // 每关的提示使用次数统计（用于触发成就 3-0）
+  let hintUses = [];
     // 初始化谜题数据
     function initPuzzle(){
       if(CONFIG.puzzleSrc){
@@ -409,6 +424,8 @@ export class Scene3Timeline extends BaseScene {
               matrix: p.matrix,
               image: (p.meta&&p.meta.image)||p.image
             }));
+            // 初始化每关的 hint 计数
+            try{ hintUses = new Array(puzzles.length).fill(0); }catch(e){ hintUses = []; }
           } else if(json.matrix){
             // 单谜题不符合“写死 4 关”需求
             throw new Error('[Nonogram] 本幕已固定为 4 关，但当前 JSON 仅包含单个 matrix。');
@@ -480,7 +497,7 @@ export class Scene3Timeline extends BaseScene {
       const progEl = root.querySelector('.puzzle-progress'); // 谜题进度文本
       if(progEl){ progEl.textContent = `(${currentIndex+1}/${puzzles.length})`; }
       const btnNextEl = root.querySelector('.btn-next'); // 下一题按钮
-      if(btnNextEl){ btnNextEl.classList.add('hidden'); }
+      if(btnNextEl){ btnNextEl.classList.add('hidden'); try{ delete btnNextEl.dataset.ready; }catch(e){} }
       // 移除可能残留的“回到通关页面”按钮（避免重复或旧按钮在新题加载时残留）
       try{ const oldFinal = root.querySelector('.btn-go-final'); if(oldFinal) oldFinal.remove(); }catch(e){}
       statusMsg.textContent = '';
@@ -595,9 +612,10 @@ export class Scene3Timeline extends BaseScene {
         const btn = root.querySelector('.btn-next');
         console.debug('[Nonogram] enableNextButton called, btn found:', !!btn, btn);
         if(!btn) return;
-        // 通过移除 hidden 让按钮可点击（不用 disabled）
-        btn.classList.remove('hidden');
-        ensureBtnAccessible(btn);
+  // 标记按钮已准备好（ready），但不要在此处直接将其显示。
+  // 显示时机由 runCompletionAnimation 在图片淡入后统一控制。
+  try{ btn.dataset.ready = '1'; }catch(e){}
+  ensureBtnAccessible(btn);
         // 若存在全局通关印记，创建并显示“回到通关页面”按钮（避免重复创建）
         try{
           const completed = (typeof localStorage !== 'undefined' && localStorage.getItem && localStorage.getItem('birthday_completed_mark') === 'true');
@@ -667,7 +685,10 @@ export class Scene3Timeline extends BaseScene {
       });
       if(btnHint){
         // 直接响应点击，按钮的可见性由 hidden 类控制
-        btnHint.addEventListener('click', () => { revealOneCorrect(); });
+        btnHint.addEventListener('click', () => { 
+          try{ hintUses[currentIndex] = (hintUses[currentIndex]||0) + 1; }catch(e){}
+          revealOneCorrect(); 
+        });
       }
       // 原图查看按钮与遮罩已移除
       if(btnRules){
@@ -896,7 +917,8 @@ export class Scene3Timeline extends BaseScene {
                     });
                   }
                 }catch(e){}
-                startSplitForSrc(revealImg.getAttribute('src'));
+                // 启动分裂并在移动到角落动画结束时通过 doneCb 显示下一题按钮
+                startSplitForSrc(revealImg.getAttribute('src'), showNextButtonDelayed);
               };
               const onTrans = (ev)=>{
                 if(!ev || ev.propertyName === 'opacity'){
@@ -912,9 +934,19 @@ export class Scene3Timeline extends BaseScene {
           }catch(e){/* defensive */}
         }
         // 淡出/淡入流程结束后再次显示“下一题”按钮
+        // 要求：若有揭示图片，则在图片 opacity 过渡结束后再延迟 200ms 显示；否则保留原超时行为
         const btn = root.querySelector('.btn-next');
-        console.debug('[Nonogram] runCompletionAnimation timeout: showing btnNext found=', !!btn, btn);
-        if(btn){ btn.classList.remove('hidden'); }
+        console.debug('[Nonogram] runCompletionAnimation timeout: scheduling btnNext show, found=', !!btn, btn);
+        if(!btn) return;
+        // Helper：在 200ms 后显示按钮（仅当其被标记为 ready）
+        const showNextButtonDelayed = () => { try{ setTimeout(()=>{ try{ const b=root.querySelector('.btn-next'); if(b && b.dataset && b.dataset.ready === '1') b.classList.remove('hidden'); }catch(e){} }, 200); }catch(e){} };
+        try{
+          // 显示时机：若存在揭示图片，则 showNextButtonDelayed 已在 startSplitForSrc 的 doneCb 中被调用。
+          // 否则立即在未有图片的路径下显示（前提：按钮已标记为 ready）。
+          if(!(revealImg && revealImg.getAttribute && revealImg.getAttribute('src'))){
+            try{ if(btn.dataset && btn.dataset.ready === '1') btn.classList.remove('hidden'); }catch(e){}
+          }
+        }catch(e){ console.warn('[Nonogram] scheduling btnNext show failed', e); try{ btn.classList.remove('hidden'); }catch(e){} }
       }, GRID_FADE_DURATION);
     }
 
