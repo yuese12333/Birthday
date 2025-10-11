@@ -3,3 +3,7 @@
 
 # 整个编辑器工具目录
 editor/
+
+# 配置文件
+.prettierrc.js
+.eslintrc.js

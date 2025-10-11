@@ -8,10 +8,12 @@ import { audioManager } from '../core/audioManager.js';
  * 终章祝福面板简单呈现“生日快乐”与一段温暖文案，可后续替换为更私密内容。
  */
 export class Scene7Future extends BaseScene {
-  async init(){ await super.init(); }
-  async enter(){
+  async init() {
+    await super.init();
+  }
+  async enter() {
     const el = document.createElement('div');
-    el.className='scene scene-future placeholder';
+    el.className = 'scene scene-future placeholder';
     el.innerHTML = `
       <h1>场景7：未来愿望（占位）</h1>
       <p class='placeholder-tip'>未来这里会是“写下愿望·点亮星空”的互动。
@@ -22,12 +24,16 @@ export class Scene7Future extends BaseScene {
     // 统一使用基类提供的文字不可选封装
     this.applyNoSelect(el);
 
-    try { audioManager.playSceneBGM('7',{ loop:true, volume:0.55, fadeIn:800 }); } catch(e){}
+    try {
+      audioManager.playSceneBGM('7', { loop: true, volume: 0.55, fadeIn: 800 });
+    } catch (e) {}
     const btn = el.querySelector('.go-final');
-    btn.addEventListener('click',()=>{
+    btn.addEventListener('click', () => {
       this.ctx.go('final');
     });
     this.ctx.rootEl.appendChild(el);
   }
-  async exit(){ audioManager.stopBGM('7',{ fadeOut:700 }); }
+  async exit() {
+    audioManager.stopBGM('7', { fadeOut: 700 });
+  }
 }

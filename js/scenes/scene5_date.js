@@ -45,21 +45,21 @@ import { audioManager } from '../core/audioManager.js';
  *  - 记录最优组合：保存 this.levelScores 与对应 cardId 集合到 localStorage。
  */
 export class Scene5Date extends BaseScene {
-  async init(){
+  async init() {
     await super.init();
     const resp = await fetch('./data/scene5_levels.json');
-    if(!resp.ok) throw new Error('关卡配置加载失败: ' + resp.status);
+    if (!resp.ok) throw new Error('关卡配置加载失败: ' + resp.status);
     const data = await resp.json();
-    if(!Array.isArray(data.levels)) throw new Error('关卡配置格式错误：levels 必须为数组');
+    if (!Array.isArray(data.levels)) throw new Error('关卡配置格式错误：levels 必须为数组');
     this.levels = data.levels;
     this.currentLevelIndex = 0;
     this.levelScores = [];
     this.selected = new Set();
   }
 
-  async enter(){
+  async enter() {
     const el = document.createElement('div');
-    el.className='scene scene-date';
+    el.className = 'scene scene-date';
     el.innerHTML = `
       <h1>场景5：第一次正式约会 · 卡牌组合</h1>
       <div style="display:flex; gap:.8rem; align-items:center; flex-wrap:wrap; margin:.3rem 0 .4rem;">
@@ -103,11 +103,15 @@ export class Scene5Date extends BaseScene {
 
     // 自动播放约会场景 BGM
     // 播放场景 BGM（key 统一用数字 '5'）
-    const bgmAudio = audioManager.playSceneBGM('5',{ loop:true, volume:0.6, fadeIn:900 });
-    bgmBtn.addEventListener('click',()=>{
-      if(bgmAudio && bgmAudio.paused){
-        const p = bgmAudio.play(); if(p) p.catch(()=>{});
-        audioManager.globalMuted = false; bgmAudio.muted=false; bgmBtn.classList.remove('muted'); return;
+    const bgmAudio = audioManager.playSceneBGM('5', { loop: true, volume: 0.6, fadeIn: 900 });
+    bgmBtn.addEventListener('click', () => {
+      if (bgmAudio && bgmAudio.paused) {
+        const p = bgmAudio.play();
+        if (p) p.catch(() => {});
+        audioManager.globalMuted = false;
+        bgmAudio.muted = false;
+        bgmBtn.classList.remove('muted');
+        return;
       }
       const muted = audioManager.toggleMute();
       bgmBtn.classList.toggle('muted', muted);
@@ -124,34 +128,50 @@ export class Scene5Date extends BaseScene {
     };
 
     const renderCards = () => {
-      grid.innerHTML='';
+      grid.innerHTML = '';
       const lv = currentLevel();
-      (lv.cards||[]).forEach(card=>{
+      (lv.cards || []).forEach((card) => {
         const div = document.createElement('div');
-        div.className='card';
+        div.className = 'card';
         div.dataset.id = card.id;
         // 先写入标题，标签区域下方再动态补齐（避免复杂模板 & 转义问题）
         const tagsWrap = document.createElement('div');
-        tagsWrap.className='tags';
-        card.tags.forEach(t=>{
+        tagsWrap.className = 'tags';
+        card.tags.forEach((t) => {
           const span = document.createElement('span');
-          let cls='tag';
-            if(t==='show'||t==='healing'||t==='fun'||t==='deep'||t==='tear'||t==='light') cls+=' type-show';
-            if(['food','sweet','romance','spicy','stim','warm','soft'].includes(t)) cls+=' type-food';
-            if(['drink','fresh','citrus','aroma'].includes(t)) cls+=' type-drink';
-          span.className=cls;
-          span.textContent=t;
+          let cls = 'tag';
+          if (
+            t === 'show' ||
+            t === 'healing' ||
+            t === 'fun' ||
+            t === 'deep' ||
+            t === 'tear' ||
+            t === 'light'
+          )
+            cls += ' type-show';
+          if (['food', 'sweet', 'romance', 'spicy', 'stim', 'warm', 'soft'].includes(t))
+            cls += ' type-food';
+          if (['drink', 'fresh', 'citrus', 'aroma'].includes(t)) cls += ' type-drink';
+          span.className = cls;
+          span.textContent = t;
           tagsWrap.appendChild(span);
         });
-        const baseEl = document.createElement('div'); baseEl.className='base'; baseEl.textContent = `基础 ${card.base}`;
-        const hintEl = document.createElement('div'); hintEl.className='hint'; hintEl.textContent = card.hint;
+        const baseEl = document.createElement('div');
+        baseEl.className = 'base';
+        baseEl.textContent = `基础 ${card.base}`;
+        const hintEl = document.createElement('div');
+        hintEl.className = 'hint';
+        hintEl.textContent = card.hint;
         div.innerHTML = `<div class='title'>${card.title}</div>`;
-        div.appendChild(tagsWrap); div.appendChild(baseEl); div.appendChild(hintEl);
-        div.addEventListener('click',()=>{
-          if(div.classList.contains('locked')) return;
-          if(this.levelResolved) return; // 当前关已结算
+        div.appendChild(tagsWrap);
+        div.appendChild(baseEl);
+        div.appendChild(hintEl);
+        div.addEventListener('click', () => {
+          if (div.classList.contains('locked')) return;
+          if (this.levelResolved) return; // 当前关已结算
           const lv = currentLevel();
-          if(this.selected.has(card.id)) this.selected.delete(card.id); else this.selected.add(card.id);
+          if (this.selected.has(card.id)) this.selected.delete(card.id);
+          else this.selected.add(card.id);
           div.classList.toggle('selected');
           refreshSelectionUI();
         });
@@ -160,48 +180,64 @@ export class Scene5Date extends BaseScene {
     };
 
     // 刷新“已选卡牌”侧边面板 + 计算按钮可用状态
-    const refreshSelectionUI = ()=>{
-      chosenList.innerHTML='';
+    const refreshSelectionUI = () => {
+      chosenList.innerHTML = '';
       const lv = currentLevel();
-      this.selected.forEach(id=>{
-        const card = (lv.cards||[]).find(c=>c.id===id);
+      this.selected.forEach((id) => {
+        const card = (lv.cards || []).find((c) => c.id === id);
         const pill = document.createElement('span');
-        pill.className='chosen-pill';
+        pill.className = 'chosen-pill';
         pill.textContent = card.title.split('·')[1]?.trim() || card.title;
         chosenList.appendChild(pill);
       });
       countEl.textContent = this.selected.size;
-      const [min,max] = currentLevel().pick;
+      const [min, max] = currentLevel().pick;
       calcBtn.disabled = this.selected.size < min || this.selected.size > max;
     };
 
-    const showSynergyPop = (text)=>{
+    const showSynergyPop = (text) => {
       synergyPop.textContent = text;
       synergyPop.classList.add('show');
-      setTimeout(()=> synergyPop.classList.remove('show'), 1300);
+      setTimeout(() => synergyPop.classList.remove('show'), 1300);
     };
 
     // 评分引擎：执行当前关卡协同规则
     // 评分核心：根据当前关卡配置与选中集合计算得分
-    const calcScore = ()=>{
+    const calcScore = () => {
       const lv = currentLevel();
-      const picked = Array.from(this.selected).map(id=> (lv.cards||[]).find(c=>c.id===id)).filter(Boolean);
-      const tagSet = new Set(picked.flatMap(c=> c.tags));
-      const base = picked.reduce((a,c)=> a + (c.base||0),0);
+      const picked = Array.from(this.selected)
+        .map((id) => (lv.cards || []).find((c) => c.id === id))
+        .filter(Boolean);
+      const tagSet = new Set(picked.flatMap((c) => c.tags));
+      const base = picked.reduce((a, c) => a + (c.base || 0), 0);
       // 目标标签 bonus：命中一个 +1
-      const targetBonus = (lv.targetTags||[]).reduce((acc,t)=> acc + (tagSet.has(t)?1:0),0);
-      let synergyBonus = 0; const ruleHits=[];
-      const rules = Array.isArray(lv.synergyRules)? lv.synergyRules : [];
-      rules.forEach(rule=>{
-        if(rule.type==='set'){ // 固定 id 集合全部被选中
-          const all = (rule.ids||[]).every(id=> this.selected.has(id));
-          if(all){ synergyBonus += rule.bonus||0; ruleHits.push(rule.label||'set'); showSynergyPop(`${rule.label||'组合'} +${rule.bonus}`); }
-        } else if(rule.type==='tagCombo'){ // 标签组合：all=true 需全部包含；否则任意一个即可（至少一个）
-          const tags = rule.tags||[];
-          const hasAll = tags.every(t=> tagSet.has(t));
-            const hasAny = tags.some(t=> tagSet.has(t));
-            const pass = rule.all ? hasAll : hasAny;
-            if(pass){ synergyBonus += rule.bonus||0; ruleHits.push(rule.label||'tagCombo'); showSynergyPop(`${rule.label||'标签协同'} +${rule.bonus}`); }
+      const targetBonus = (lv.targetTags || []).reduce(
+        (acc, t) => acc + (tagSet.has(t) ? 1 : 0),
+        0
+      );
+      let synergyBonus = 0;
+      const ruleHits = [];
+      const rules = Array.isArray(lv.synergyRules) ? lv.synergyRules : [];
+      rules.forEach((rule) => {
+        if (rule.type === 'set') {
+          // 固定 id 集合全部被选中
+          const all = (rule.ids || []).every((id) => this.selected.has(id));
+          if (all) {
+            synergyBonus += rule.bonus || 0;
+            ruleHits.push(rule.label || 'set');
+            showSynergyPop(`${rule.label || '组合'} +${rule.bonus}`);
+          }
+        } else if (rule.type === 'tagCombo') {
+          // 标签组合：all=true 需全部包含；否则任意一个即可（至少一个）
+          const tags = rule.tags || [];
+          const hasAll = tags.every((t) => tagSet.has(t));
+          const hasAny = tags.some((t) => tagSet.has(t));
+          const pass = rule.all ? hasAll : hasAny;
+          if (pass) {
+            synergyBonus += rule.bonus || 0;
+            ruleHits.push(rule.label || 'tagCombo');
+            showSynergyPop(`${rule.label || '标签协同'} +${rule.bonus}`);
+          }
         }
         // 预留：else if(rule.type==='ratio') {...}
       });
@@ -210,58 +246,74 @@ export class Scene5Date extends BaseScene {
     };
 
     // 关卡结算：锁定卡牌防止继续修改
-    const lockCards = ()=>{
+    const lockCards = () => {
       this.levelResolved = true;
-      grid.querySelectorAll('.card').forEach(c=> c.classList.add('locked'));
+      grid.querySelectorAll('.card').forEach((c) => c.classList.add('locked'));
     };
 
     // “提交本关”点击：计算得分 & 展示下一步按钮
-    calcBtn.addEventListener('click',()=>{
-      if(calcBtn.disabled) return;
+    calcBtn.addEventListener('click', () => {
+      if (calcBtn.disabled) return;
       const sc = calcScore();
       lockCards();
       this.levelScores.push(sc);
       scoreBox.innerHTML = `基础 ${sc.base} + 目标匹配 ${sc.targetBonus} + 协同 ${sc.synergyBonus} = <strong>${sc.total}</strong>`;
-      const isLast = this.currentLevelIndex === this.levels.length -1;
-      if(isLast){ finalBtn.classList.remove('hidden'); }
-      else { nextBtn.classList.remove('hidden'); }
-      const lvEnd = document.createElement('div'); lvEnd.className='level-end';
+      const isLast = this.currentLevelIndex === this.levels.length - 1;
+      if (isLast) {
+        finalBtn.classList.remove('hidden');
+      } else {
+        nextBtn.classList.remove('hidden');
+      }
+      const lvEnd = document.createElement('div');
+      lvEnd.className = 'level-end';
       lvEnd.textContent = '本关完成，随时可继续。';
       scoreBox.appendChild(lvEnd);
     });
 
     // 重选：仅在未结算时允许清空选择
-    resetBtn.addEventListener('click',()=>{
-      if(this.levelResolved) return; // 结算后不可重置
+    resetBtn.addEventListener('click', () => {
+      if (this.levelResolved) return; // 结算后不可重置
       this.selected.clear();
-      grid.querySelectorAll('.card').forEach(c=> c.classList.remove('selected'));
+      grid.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
       refreshSelectionUI();
     });
 
     // 进入下一关：重置临时状态
-    nextBtn.addEventListener('click',()=>{
+    nextBtn.addEventListener('click', () => {
       this.currentLevelIndex++;
-      this.selected.clear(); this.levelResolved = false;
-      nextBtn.classList.add('hidden'); scoreBox.textContent=''; summaryContainer.textContent='';
-      grid.innerHTML='';
-      renderCards(); updateLevelInfo(); refreshSelectionUI();
+      this.selected.clear();
+      this.levelResolved = false;
+      nextBtn.classList.add('hidden');
+      scoreBox.textContent = '';
+      summaryContainer.textContent = '';
+      grid.innerHTML = '';
+      renderCards();
+      updateLevelInfo();
+      refreshSelectionUI();
     });
 
     // 最终汇总：估算理论最大（粗略）并给出评价
-    finalBtn.addEventListener('click',()=>{
-      const total = this.levelScores.reduce((a,s)=> a + s.total,0);
+    finalBtn.addEventListener('click', () => {
+      const total = this.levelScores.reduce((a, s) => a + s.total, 0);
       // 动态粗略最大值估算：每关取其 cards 基础分 top N + targetTags 数量 + 所有规则 bonus
-      const maxPerLevel = this.levels.map(lv=>{
-        const pickMax = lv.pick? lv.pick[1] : (lv.cards||[]).length;
-        const sorted = [...(lv.cards||[])].sort((a,b)=> (b.base||0)-(a.base||0)).slice(0,pickMax);
-        const baseMax = sorted.reduce((a,c)=> a + (c.base||0),0);
-        const tagMax = (lv.targetTags||[]).length; // 理论命中全部
-        const ruleBonus = (lv.synergyRules||[]).reduce((a,r)=> a + (r.bonus||0),0); // 理论全部触发
+      const maxPerLevel = this.levels.map((lv) => {
+        const pickMax = lv.pick ? lv.pick[1] : (lv.cards || []).length;
+        const sorted = [...(lv.cards || [])]
+          .sort((a, b) => (b.base || 0) - (a.base || 0))
+          .slice(0, pickMax);
+        const baseMax = sorted.reduce((a, c) => a + (c.base || 0), 0);
+        const tagMax = (lv.targetTags || []).length; // 理论命中全部
+        const ruleBonus = (lv.synergyRules || []).reduce((a, r) => a + (r.bonus || 0), 0); // 理论全部触发
         return baseMax + tagMax + ruleBonus;
       });
-      const maxTheoretical = maxPerLevel.reduce((a,b)=>a+b,0) || 1;
+      const maxTheoretical = maxPerLevel.reduce((a, b) => a + b, 0) || 1;
       let ratio = total / maxTheoretical;
-      let evalText = ratio>=0.8? '我们简直是氛围导演！' : ratio>=0.6? '默契在线，随手就是对味组合~' : '组合独特，可爱即正义。';
+      let evalText =
+        ratio >= 0.8
+          ? '我们简直是氛围导演！'
+          : ratio >= 0.6
+          ? '默契在线，随手就是对味组合~'
+          : '组合独特，可爱即正义。';
       summaryContainer.innerHTML = `
         <div class='summary-card'>
           <h3>组合旅程总结</h3>
@@ -270,15 +322,17 @@ export class Scene5Date extends BaseScene {
           <p>${evalText}</p>
         </div>`;
       finalBtn.disabled = true;
-      setTimeout(()=> this.ctx.go('scarf'), 900);
+      setTimeout(() => this.ctx.go('scarf'), 900);
     });
 
     // 初始渲染
-  // 初始渲染入口
-  renderCards(); updateLevelInfo(); refreshSelectionUI();
+    // 初始渲染入口
+    renderCards();
+    updateLevelInfo();
+    refreshSelectionUI();
     this.ctx.rootEl.appendChild(el);
   }
-  async exit(){
-    audioManager.stopBGM('5',{ fadeOut:650 });
+  async exit() {
+    audioManager.stopBGM('5', { fadeOut: 650 });
   }
 }

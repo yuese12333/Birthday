@@ -7,7 +7,7 @@ import { audioManager } from '../core/audioManager.js';
  * 未来可能形态：多段真实表白台词 + 分支回答影响后续彩蛋 / 成就。
  */
 export class Scene4Confession extends BaseScene {
-  async enter(){
+  async enter() {
     const el = document.createElement('div');
     el.className = 'scene scene-confession scene-placeholder';
     el.innerHTML = `
@@ -23,30 +23,35 @@ export class Scene4Confession extends BaseScene {
     this.applyNoSelect(el);
 
     // 播放 BGM（占位，可换成未来表白专属 BGM）
-    const bgmAudio = audioManager.playSceneBGM('4',{ loop:true, volume:0.55, fadeIn:800 });
+    const bgmAudio = audioManager.playSceneBGM('4', { loop: true, volume: 0.55, fadeIn: 800 });
     const bgmBtn = el.querySelector('.confession-bgm');
-    bgmBtn.addEventListener('click',()=>{
-      if(!bgmAudio) return;
-      if(bgmAudio.paused){ bgmAudio.play().catch(()=>{}); bgmBtn.classList.remove('muted'); }
-      else { bgmAudio.pause(); bgmBtn.classList.add('muted'); }
+    bgmBtn.addEventListener('click', () => {
+      if (!bgmAudio) return;
+      if (bgmAudio.paused) {
+        bgmAudio.play().catch(() => {});
+        bgmBtn.classList.remove('muted');
+      } else {
+        bgmAudio.pause();
+        bgmBtn.classList.add('muted');
+      }
     });
-    el.querySelector('.go-next').addEventListener('click',()=>{
-      this.ctx.go('transition',{
-        next:'date',
-        style:'flash45',
-        images:[
+    el.querySelector('.go-next').addEventListener('click', () => {
+      this.ctx.go('transition', {
+        next: 'date',
+        style: 'flash45',
+        images: [
           './assets/images/mem_4_1.jpg',
           './assets/images/mem_4_2.jpg',
           './assets/images/mem_4_3.jpg',
-          './assets/images/mem_4_4.jpg'
+          './assets/images/mem_4_4.jpg',
         ],
-        duration:4000,
-        sound:'./assets/audio/scene_45.wav'
+        duration: 4000,
+        sound: './assets/audio/scene_45.wav',
       });
     });
     this.ctx.rootEl.appendChild(el);
   }
-  async exit(){
-    audioManager.stopBGM('4',{ fadeOut:600 });
+  async exit() {
+    audioManager.stopBGM('4', { fadeOut: 600 });
   }
 }

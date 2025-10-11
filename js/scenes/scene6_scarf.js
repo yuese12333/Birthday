@@ -12,10 +12,12 @@ import { audioManager } from '../core/audioManager.js';
  *   - 震动反馈（navigator.vibrate）/ 织线粒子效果。
  */
 export class Scene6Scarf extends BaseScene {
-  async init(){ await super.init(); }
-  async enter(){
+  async init() {
+    await super.init();
+  }
+  async enter() {
     const el = document.createElement('div');
-    el.className='scene scene-scarf placeholder';
+    el.className = 'scene scene-scarf placeholder';
     el.innerHTML = `
       <h1>场景6：亲手织的围巾（占位）</h1>
       <p class='placeholder-tip'>
@@ -27,9 +29,13 @@ export class Scene6Scarf extends BaseScene {
     // 统一使用基类提供的文字不可选封装
     this.applyNoSelect(el);
 
-    try { audioManager.playSceneBGM('6',{ loop:true, volume:0.6, fadeIn:600 }); } catch(e){}
-    el.querySelector('.next-btn').addEventListener('click',()=> this.ctx.go('future'));
+    try {
+      audioManager.playSceneBGM('6', { loop: true, volume: 0.6, fadeIn: 600 });
+    } catch (e) {}
+    el.querySelector('.next-btn').addEventListener('click', () => this.ctx.go('future'));
     this.ctx.rootEl.appendChild(el);
   }
-  async exit(){ audioManager.stopBGM('6',{ fadeOut:500 }); }
+  async exit() {
+    audioManager.stopBGM('6', { fadeOut: 500 });
+  }
 }
