@@ -315,7 +315,16 @@ export class Scene3Timeline extends BaseScene {
                 Array.isArray(puzzles) &&
                 currentIndex === puzzles.length - 1;
               if (isFinal) {
-                const payload = { hintUse: hintUses[currentIndex] || 0, index: currentIndex };
+                // 在 startSplitForSrc 闭包中无法直接访问 flag 变量，尝试自 gridContainer 读取（构建时挂载）
+                const gFlags = gridContainer && gridContainer._precisionFlags;
+                const payload = {
+                  // 布尔：true=使用过提示, false=未使用
+                  hintUse: (hintUses[currentIndex] || 0) > 0,
+                  index: currentIndex,
+                  wrongClick: gFlags && gFlags.wrongClick ? 1 : 0,
+                  useReset: gFlags && gFlags.useReset ? 1 : 0,
+                  useErase: gFlags && gFlags.useErase ? 1 : 0,
+                };
                 try {
                   achievements.recordEvent('scene3:final_complete', payload);
                 } catch (e) {}
@@ -645,6 +654,24 @@ export class Scene3Timeline extends BaseScene {
     // 运行时根据图片构建数织功能已移除；仅保留通过 JSON 加载并渲染的路径。
     function renderPuzzle(matrix, rowClues, colClues, w, h) {
       // 为避免多次 addEventListener 累积，克隆按钮以清除旧监听。
+      // 每关开始时初始化本关的“精准”统计标志（只关心是否发生过而不计次数）
+      let flagWrongClick = false; // 是否曾经点错（填到不该填 或 擦掉应该填）
+      let flagUseReset = false; // 是否使用过重置按钮
+      let flagUseErase = false; // 是否使用过右键（或擦除行为）
+      // 将引用挂在 gridContainer 供异步/其它闭包读取（如分裂动画结束时）
+      try {
+        gridContainer._precisionFlags = {
+          get wrongClick() {
+            return flagWrongClick;
+          },
+          get useReset() {
+            return flagUseReset;
+          },
+          get useErase() {
+            return flagUseErase;
+          },
+        };
+      } catch (e) {}
       function replaceButton(oldBtn) {
         if (!oldBtn || !oldBtn.parentNode) return oldBtn;
         const wasDebouncing = !!oldBtn._debouncing || oldBtn.classList.contains('debouncing');
@@ -736,9 +763,13 @@ export class Scene3Timeline extends BaseScene {
               try {
                 achievements.recordEvent('scene3:puzzle_complete', {
                   index: currentIndex,
-                  hintUse: Array.isArray(hintUses) ? hintUses[currentIndex] || 0 : 0,
+                  // 现在将 hintUse 改为布尔：true=使用过至少一次提示，false=从未使用
+                  hintUse: (Array.isArray(hintUses) ? hintUses[currentIndex] || 0 : 0) > 0,
                   inversionRatio,
                   completelyInverted,
+                  wrongClick: flagWrongClick ? 1 : 0,
+                  useReset: flagUseReset ? 1 : 0,
+                  useErase: flagUseErase ? 1 : 0,
                 });
               } catch (e) {}
             } catch (e) {}
@@ -874,6 +905,7 @@ export class Scene3Timeline extends BaseScene {
       btnReset.addEventListener('click', () => {
         // 若当前题已完成（动画已触发），重置无效
         if (gridContainer.dataset.animDone) return;
+        flagUseReset = true; // 标记使用过重置
         api.reset();
         statusMsg.textContent = '';
         btnNext.classList.add('hidden');

@@ -393,7 +393,7 @@ achievements.register(
   '0-0',
   {
     title: '完成注册',
-    desc: '欢迎加入，注册完成！',
+    desc: '注册完成，旅程开始！',
     descriptionVisible: true,
   },
   (events) => {
@@ -520,7 +520,7 @@ achievements.register(
   '2-2',
   {
     title: '我帮你做啦',
-    desc: '本次考试每题均通过宠溺跳过获得分数',
+    desc: '可爱溜溜，不怕困难，因为有我~',
     descriptionVisible: false,
   },
   (events) => {
@@ -540,7 +540,7 @@ achievements.register(
   '2-3',
   {
     title: '被提示包圆',
-    desc: '每题都靠第三次提示自动通过',
+    desc: '人与动物最大的区别就是会使用工具',
     descriptionVisible: false,
   },
   (events) => {
@@ -560,7 +560,7 @@ achievements.register(
   '2-4',
   {
     title: '错误也可爱',
-    desc: '每题都通过宠溺错误的方式完成',
+    desc: '精准避开正确答案，莫非你是天选之子？',
     descriptionVisible: false,
   },
   (events) => {
@@ -593,15 +593,14 @@ achievements.register(
   '3-1',
   {
     title: '心灵手巧',
-    desc: '在第三幕未使用提示完成拼图',
+    desc: '小小数织，拿捏！',
     descriptionVisible: true,
   },
   (events) => {
     try {
       const e = events.find((ev) => ev && ev.name === 'scene3:final_complete');
       if (!e || !e.payload) return false;
-      const { hintUse = 0 } = e.payload;
-      return hintUse === 0;
+      return e.payload.hintUse === false;
     } catch (e) {
       return false;
     }
@@ -635,6 +634,35 @@ achievements.register(
       // 有时 payload 可能携带原始统计字段
       if (typeof p.inversion_ratio === 'number' && p.inversion_ratio === 1) return true;
       return false;
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 3-3：快！准！狠！—— 第三幕任意一张数织图：未发生错误点击、未使用重置、未使用擦除（右键）
+// 条件：监听 scene3:puzzle_complete / scene3:final_complete 中 wrongClick/useReset/useErase 均为 0
+achievements.register(
+  '3-3',
+  {
+    title: '快！准！狠！',
+    desc: '你是不是看过题啊？太厉害了吧！',
+    descriptionVisible: false,
+  },
+  (events) => {
+    try {
+      const ev = events.find(
+        (e) =>
+          e &&
+          (e.name === 'scene3:puzzle_complete' || e.name === 'scene3:final_complete') &&
+          e.payload &&
+          e.payload.wrongClick === 0 &&
+          e.payload.useReset === 0 &&
+          e.payload.useErase === 0
+      );
+      if (!ev) return false;
+      const p = ev.payload;
+      return !p.wrongClick && !p.useReset && !p.useErase;
     } catch (e) {
       return false;
     }
