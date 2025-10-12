@@ -12,7 +12,11 @@
     "./assets/images/scene3_3.png",
     "./assets/images/scene3_4.png",
     "./assets/images/lock.png",
-    "./assets/images/unlock.png"
+    "./assets/images/unlock.png",
+    "./assets/images/mem_4_1.jpg",
+    "./assets/images/mem_4_2.jpg",
+    "./assets/images/mem_4_3.jpg",
+    "./assets/images/mem_4_4.jpg"
   ],
   "audio": [
     "./assets/audio/scene_0.mp3",
@@ -20,7 +24,7 @@
     "./assets/audio/scene_2.mp3",
     "./assets/audio/scene_3.mp3",
     "./assets/audio/scene_4.mp3",
-    "./assets/audio/scene_45.wav",
+    "./assets/audio/flash_45.wav",
     "./assets/audio/Achievement.wav"
   ]
 }

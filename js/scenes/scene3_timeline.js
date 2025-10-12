@@ -3,7 +3,7 @@ import { audioManager } from '../core/audioManager.js';
 import { achievements } from '../core/achievements.js';
 
 /**
- * Scene3 — Nonogram / Picross
+ * Scene3 — 心动瞬间（数织 Nonogram）
  *
  * Purpose
  *  - 从预生成的 puzzles JSON 加载若干关（本实现写死为 4 关），每关包含：

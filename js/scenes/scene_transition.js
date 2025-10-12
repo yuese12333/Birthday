@@ -82,16 +82,29 @@ export class TransitionScene extends BaseScene {
         );
       }
     }
+    // 支持显式指定一次性音效的音量（data.soundVolume: 0.0 - 1.0），优先使用该值
+    const explicitSoundVolume =
+      typeof data?.soundVolume === 'number' && !Number.isNaN(data.soundVolume)
+        ? Math.max(0, Math.min(1, data.soundVolume))
+        : null;
     let playedOneShot = false;
+    // 保存一次性音效引用，便于在结束时停止
+    let oneShotAudio = null;
     if (!useBGM) {
       for (const cand of tryCandidates) {
         try {
           const a = new Audio(cand);
-          a.volume = originalStyle === 'flash45' ? 0.85 : 0.75;
-          const p = a.play();
-          if (p) {
-            p.then(() => {}).catch(() => {});
+          a.volume =
+            explicitSoundVolume != null
+              ? explicitSoundVolume
+              : originalStyle === 'flash45'
+              ? 0.85
+              : 0.75;
+          const playPromise = a.play();
+          if (playPromise) {
+            playPromise.then(() => {}).catch(() => {});
           }
+          oneShotAudio = a;
           playedOneShot = true;
           break;
         } catch (e) {
@@ -137,7 +150,15 @@ export class TransitionScene extends BaseScene {
       imgs.forEach((src, i) => {
         const f = document.createElement('div');
         f.className = 'flash45-frame';
-        f.style.setProperty('--i', i);
+        // 计算每帧的显示时机：在总时长 this.duration 中，前后各留 300ms 空白
+        const totalMs = this.duration || 3000;
+        const pad = 300; // ms 前后留白
+        const avail = Math.max(0, totalMs - pad * 2);
+        const slot = avail / imgs.length;
+        const start = pad + i * slot;
+        // 将计算结果注入为 CSS 变量（如 850ms）供样式使用
+        f.style.setProperty('--delay', `${start}ms`);
+        f.style.setProperty('--dur', `${Math.max(80, slot)}ms`);
         f.style.backgroundImage = `url('${src}')`;
         seqEl.appendChild(f);
       });
@@ -163,6 +184,22 @@ export class TransitionScene extends BaseScene {
 
     // 超时后进入下个场景（给一个略长缓冲防止闪）
     setTimeout(() => {
+      // 在切换场景前立即停止一次性音效，避免残音继续播放
+      try {
+        if (oneShotAudio) {
+          oneShotAudio.pause();
+          try {
+            oneShotAudio.currentTime = 0;
+          } catch (e) {
+            /* ignore */
+          }
+          oneShotAudio = null;
+        }
+      } catch (e) {}
+      // 同时确保回退的 transition BGM 也不会残留（立即停止，无淡出）
+      try {
+        audioManager.stopBGM && audioManager.stopBGM('transition', { fadeOut: 0 });
+      } catch (e) {}
       this.ctx.go(next);
     }, this.duration);
   }

@@ -1225,8 +1225,9 @@ button.shake {
 }
 /* 通过 --i 计算延迟 */
 .flash45-frame {
-  animation-delay: calc(var(--i) * 0.22s);
-  animation-duration: 0.9s;
+  /* 每帧的延迟与持续时间由 JS 注入的 --delay/--dur 决定，单位 ms */
+  animation-delay: var(--delay, calc(var(--i) * 0.22s));
+  animation-duration: calc(var(--dur, 900ms));
 }
 /* 闪白叠层 */
 .flash45-seq::before,

@@ -43,6 +43,7 @@ const QUESTION_TYPE_REGISTRY = {
           (o, i) => `
         <label class='q-opt' data-index='${i}'>
           <input type='checkbox' class='q-opt-input' name='qopt' value='${i}' />
+          <span class='q-opt-prefix'>${String.fromCharCode(65 + i)}</span>
           <span class='q-opt-label'>${o}</span>
         </label>
       `
@@ -58,6 +59,7 @@ const QUESTION_TYPE_REGISTRY = {
           (o, i) => `
         <label class='q-opt' data-index='${i}'>
           <input type='checkbox' class='q-opt-input' name='qopt' value='${i}' />
+          <span class='q-opt-prefix'>${String.fromCharCode(65 + i)}</span>
           <span class='q-opt-label'>${o}</span>
         </label>
       `
@@ -179,7 +181,7 @@ export class Scene2Exam extends BaseScene {
         title: '语文',
         done: false,
         questions: data.chinesePoemFill.map((item) => ({
-          type: item.questionType || item.type || 'fill',
+          type: item.questionType || 'fill',
           difficulty: item.difficulty || 'easy',
           prompt: item.question.includes('_____')
             ? item.question.replace('_____', '')
@@ -202,7 +204,7 @@ export class Scene2Exam extends BaseScene {
         done: false,
         questions: data.mathPuzzles.map((item) => {
           const base = {
-            type: item.questionType || item.type || 'fill',
+            type: item.questionType || 'fill',
             difficulty: item.difficulty || 'medium',
             prompt: item.question,
             hints: item.hints || [],
@@ -210,7 +212,7 @@ export class Scene2Exam extends BaseScene {
             correctMsg: item.encourageCorrect,
             wrongMsg: item.encourageWrong,
           };
-          // if options present, keep them and preserve answer as-is (for select types)
+          // 如果有 options 则视为选择题
           if (Array.isArray(item.options) && item.options.length) {
             return Object.assign({}, base, {
               options: item.options,
@@ -218,7 +220,7 @@ export class Scene2Exam extends BaseScene {
               placeholder: '答案',
             });
           }
-          // otherwise treat as fill and coerce answer to string safely
+          // 否则视为填空题，并安全地将答案转换为字符串
           let ans = '';
           if (typeof item.answer === 'string') {
             ans = item.answer.split(' ')[0];
@@ -528,8 +530,8 @@ export class Scene2Exam extends BaseScene {
         <p>${diffTag} <span class='q-type-label'>${typeLabel}</span> ${nextQ.prompt}</p>
         <div class='q-box'>${inputHtml}</div>
         <div class='actions'>
-          <button class='hint-btn'>提示</button>
           <button class='submit-btn'>提交</button>
+          <button class='hint-btn'>提示</button>
           <button class='skip-love-btn'>不会但我超可爱</button>
         </div>
         <div class='hint-area'></div>

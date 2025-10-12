@@ -4,7 +4,6 @@ import { audioManager } from '../core/audioManager.js';
 /**
  * 场景4（占位版）
  * 原“表白分支”玩法暂未最终定稿。先放占位说明，保留流程连续性。
- * 未来可能形态：多段真实表白台词 + 分支回答影响后续彩蛋 / 成就。
  */
 export class Scene4Confession extends BaseScene {
   async enter() {
@@ -40,13 +39,15 @@ export class Scene4Confession extends BaseScene {
         next: 'date',
         style: 'flash45',
         images: [
+          './assets/images/mem_4_4.jpg',
+          './assets/images/mem_4_3.jpg',
           './assets/images/mem_4_1.jpg',
           './assets/images/mem_4_2.jpg',
-          './assets/images/mem_4_3.jpg',
-          './assets/images/mem_4_4.jpg',
         ],
         duration: 4000,
-        sound: './assets/audio/scene_45.wav',
+        sound: './assets/audio/flash_45.wav',
+        // 可选：显式调整一次性音效音量（0.0 - 1.0），若不提供将使用 TransitionScene 的默认值
+        soundVolume: 0.3,
       });
     });
     this.ctx.rootEl.appendChild(el);

@@ -389,7 +389,7 @@ this.ctx.go('transition', {
 
 | 需求              | 调用参数                                                                | 说明           |
 | ----------------- | ----------------------------------------------------------------------- | -------------- |
-| 固定 4 秒照片闪回 | `style:'flash45', duration:4000, images:[...], sound:'scene_45.wav'`    | 不随图片数变化 |
+| 固定 4 秒照片闪回 | `style:'flash45', duration:4000, images:[...], sound:'flash_45.wav'`    | 不随图片数变化 |
 | 基础心跳过渡      | `style:'flash12'`                                                       | 默认 3s + 粒子 |
 | 只换 BGM          | `style:'flash12', useBGM:true`                                          | 不放一次性音效 |
 | 静默黑场          | `style:'flash12', duration:1200, sound:undefined` + 自定义 CSS 隐藏元素 | 需要自定样式   |
