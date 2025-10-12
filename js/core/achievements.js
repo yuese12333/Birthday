@@ -388,10 +388,26 @@ class Achievements {
 export const achievements = new Achievements();
 export default achievements;
 
-// 成就 0 —— 在注册页面输入生日密码
-// 成就 0-0 —— 在注册页面输入生日密码
+// 成就 0-0：完成注册（注册时触发）
 achievements.register(
   '0-0',
+  {
+    title: '完成注册',
+    desc: '欢迎加入，注册完成！',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      return events.some((ev) => ev && ev.name === 'player:registered');
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 0-1 —— 在注册页面输入生日密码
+achievements.register(
+  '0-1',
   {
     title: '生日密码',
     desc: '这年头谁还用生日当密码呀',
@@ -408,9 +424,9 @@ achievements.register(
   }
 );
 
-// 成就 0-1：在注册页面多次点击“我忘了”并触发哭脸
+// 成就 0-2：在注册页面多次点击“我忘了”并触发哭脸
 achievements.register(
-  '0-1',
+  '0-2',
   {
     title: '记性真差',
     desc: '你是不是故意的？',
@@ -421,9 +437,9 @@ achievements.register(
   }
 );
 
-// 成就 0-2：密码错误达到 6 次（连续错误导致退出）
+// 成就 0-3：密码错误达到 6 次（连续错误导致退出）
 achievements.register(
-  '0-2',
+  '0-3',
   {
     title: '执着的尝试',
     desc: '好奇心不仅会害死猫，还会气死我',
@@ -434,9 +450,47 @@ achievements.register(
   }
 );
 
-// 成就 2-0：第二幕超级学霸（未使用提示、未跳过、未出现错误宠溺）
+// 成就 1-0：完成第一幕（进入下一段记忆或胜利分支）
+achievements.register(
+  '1-0',
+  {
+    title: '通关第一幕',
+    desc: '完成第一幕，进入下一段记忆。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      return events.some((ev) => ev && ev.name === 'scene1:completed');
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 2-0：通关第二幕（完成考试并进入下一阶段）
 achievements.register(
   '2-0',
+  {
+    title: '通关第二幕',
+    desc: '完成第二幕的考试，进入下一段记忆。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 支持两种上报方式：明确的 scene2:completed 或者已有的 scene2:exam_summary（且包含 totalQuestions）
+      if (events.some((ev) => ev && ev.name === 'scene2:completed')) return true;
+      const e = events.find((ev) => ev && ev.name === 'scene2:exam_summary');
+      if (!e || !e.payload) return false;
+      return typeof e.payload.totalQuestions === 'number' && e.payload.totalQuestions > 0;
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 2-1：第二幕超级学霸（未使用提示、未跳过、未出现错误宠溺）
+achievements.register(
+  '2-1',
   {
     title: '超级学霸',
     desc: '考试一次过，你就是学霸！',
@@ -461,9 +515,9 @@ achievements.register(
   }
 );
 
-// 成就 2-1：本次考试全部由宠溺跳过通过
+// 成就 2-2：本次考试全部由宠溺跳过通过
 achievements.register(
-  '2-1',
+  '2-2',
   {
     title: '我帮你做啦',
     desc: '本次考试每题均通过宠溺跳过获得分数',
@@ -481,9 +535,9 @@ achievements.register(
   }
 );
 
-// 成就 2-2：本次考试全部靠第三次提示（自动判定）完成
+// 成就 2-3：本次考试全部靠第三次提示（自动判定）完成
 achievements.register(
-  '2-2',
+  '2-3',
   {
     title: '被提示包圆',
     desc: '每题都靠第三次提示自动通过',
@@ -501,9 +555,9 @@ achievements.register(
   }
 );
 
-// 成就 2-3：本次考试全部为宠溺错误（全部答错走宠溺逻辑）
+// 成就 2-4：本次考试全部为宠溺错误（全部答错走宠溺逻辑）
 achievements.register(
-  '2-3',
+  '2-4',
   {
     title: '错误也可爱',
     desc: '每题都通过宠溺错误的方式完成',
@@ -521,12 +575,25 @@ achievements.register(
   }
 );
 
-// 成就 3-0：心灵手巧——完成第 3 幕的最后一张数织图且未使用提示
+// 成就 3-0：完成第三幕——完成第 3 幕的最后一张数织图
 achievements.register(
   '3-0',
   {
+    title: '通关第三幕',
+    desc: '完成第三幕的拼图，进入下一段记忆。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    return events.some((ev) => ev && ev.name === 'scene3:final_complete');
+  }
+);
+
+// 成就 3-1：心灵手巧——完成第 3 幕的最后一张数织图且未使用提示
+achievements.register(
+  '3-1',
+  {
     title: '心灵手巧',
-    desc: '在数织的最后一关中未使用提示完成拼图',
+    desc: '在第三幕未使用提示完成拼图',
     descriptionVisible: true,
   },
   (events) => {
@@ -535,6 +602,39 @@ achievements.register(
       if (!e || !e.payload) return false;
       const { hintUse = 0 } = e.payload;
       return hintUse === 0;
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 3-2：叛逆心理 —— 任意一关填色与正确答案完全相反（完全反转）
+achievements.register(
+  '3-2',
+  {
+    title: '叛逆心理',
+    desc: '你故意把所有格子都涂成相反的样子？',
+    descriptionVisible: false,
+  },
+  (events) => {
+    try {
+      // 宽松匹配：支持不同事件名与不同 payload 字段命名
+      // 1) 关注即时反转事件：scene3:puzzle_inverted
+      if (events.some((ev) => ev && ev.name === 'scene3:puzzle_inverted')) return true;
+      // 2) 支持完成时上报的字段（scene3:puzzle_complete or scene3:final_complete）
+      const candidate = events.find(
+        (ev) => ev && (ev.name === 'scene3:puzzle_complete' || ev.name === 'scene3:final_complete')
+      );
+      if (!candidate || !candidate.payload) return false;
+      const p = candidate.payload;
+      // 常见字段：completelyInverted, inverted, filledOpposite, inversionRatio
+      if (p.completelyInverted === true) return true;
+      if (p.inverted === true) return true;
+      if (p.filledOpposite === true) return true;
+      if (typeof p.inversionRatio === 'number' && p.inversionRatio === 1) return true;
+      // 有时 payload 可能携带原始统计字段
+      if (typeof p.inversion_ratio === 'number' && p.inversion_ratio === 1) return true;
+      return false;
     } catch (e) {
       return false;
     }

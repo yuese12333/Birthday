@@ -1,6 +1,7 @@
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
 import { typeSfx } from '../core/typeSfx.js';
+import { achievements } from '../core/achievements.js';
 
 // 若全局未提供 showOutcomeOverlay，这里给出一个最小可用的本地兜底实现
 // 语义：返回一个 Promise，在用户点击“继续”按钮后 resolve
@@ -292,6 +293,10 @@ export class Scene1Intro extends BaseScene {
       if (!choice) return;
       if (choice.win === true) {
         if (ended) return; // 避免重复执行
+        // 记录第一幕完成事件，供成就系统触发
+        try {
+          achievements.recordEvent('scene1:completed', { stageId: this.currentStage?.id || null });
+        } catch (e) {}
         ended = true;
         const vnWrapper = el.querySelector('.vn-wrapper');
         const vnBox = vnWrapper && vnWrapper.querySelector('.vn-box');

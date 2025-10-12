@@ -801,13 +801,6 @@ export class Scene2Exam extends BaseScene {
               )
               .join('')}
           </div>
-          <p>评价：${
-            this.score >= totalQuestions * 4
-              ? '学霸模式开启！'
-              : this.score >= totalQuestions * 3
-              ? '很棒的默契～'
-              : '分数不是全部，心意最重要'
-          }</p>
           ${easterHTML}
         </div>
       `;
@@ -821,6 +814,13 @@ export class Scene2Exam extends BaseScene {
           totalQuestions: totalQuestions || 0,
           score: this.score || 0,
         });
+        // 额外发出一个更语义化的完成事件，便于成就与外部监听
+        try {
+          achievements.recordEvent('scene2:completed', {
+            totalQuestions: totalQuestions || 0,
+            score: this.score || 0,
+          });
+        } catch (e) {}
       } catch (e) {
         console.warn('emit exam summary err', e);
       }

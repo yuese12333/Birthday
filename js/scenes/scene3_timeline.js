@@ -680,9 +680,69 @@ export class Scene3Timeline extends BaseScene {
         (changedX, changedY) => {
           updateRowHighlight(changedY);
           updateColHighlight(changedX);
+
+          // 计算当前填色与原矩阵的反转比例（实时检测）
+          try {
+            const cells = gridContainer.querySelectorAll('.cell');
+            if (cells && cells.length > 0) {
+              let total = 0;
+              let invertedCount = 0;
+              for (let yy = 0; yy < h; yy++) {
+                for (let xx = 0; xx < w; xx++) {
+                  total++;
+                  const idx = yy * w + xx;
+                  const cell = cells[idx];
+                  const should = matrix[yy][xx];
+                  const filled = cell && cell.classList.contains('filled');
+                  if ((filled && !should) || (!filled && should)) invertedCount++;
+                }
+              }
+              const inversionRatioNow = total > 0 ? invertedCount / total : 0;
+              const completelyNow = inversionRatioNow === 1;
+              if (completelyNow) {
+                try {
+                  achievements.recordEvent('scene3:puzzle_inverted', {
+                    index: currentIndex,
+                    inversionRatio: 1,
+                    completelyInverted: true,
+                  });
+                } catch (e) {}
+              }
+            }
+          } catch (e) {
+            /* defensive */
+          }
+
           if (checkComplete(matrix, gridContainer)) {
             statusMsg.textContent = '完成！';
             enableNextButton();
+            // 在触发完成动画前，统计本次的 inversion 信息并上报成就事件
+            try {
+              const cells = gridContainer.querySelectorAll('.cell');
+              let total = 0;
+              let invertedCount = 0;
+              for (let yy = 0; yy < h; yy++) {
+                for (let xx = 0; xx < w; xx++) {
+                  total++;
+                  const idx = yy * w + xx;
+                  const cell = cells[idx];
+                  const should = matrix[yy][xx];
+                  const filled = cell && cell.classList.contains('filled');
+                  if ((filled && !should) || (!filled && should)) invertedCount++;
+                }
+              }
+              const inversionRatio = total > 0 ? invertedCount / total : 0;
+              const completelyInverted = inversionRatio === 1;
+              try {
+                achievements.recordEvent('scene3:puzzle_complete', {
+                  index: currentIndex,
+                  hintUse: Array.isArray(hintUses) ? hintUses[currentIndex] || 0 : 0,
+                  inversionRatio,
+                  completelyInverted,
+                });
+              } catch (e) {}
+            } catch (e) {}
+
             runCompletionAnimation();
           } else {
             statusMsg.textContent = '';
