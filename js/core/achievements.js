@@ -600,7 +600,8 @@ achievements.register(
     try {
       const e = events.find((ev) => ev && ev.name === 'scene3:final_complete');
       if (!e || !e.payload) return false;
-      return e.payload.hintUse === false;
+      const { hintUse = 0 } = e.payload;
+      return hintUse === 0;
     } catch (e) {
       return false;
     }
@@ -634,35 +635,6 @@ achievements.register(
       // 有时 payload 可能携带原始统计字段
       if (typeof p.inversion_ratio === 'number' && p.inversion_ratio === 1) return true;
       return false;
-    } catch (e) {
-      return false;
-    }
-  }
-);
-
-// 成就 3-3：快！准！狠！—— 第三幕任意一张数织图：未发生错误点击、未使用重置、未使用擦除（右键）
-// 条件：监听 scene3:puzzle_complete / scene3:final_complete 中 wrongClick/useReset/useErase 均为 0
-achievements.register(
-  '3-3',
-  {
-    title: '快！准！狠！',
-    desc: '你是不是看过题啊？太厉害了吧！',
-    descriptionVisible: false,
-  },
-  (events) => {
-    try {
-      const ev = events.find(
-        (e) =>
-          e &&
-          (e.name === 'scene3:puzzle_complete' || e.name === 'scene3:final_complete') &&
-          e.payload &&
-          e.payload.wrongClick === 0 &&
-          e.payload.useReset === 0 &&
-          e.payload.useErase === 0
-      );
-      if (!ev) return false;
-      const p = ev.payload;
-      return !p.wrongClick && !p.useReset && !p.useErase;
     } catch (e) {
       return false;
     }
