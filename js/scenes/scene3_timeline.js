@@ -430,29 +430,6 @@ export class Scene3Timeline extends BaseScene {
     `;
     this.ctx.rootEl.appendChild(root);
 
-    // 注入一次性移动端样式以改善行提示数在窄屏下的显示（多数字折行显示）
-    try {
-      if (!document.getElementById('scene3-mobile-style')) {
-        const st = document.createElement('style');
-        st.id = 'scene3-mobile-style';
-        st.textContent = `
-          /* Scene3 移动端行提示数适配 */
-          @media (max-width: 640px) {
-            .scene-nonogram .left-clues-area { overflow: visible; }
-            .scene-nonogram .row-clue { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; padding: 0 2px; box-sizing: border-box; }
-            .scene-nonogram .row-clue-num { display:inline-block; min-width:0.8em; text-align:center; line-height:1; }
-            .scene-nonogram .row-clue { font-size: 11px; }
-          }
-          @media (max-width: 420px) {
-            .scene-nonogram .row-clue { font-size: 10px; gap: 2px; }
-          }
-        `;
-        document.head.appendChild(st);
-      }
-    } catch (e) {
-      /* 忽略样式注入失败 */
-    }
-
     const topCluesEl = root.querySelector('.top-clues-area .top-inner'); // 上提示数
     const leftCluesEl = root.querySelector('.left-clues-area .left-inner'); // 左提示数
     const gridContainer = root.querySelector('.grid-container'); // 交互网格
@@ -1036,15 +1013,7 @@ export class Scene3Timeline extends BaseScene {
         const div = document.createElement('div');
         div.className = 'row-clue';
         div.style.height = cell + 'px';
-        // 为每个数字创建独立 span，方便在移动端折行显示
-        const arr = c;
-        for (let i = 0; i < arr.length; i++) {
-          const num = arr[i];
-          const sp = document.createElement('span');
-          sp.className = 'row-clue-num';
-          sp.textContent = num === 0 && arr.length === 1 ? '0' : String(num);
-          div.appendChild(sp);
-        }
+        div.textContent = c.join(' ');
         container.appendChild(div);
       });
     }
