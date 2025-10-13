@@ -10,7 +10,6 @@ import { audioManager } from '../core/audioManager.js';
 export class TransitionScene extends BaseScene {
   constructor(ctx) {
     super(ctx);
-    // 调整：根据需求将过渡停留时长从 1.4s 延长到 3s
     this.duration = 3000; // ms 动画时长（展示心跳与提示 3 秒后进入下一场景）
   }
   async enter(data) {
