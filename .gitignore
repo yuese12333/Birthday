@@ -7,3 +7,11 @@ editor/
 # 配置文件
 .prettierrc.js
 .eslintrc.js
+
+.env
+.env.example
+
+server-err.log
+server-out.log
+
+node_modules/

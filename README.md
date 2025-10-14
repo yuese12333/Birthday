@@ -72,6 +72,19 @@ README.md
 - 可以通过 debug 面板进入任意场景。
 - 可通过 debug 面板清空成就。
 
+**邮件发送（注册彩蛋）**
+
+- 在注册场景的生日彩蛋里（“写一句话给他/写一句话给自己”），页面会把用户输入的文本发送到本地运行的邮件服务，从而把消息发送到预设的收件人。
+- 后端接口：POST /send-egg
+  - 请求示例（JSON）：
+    - { type: 'to-him'|'to-me', subject?: string, message: string }
+  - 默认服务地址：http://127.0.0.1:3001 （可在前端通过 window.EMAIL_SERVER_URL 覆盖为局域网地址，例如 http://100.80.100.174:3001）
+- 环境变量（服务器端）：可通过 `.env` 配置真实 SMTP，常用字段如下：
+  - SMTP_HOST, SMTP_PORT, SMTP_SECURE (true/false), SMTP_USER, SMTP_PASS, FROM_ADDRESS
+  - HOST, PORT（控制监听地址与端口，开发时可设置 HOST=0.0.0.0 以便局域网访问）
+- 开发回退：如果未配置 SMTP，服务器会自动使用 Nodemailer 的测试账号（Ethereal），并在响应中返回预览 URL 以便本地测试，不会发送真实邮件。
+- 安全提示：不要把真实凭据提交到版本库，`.env` 应该被忽略（项目中已包含 `.env.example` 作为示例）。
+
 ### 1. 穿越高中（Scene1Intro）
 
 **当前实现（统一命名 + 失败推进 + 扩展 fail:x）**

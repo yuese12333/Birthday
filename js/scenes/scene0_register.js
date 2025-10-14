@@ -212,7 +212,7 @@ export class Scene0Register extends BaseScene {
             <div style='display:flex;flex-direction:column;gap:.5rem;align-items:center;'>
               <button type='button' class='her-play' style='width:240px;padding:.5rem;'>播放那天的歌（占位）</button>
               <button type='button' class='her-mem' style='width:240px;padding:.5rem;'>打开她的回忆（占位）</button>
-              <button type='button' class='her-write' style='width:240px;padding:.5rem;'>写一句话给她</button>
+              <button type='button' class='her-write' style='width:240px;padding:.5rem;'>写一句话给自己</button>
               <div style='display:flex;gap:.6rem;margin-top:.4rem;justify-content:center;'>
                 <button type='button' class='her-close' style='padding:.45rem .8rem;background:#eee;color:#333;border:none;border-radius:6px;'>关闭</button>
               </div>
@@ -256,22 +256,103 @@ export class Scene0Register extends BaseScene {
           const writeBtn = eggWrap.querySelector('.her-write');
           if (writeBtn) {
             writeBtn.addEventListener('click', () => {
-              try {
-                const text = prompt('写给她的一句话（占位）', '');
-                if (text) {
-                  const t = document.createElement('div');
-                  t.textContent =
-                    '已为她记录（占位）: ' + (text.length > 60 ? text.slice(0, 60) + '…' : text);
-                  t.style.cssText =
-                    'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;';
-                  document.body.appendChild(t);
-                  setTimeout(() => {
-                    try {
-                      t.remove();
-                    } catch (e) {}
-                  }, 2400);
+              (async () => {
+                try {
+                  const text = prompt('写给自己的一句话（占位）', '');
+                  if (!text) return;
+
+                  // small helper to show temporary toasts
+                  const makeToast = (msg, opts = {}) => {
+                    const t = document.createElement('div');
+                    t.textContent = msg;
+                    t.style.cssText =
+                      'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;';
+                    if (opts.bg) t.style.background = opts.bg;
+                    document.body.appendChild(t);
+                    return t;
+                  };
+
+                  const loading = makeToast('正在发送…');
+
+                  // default endpoint (can be overridden by setting window.EMAIL_SERVER_URL)
+                  const base = window.EMAIL_SERVER_URL || 'http://127.0.0.1:3001';
+                  const endpoint = base.replace(/\/$/, '') + '/send-egg';
+
+                  const payload = {
+                    type: 'to-me',
+                    subject: '一句话给自己',
+                    message: text,
+                  };
+
+                  let res;
+                  try {
+                    res = await fetch(endpoint, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(payload),
+                    });
+                  } catch (err) {
+                    loading.remove();
+                    const e = makeToast('发送失败（网络错误）', { bg: '#a33' });
+                    setTimeout(() => {
+                      try {
+                        e.remove();
+                      } catch (e) {}
+                    }, 3200);
+                    return;
+                  }
+
+                  let j;
+                  try {
+                    j = await res.json();
+                  } catch (err) {
+                    loading.remove();
+                    const e = makeToast('发送失败（非 JSON 响应）', { bg: '#a33' });
+                    setTimeout(() => {
+                      try {
+                        e.remove();
+                      } catch (e) {}
+                    }, 3200);
+                    return;
+                  }
+
+                  loading.remove();
+                  if (j && j.ok) {
+                    const info = j.info || {};
+                    const h = info.preview
+                      ? `已发送（测试邮箱），预览：${info.preview}`
+                      : `已发送，id: ${info.messageId || info.accepted}`;
+                    const s = makeToast(h, { bg: '#2a8' });
+                    setTimeout(() => {
+                      try {
+                        s.remove();
+                      } catch (e) {}
+                    }, 7000);
+                  } else {
+                    const errMsg = (j && j.error) || '发送失败';
+                    const e = makeToast(errMsg, { bg: '#a33' });
+                    setTimeout(() => {
+                      try {
+                        e.remove();
+                      } catch (e) {}
+                    }, 4200);
+                  }
+                } catch (e) {
+                  // swallow errors silently but show small hint
+                  try {
+                    const t = document.createElement('div');
+                    t.textContent = '发送出错，请稍后重试';
+                    t.style.cssText =
+                      'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#a33;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;';
+                    document.body.appendChild(t);
+                    setTimeout(() => {
+                      try {
+                        t.remove();
+                      } catch (e) {}
+                    }, 3200);
+                  } catch (e) {}
                 }
-              } catch (e) {}
+              })();
             });
           }
           // 仅保留关闭按钮，继续按钮已移除
@@ -283,7 +364,7 @@ export class Scene0Register extends BaseScene {
             <div style='display:flex;flex-direction:column;gap:.5rem;align-items:center;'>
               <button type='button' class='you-play' style='width:240px;padding:.5rem;'>播放提示音（占位）</button>
               <button type='button' class='you-mem' style='width:240px;padding:.5rem;'>查看我们的时光（占位）</button>
-              <button type='button' class='you-write' style='width:240px;padding:.5rem;'>写一句话给自己</button>
+              <button type='button' class='you-write' style='width:240px;padding:.5rem;'>写一句话给他</button>
               <div style='display:flex;gap:.6rem;margin-top:.4rem;justify-content:center;'>
                 <button type='button' class='you-close' style='padding:.45rem .8rem;background:#eee;color:#333;border:none;border-radius:6px;'>关闭</button>
               </div>
@@ -327,22 +408,98 @@ export class Scene0Register extends BaseScene {
           const writeBtn = eggWrap.querySelector('.you-write');
           if (writeBtn) {
             writeBtn.addEventListener('click', () => {
-              try {
-                const text = prompt('写给你自己的一句话（占位）', '');
-                if (text) {
-                  const t = document.createElement('div');
-                  t.textContent =
-                    '已记录（占位）: ' + (text.length > 60 ? text.slice(0, 60) + '…' : text);
-                  t.style.cssText =
-                    'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;';
-                  document.body.appendChild(t);
-                  setTimeout(() => {
-                    try {
-                      t.remove();
-                    } catch (e) {}
-                  }, 2400);
+              (async () => {
+                try {
+                  const text = prompt('写给他的一句话（占位）', '');
+                  if (!text) return;
+
+                  const makeToast = (msg, opts = {}) => {
+                    const t = document.createElement('div');
+                    t.textContent = msg;
+                    t.style.cssText =
+                      'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#333;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;';
+                    if (opts.bg) t.style.background = opts.bg;
+                    document.body.appendChild(t);
+                    return t;
+                  };
+
+                  const loading = makeToast('正在发送…');
+                  const base = window.EMAIL_SERVER_URL || 'http://127.0.0.1:3001';
+                  const endpoint = base.replace(/\/$/, '') + '/send-egg';
+                  const payload = {
+                    type: 'to-him',
+                    subject: '一句话给他',
+                    message: text,
+                  };
+
+                  let res;
+                  try {
+                    res = await fetch(endpoint, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify(payload),
+                    });
+                  } catch (err) {
+                    loading.remove();
+                    const e = makeToast('发送失败（网络错误）', { bg: '#a33' });
+                    setTimeout(() => {
+                      try {
+                        e.remove();
+                      } catch (e) {}
+                    }, 3200);
+                    return;
+                  }
+
+                  let j;
+                  try {
+                    j = await res.json();
+                  } catch (err) {
+                    loading.remove();
+                    const e = makeToast('发送失败（非 JSON 响应）', { bg: '#a33' });
+                    setTimeout(() => {
+                      try {
+                        e.remove();
+                      } catch (e) {}
+                    }, 3200);
+                    return;
+                  }
+
+                  loading.remove();
+                  if (j && j.ok) {
+                    const info = j.info || {};
+                    const h = info.preview
+                      ? `已发送（测试邮箱），预览：${info.preview}`
+                      : `已发送，id: ${info.messageId || info.accepted}`;
+                    const s = makeToast(h, { bg: '#2a8' });
+                    setTimeout(() => {
+                      try {
+                        s.remove();
+                      } catch (e) {}
+                    }, 7000);
+                  } else {
+                    const errMsg = (j && j.error) || '发送失败';
+                    const e = makeToast(errMsg, { bg: '#a33' });
+                    setTimeout(() => {
+                      try {
+                        e.remove();
+                      } catch (e) {}
+                    }, 4200);
+                  }
+                } catch (e) {
+                  try {
+                    const t = document.createElement('div');
+                    t.textContent = '发送出错，请稍后重试';
+                    t.style.cssText =
+                      'position:fixed;left:50%;bottom:18px;transform:translateX(-50%);background:#a33;color:#fff;padding:.5rem .8rem;border-radius:8px;z-index:100001;';
+                    document.body.appendChild(t);
+                    setTimeout(() => {
+                      try {
+                        t.remove();
+                      } catch (e) {}
+                    }, 3200);
+                  } catch (e) {}
                 }
-              } catch (e) {}
+              })();
             });
           }
           // 仅保留关闭按钮，继续按钮已移除
