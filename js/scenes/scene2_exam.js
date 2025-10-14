@@ -105,18 +105,40 @@ function isAnswerCorrect(q, userAns) {
   }
   if (q.type === 'multi_select') {
     // q.answerIndex expected to be an array of indices
-    const correctArr = Array.isArray(q.answerIndex)
+    const correctArrRaw = Array.isArray(q.answerIndex)
       ? q.answerIndex
       : Array.isArray(q.answer)
       ? q.answer
       : null;
-    if (!Array.isArray(correctArr)) return false;
+    if (!Array.isArray(correctArrRaw)) return false;
     if (!Array.isArray(userAns)) return false;
-    // compare as sets (order-insensitive)
-    const a = [...new Set(userAns)].sort();
-    const b = [...new Set(correctArr)].sort();
-    if (a.length !== b.length) return false;
-    for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+    // Normalize both arrays to arrays of numbers (indices), remove duplicates, sort
+    const normalize = (arr) =>
+      Array.from(
+        new Set(
+          arr
+            .map((v) => {
+              // Try parse to int; if not number, leave as original
+              const n = Number(v);
+              return Number.isNaN(n) ? v : n;
+            })
+            .filter((v) => v !== null && typeof v !== 'undefined')
+        )
+      ).sort((x, y) => {
+        // ensure consistent sort for mixed types: numbers before strings
+        if (typeof x === 'number' && typeof y === 'number') return x - y;
+        if (typeof x === 'number') return -1;
+        if (typeof y === 'number') return 1;
+        return String(x).localeCompare(String(y));
+      });
+
+    const correctArr = normalize(correctArrRaw);
+    const userArr = normalize(userAns);
+
+    if (correctArr.length !== userArr.length) return false;
+    for (let i = 0; i < correctArr.length; i++) {
+      if (correctArr[i] !== userArr[i]) return false;
+    }
     return true;
   }
   return false; // 未知题型默认 false（或可改为 true 宽松模式）
@@ -508,16 +530,8 @@ export class Scene2Exam extends BaseScene {
         // 未知题型：提示并降级为填空
         inputHtml = QUESTION_TYPE_REGISTRY.fill({ placeholder: '(未知题型降级为填空)' });
       }
-      // 如果是 single_select，需要把默认生成的 checkbox inputs 改为 radio 并赋予一个题目唯一 name
-      if (nextQ.type === 'single_select') {
-        const uniqueName = `q_${subject.key}_${Math.floor(Math.random() * 1000000)}`;
-        // 将所有 input[type=checkbox] 替换为 input[type=radio] 并注入 name
-        inputHtml = inputHtml.replace(/type='checkbox'/g, `type='radio' name='${uniqueName}'`);
-        inputHtml = inputHtml.replace(
-          /type=\"checkbox\"/g,
-          `type=\"radio\" name=\"${uniqueName}\"`
-        );
-      }
+      // 保持 single_select 使用 checkbox 的 DOM（视觉统一）。
+      // 后续在渲染后通过事件绑定强制单选行为（选中时取消其他选中项）。
       const typeLabel =
         nextQ.type === 'fill'
           ? '填空题'
@@ -541,6 +555,28 @@ export class Scene2Exam extends BaseScene {
       `;
       board.appendChild(wrapper);
       const optsContainer = wrapper.querySelector('.q-opts');
+      if (optsContainer) {
+        // 样式已从内联抽离到 css/styles.css（类选择器：.scene-exam .q-opt / .q-opt.checked-anim / .q-opt-prefix）
+        // 这里保留逻辑处理（事件绑定），不再向 head 注入 style 元素。
+        const inputs = Array.from(optsContainer.querySelectorAll('.q-opt-input'));
+        inputs.forEach((inp) => {
+          const lbl = inp.closest('.q-opt');
+          inp.addEventListener('change', () => {
+            // 动画：添加类并在短时间后移除
+            if (lbl) {
+              lbl.classList.add('checked-anim');
+              setTimeout(() => lbl.classList.remove('checked-anim'), 220);
+            }
+            // 若当前为 single_select，确保只允许单选（选中时取消其它项）
+            if (nextQ.type === 'single_select') {
+              if (!inp.checked) return;
+              inputs.forEach((other) => {
+                if (other !== inp) other.checked = false;
+              });
+            }
+          });
+        });
+      }
       if ((nextQ.type === 'single_select' || nextQ.type === 'multi_select') && !optsContainer) {
         console.warn('select type but .q-opts missing for question:', nextQ);
       }

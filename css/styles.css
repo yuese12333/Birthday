@@ -281,10 +281,27 @@ button.shake {
   display: block;
   margin: 6px 0;
 }
-.scene-exam .q-opts .q-opt {
-  display: block;
+.scene-exam .q-opts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem; /* 选项间距 */
   margin: 8px 0;
+}
+.scene-exam .q-opts .q-opt {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   cursor: pointer;
+  padding: 0.5rem 0.6rem; /* 选项内边距 */
+  border: 1px solid rgba(120, 90, 100, 0.12); /* 明显边框 */
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.9), rgba(255, 245, 248, 0.85));
+  border-radius: 10px;
+  transition: box-shadow 0.16s ease, transform 0.12s ease, border-color 0.12s ease;
+}
+.scene-exam .q-opts .q-opt:hover {
+  box-shadow: 0 8px 20px rgba(122, 40, 60, 0.06);
+  transform: translateY(-2px);
+  border-color: rgba(255, 90, 130, 0.22);
 }
 .scene-exam .q-opt-label {
   margin-left: 10px;
@@ -292,28 +309,95 @@ button.shake {
 }
 /* checkbox styled as circular control to match radio */
 .scene-exam .q-opt-input[type='checkbox'] {
-  appearance: none;
-  -webkit-appearance: none;
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  display: inline-block;
-  border: 2px solid #888;
-  vertical-align: middle;
-  position: relative;
-  background-clip: content-box;
-  padding: 0;
-  margin: 0;
+  /* 视觉隐藏：保留在 DOM 中以保持可访问性与表单行为，但不显示默认圆形复选框 */
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  overflow: hidden !important;
+  clip: rect(1px, 1px, 1px, 1px) !important;
+  white-space: nowrap !important;
+  border: 0 !important;
+  padding: 0 !important;
+  margin: 0 !important;
 }
-.scene-exam .q-opt-input[type='checkbox']:checked {
-  background-color: #4a90e2;
-  border-color: #4a90e2;
+.scene-exam .q-opt-input[type='checkbox']:focus + .q-opt-prefix,
+.scene-exam .q-opt-input[type='checkbox']:focus-visible + .q-opt-prefix {
+  outline: 2px dashed rgba(122, 40, 60, 0.18);
+  outline-offset: 4px;
 }
 .scene-exam .q-opt-input[type='radio'] {
   vertical-align: middle;
 }
 .scene-exam .q-opt {
   user-select: none;
+}
+
+/* Extracted checkbox/option animation & prefix styles (moved from js/scenes/scene2_exam.js) */
+.scene-exam .q-opt {
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.18rem 0.4rem;
+  border-radius: 8px;
+}
+.scene-exam .q-opt.checked-anim {
+  transform: scale(0.985);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+}
+.scene-exam .q-opt-prefix {
+  display: inline-flex;
+  width: 1.4em;
+  height: 1.4em;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  background: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.06);
+  font-weight: 600;
+}
+.scene-exam .q-opt-input:checked + .q-opt-prefix {
+  background: linear-gradient(90deg, #ff8fb5, #ff6f9d);
+  color: #fff;
+  border-color: transparent;
+}
+
+/* 使整个选项成为点击目标（替代隐藏的原生复选框） */
+.scene-exam .q-opt {
+  position: relative;
+}
+.scene-exam .q-opt-label {
+  flex: 1;
+}
+
+/* Tabs (选项卡) styles for scene 2 — make them more prominent and theme-consistent */
+.scene-exam .tabs {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+.scene-exam .tab {
+  background: linear-gradient(180deg, #fff, #ffeef4);
+  border: 1px solid rgba(255, 90, 130, 0.12);
+  padding: 0.45rem 0.8rem;
+  border-radius: 12px;
+  font-weight: 700;
+  color: #6a2630;
+  box-shadow: 0 6px 14px -8px rgba(122, 40, 60, 0.45);
+  transition: transform 0.14s ease, box-shadow 0.14s ease, background 0.14s ease;
+}
+.scene-exam .tab:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 22px -10px rgba(122, 40, 60, 0.45);
+}
+.scene-exam .tab.active {
+  background: linear-gradient(90deg, #ff9eb7, #ff7ea0);
+  color: #fff;
+  box-shadow: 0 10px 28px -6px rgba(255, 110, 150, 0.28);
+}
+.scene-exam .tab.displayed {
+  outline: 2px dashed rgba(255, 110, 150, 0.18);
 }
 
 /* difficulty badges (compact variant) */

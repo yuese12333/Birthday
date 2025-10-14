@@ -87,14 +87,86 @@ function mountPreloadScreen() {
   wrap.id = 'preload-screen';
   wrap.style.cssText =
     'position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:radial-gradient(circle at 40% 40%, #ffe5ec,#ffc0d2,#ffb0c9);z-index:10000;font-family:BirthdayFont,system-ui,sans-serif;color:#6a2d3a;';
+  /*
+    首屏加载器（Inline）：
+    - 将 SVG 环形加载动画、进度条与说明文案作为一个连续的模板字符串插入到 DOM
+    - 所有必要的 CSS 动画与 keyframes 保留为内联样式，方便在不修改全局样式文件的情况下使用
+    - HTML 内部也加入了中文注释，便于日后维护理解结构（标题、SVG、进度、说明、内联样式）
+  */
+  // 注：下面把 SVG 加载动画和必要的内联 CSS 直接嵌入到首屏预加载 DOM 中，
+  // 以便无需额外 CSS 文件即可展示漂亮的环形进度动画。
+  // SVG 动画来自设计稿：多个同心圆环配合 stroke-dasharray 与动画关键帧实现脉冲/移动效果。
   wrap.innerHTML = `<div style="text-align:center;display:flex;flex-direction:column;gap:1.2rem;align-items:center;">
     <h1 style="margin:0;font-size:clamp(1.6rem,5vw,2.6rem);letter-spacing:1px;">回忆旅程准备中…</h1>
-    <div id='preload-progress' style="--p:0;background:rgba(255,255,255,.5);backdrop-filter:blur(6px);padding:.9rem 1.4rem;border-radius:18px;min-width:220px;font-size:.9rem;position:relative;overflow:hidden;">
-      <span style="position:absolute;inset:0;background:linear-gradient(90deg,#ff8fb5,#ff6f9d);width:calc(var(--p)*1%);mix-blend-mode:multiply;opacity:.35;pointer-events:none;transition:width .35s;" ></span>
-      加载中 0%
+    <!--
+      以下为加载器主体：
+      - SVG 环形动画（居中显示）
+      - 进度条（置于 SVG 下方）
+      - 说明文案（位于最下方）
+    -->
+    <div style="display:flex;flex-direction:column;align-items:center;gap:.9rem;">
+      <!-- SVG 环形加载器（请勿拆分该节点，动画依赖 class 名称与结构） -->
+      <svg class="pl" width="96" height="96" viewBox="0 0 240 240" aria-hidden="true" style="display:block;margin:0 auto;">
+        <circle class="pl__ring pl__ring--a" cx="120" cy="120" r="105" fill="none" stroke="#f42f25" stroke-width="20" stroke-dasharray="0 660" stroke-dashoffset="-330" stroke-linecap="round"></circle>
+        <circle class="pl__ring pl__ring--b" cx="120" cy="120" r="35" fill="none" stroke="#f49725" stroke-width="20" stroke-dasharray="0 220" stroke-dashoffset="-110" stroke-linecap="round"></circle>
+        <circle class="pl__ring pl__ring--c" cx="85" cy="120" r="70" fill="none" stroke="#255ff4" stroke-width="20" stroke-dasharray="0 440" stroke-linecap="round"></circle>
+        <circle class="pl__ring pl__ring--d" cx="155" cy="120" r="70" fill="none" stroke="#f42582" stroke-width="20" stroke-dasharray="0 440" stroke-linecap="round"></circle>
+      </svg>
+      <!-- 进度显示（文字与背景层） -->
+      <div id='preload-progress' style="--p:0;background:rgba(255,255,255,.5);backdrop-filter:blur(6px);padding:.9rem 1.4rem;border-radius:18px;min-width:220px;max-width:80vw;font-size:.9rem;position:relative;overflow:hidden;text-align:center;">
+        <!-- 进度填充层（宽度由 --p CSS 变量驱动） -->
+        <span style="position:absolute;inset:0;background:linear-gradient(90deg,#ff8fb5,#ff6f9d);width:calc(var(--p)*1%);mix-blend-mode:multiply;opacity:.35;pointer-events:none;transition:width .35s;" ></span>
+        加载中 0%
+      </div>
     </div>
+    <!-- 额外说明文字 -->
     <div style="font-size:.7rem;opacity:.75;">（首屏资源预热，避免进入后首段音乐与图片卡顿）</div>
-  </div>`;
+    <!-- Inline CSS for SVG loader animation: 保持内联，便于不改动外部样式文件直接运行 -->
+    <style>
+      .pl { width: 6em; height: 6em; }
+      .pl__ring { animation: ringA 2s linear infinite; }
+      .pl__ring--a { stroke: #f42f25; }
+      .pl__ring--b { animation-name: ringB; stroke: #f49725; }
+      .pl__ring--c { animation-name: ringC; stroke: #255ff4; }
+      .pl__ring--d { animation-name: ringD; stroke: #f42582; }
+      @keyframes ringA {
+        from, 4% { stroke-dasharray: 0 660; stroke-width: 20; stroke-dashoffset: -330; }
+        12% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -335; }
+        32% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -595; }
+        40%,54% { stroke-dasharray: 0 660; stroke-width: 20; stroke-dashoffset: -660; }
+        62% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -665; }
+        82% { stroke-dasharray: 60 600; stroke-width: 30; stroke-dashoffset: -925; }
+        90%, to { stroke-dasharray: 0 660; stroke-width: 20; stroke-dashoffset: -990; }
+      }
+      @keyframes ringB {
+        from,12% { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -110; }
+        20% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -115; }
+        40% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -195; }
+        48%,62% { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -220; }
+        70% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -225; }
+        90% { stroke-dasharray: 20 200; stroke-width: 30; stroke-dashoffset: -305; }
+        98%, to { stroke-dasharray: 0 220; stroke-width: 20; stroke-dashoffset: -330; }
+      }
+      @keyframes ringC {
+        from { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: 0; }
+        8% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -5; }
+        28% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -175; }
+        36%,58% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -220; }
+        66% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -225; }
+        86% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -395; }
+        94%, to { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -440; }
+      }
+      @keyframes ringD {
+        from,8% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: 0; }
+        16% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -5; }
+        36% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -175; }
+        44%,50% { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -220; }
+        58% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -225; }
+        78% { stroke-dasharray: 40 400; stroke-width: 30; stroke-dashoffset: -395; }
+        86%, to { stroke-dasharray: 0 440; stroke-width: 20; stroke-dashoffset: -440; }
+      }
+    </style>
+`;
   document.body.appendChild(wrap);
   return wrap;
 }
