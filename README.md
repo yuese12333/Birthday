@@ -83,7 +83,21 @@ README.md
   - SMTP_HOST, SMTP_PORT, SMTP_SECURE (true/false), SMTP_USER, SMTP_PASS, FROM_ADDRESS
   - HOST, PORT（控制监听地址与端口，开发时可设置 HOST=0.0.0.0 以便局域网访问）
 - 开发回退：如果未配置 SMTP，服务器会自动使用 Nodemailer 的测试账号（Ethereal），并在响应中返回预览 URL 以便本地测试，不会发送真实邮件。
-- 安全提示：不要把真实凭据提交到版本库，`.env` 应该被忽略（项目中已包含 `.env.example` 作为示例）。
+
+- 使用方法（仅作者内网可用）：终端输入
+```powershell
+$env:SMTP_HOST='smtp.qq.com'
+$env:SMTP_PORT='465'
+$env:SMTP_SECURE='true'
+$env:SMTP_USER='yuese12333@qq.com'
+$env:SMTP_PASS='dtgiffuzmhieceie'
+$env:FROM_ADDRESS='yuese12333@qq.com'
+$env:HOST='0.0.0.0'
+$env:PORT='3001'
+
+# 启动服务
+node server\emailServer.js
+```
 
 ### 1. 穿越高中（Scene1Intro）
 

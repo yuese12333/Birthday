@@ -18,8 +18,14 @@ export class Scene0Register extends BaseScene {
       <h1>进入之前 · 一个小小的仪式（开发版本不代表最终品质）</h1>
       <p class='desc'>这是我们专属的纪念入口。随便写一个“用户名”，然后输入那一天的日期当作密码。</p>
       <form class='reg-form'>
-        <label>用户名<input name='user' placeholder='请输入用户名' autocomplete='off'/></label>
-        <label>密码（纪念日）<input name='pass' type='password' placeholder='请输入密码' autocomplete='off' /></label>
+        <div class='form-control'>
+          <input name='user' type='text' required placeholder=' ' autocomplete='off' title='请输入用户名' />
+          <label><span style='transition-delay:0ms'>用</span><span style='transition-delay:80ms'>户</span><span style='transition-delay:160ms'>名</span></label>
+        </div>
+        <div class='form-control'>
+          <input name='pass' type='password' required placeholder=' ' autocomplete='off' title='请输入密码' />
+          <label><span style='transition-delay:0ms'>密</span><span style='transition-delay:80ms'>码</span><span style='transition-delay:160ms'>（</span><span style='transition-delay:240ms'>纪</span><span style='transition-delay:320ms'>念</span><span style='transition-delay:400ms'>日</span><span style='transition-delay:480ms'>）</span></label>
+        </div>
         <div style='display:flex;align-items:center;gap:.6rem;flex-wrap:wrap;'>
           <button type='submit' data-debounce='800'>进入旅程</button>
           <button type='button' class='bgm-btn reg-bgm' title='好听的音乐' data-debounce style='background:#ffb3c4;width:46px;height:36px;font-size:.85rem;'>♪</button>

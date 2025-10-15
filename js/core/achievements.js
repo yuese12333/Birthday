@@ -594,7 +594,7 @@ achievements.register(
   {
     title: '心灵手巧',
     desc: '小小数织，拿捏！',
-    descriptionVisible: true,
+    descriptionVisible: false,
   },
   (events) => {
     try {

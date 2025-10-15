@@ -77,4 +77,24 @@
 
 ### 今日成果：
 
-1. 添加了生日密码彩蛋的邮件发送功能。
+1. 添加了生日密码彩蛋的邮件发送功能。使用方法：终端输入
+
+```powershell
+$env:SMTP_HOST='smtp.qq.com'
+$env:SMTP_PORT='465'
+$env:SMTP_SECURE='true'
+$env:SMTP_USER='yuese12333@qq.com'
+$env:SMTP_PASS='dtgiffuzmhieceie'
+$env:FROM_ADDRESS='yuese12333@qq.com'
+$env:HOST='0.0.0.0'
+$env:PORT='3001'
+
+# 启动服务
+node server\emailServer.js
+```
+
+2. 调整了注册页输入框样式。
+
+## 2025-10-15
+
+### 今日成果：

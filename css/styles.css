@@ -978,9 +978,67 @@ button.shake {
   background: rgba(255, 255, 255, 0.35);
   padding: 0.6rem 0.8rem;
   border-radius: 14px;
-  font-size: 0.68rem;
-  line-height: 1.4;
-  box-shadow: 0 2px 6px -2px rgba(0, 0, 0, 0.08);
+
+  /* Scoped floating label input styles for Scene 0 */
+}
+.scene-register .form-control {
+  position: relative;
+  margin: 12px 0 18px;
+  width: 190px;
+}
+.scene-register .form-control input {
+  background: none;
+  border: none;
+  border-bottom: 2px solid #7a2940; /* 基础直线 */
+  border-radius: 0; /* 避免两端出现圆角视觉 */
+  display: block;
+  width: 100%;
+  padding: 12px 0 10px; /* 底部稍收紧让线条更贴近文本 */
+  font-size: 16px;
+  color: #3a1b28;
+  box-shadow: none;
+  outline: none;
+  position: relative;
+}
+.scene-register .form-control input:focus,
+.scene-register .form-control input:valid {
+  outline: 0;
+  border-bottom-color: #ff6f90;
+}
+.scene-register .form-control input::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  bottom: -2px;
+  height: 2px;
+  width: 100%;
+  background: #ff6f90;
+  transform: scaleX(0);
+  transform-origin: left center;
+  transition: transform 0.28s ease;
+  pointer-events: none;
+}
+.scene-register .form-control input:focus::after {
+  transform: scaleX(1);
+}
+.scene-register .form-control label {
+  flex-direction: row;
+  position: absolute;
+  top: 12px;
+  left: 0;
+  pointer-events: none;
+}
+.scene-register .form-control label span {
+  display: inline-block;
+  font-size: 16px;
+  min-width: 5px;
+  color: rgba(58, 27, 40, 0.9);
+  transition: 0.3s cubic-bezier(0.68, -0.55, 0.265, 1.55);
+}
+.scene-register .form-control input:focus + label span,
+.scene-register .form-control input:valid + label span {
+  color: #ff6f90;
+  transform: translateY(-24px);
 }
 .scene-register .clues.hidden {
   display: none;
