@@ -182,11 +182,10 @@ export class Scene2Exam extends BaseScene {
     this.subjects = built;
     console.info('题库加载成功：使用 external scene2_questions.json');
     this.score = 0;
-    // 每科得分统计
-    this.subjectScores = {}; // key -> score
+    // 每科得分统计（对象：subjectKey -> score）
+    this.subjectScores = {};
     this.hintsUsed = 0;
     this.skippedQuestions = 0; // 统计宠溺跳过次数
-    this.totalQuestionsCount = () => this.subjects.reduce((a, s) => a + s.questions.length, 0);
   }
   /**
    * 将 external JSON 数据转换为内部统一结构。
@@ -639,13 +638,11 @@ export class Scene2Exam extends BaseScene {
       // 提交按钮：判断正误；正确=加分；错误=宠溺满分 + 答案展示
       submitBtn.addEventListener('click', () => {
         if (wrapper._locked) return; // 操作锁
-        let userAns = '';
-        userAns = extractUserAnswer(wrapper, nextQ);
+        const userAns = extractUserAnswer(wrapper, nextQ);
         // 空输入/未选择：不给分也不判错，给予轻提示
         const isEmpty =
           (nextQ.type === 'fill' && userAns === '') ||
-          ((nextQ.type === 'select' || nextQ.type === 'single_select') &&
-            (userAns === '' || userAns == null)) ||
+          (nextQ.type === 'single_select' && (userAns === '' || userAns == null)) ||
           (nextQ.type === 'multi_select' && Array.isArray(userAns) && userAns.length === 0);
         if (isEmpty) {
           status.innerHTML = `<span class='err'>先填写/选择一个答案再提交哦~</span>`;
@@ -789,9 +786,7 @@ export class Scene2Exam extends BaseScene {
       const totalQuestions = this.subjects.reduce((a, s) => a + s.questions.length, 0);
       summaryEl.classList.remove('hidden');
       const allSkipped = this.skippedQuestions === totalQuestions;
-      // 取消 partialHighSkip 展示：仍计算但不再使用（保留变量以便未来需要恢复时方便）
-      const partialHighSkip =
-        !allSkipped && totalQuestions > 0 && this.skippedQuestions / totalQuestions >= 0.5;
+      // 已移除 partialHighSkip 统计（若需恢复，可从 git 历史找回）
       // 统计错误宠溺通过数量（既标记 _pamperedWrong 且未 _skipped）
       const pamperedWrongCount = this.subjects.reduce(
         (acc, s) => acc + s.questions.filter((q) => q._pamperedWrong).length,

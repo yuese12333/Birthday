@@ -21,9 +21,6 @@ function formatDuration(ms) {
  *  - 添加“再走一遍旅程”或“下载纪念图”功能
  */
 export class Scene8Final extends BaseScene {
-  async init() {
-    await super.init();
-  }
   async enter() {
     const el = document.createElement('div');
     el.className = 'scene scene-final placeholder';

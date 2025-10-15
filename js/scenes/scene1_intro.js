@@ -3,57 +3,6 @@ import { audioManager } from '../core/audioManager.js';
 import { typeSfx } from '../core/typeSfx.js';
 import { achievements } from '../core/achievements.js';
 
-// 若全局未提供 showOutcomeOverlay，这里给出一个最小可用的本地兜底实现
-// 语义：返回一个 Promise，在用户点击“继续”按钮后 resolve
-// 如果外部以后定义了 window.showOutcomeOverlay，会优先使用外部版本（保持可替换性）
-const showOutcomeOverlay = (type) => {
-  try {
-    if (typeof window !== 'undefined' && typeof window.showOutcomeOverlay === 'function') {
-      return window.showOutcomeOverlay(type);
-    }
-  } catch (_e) {
-    /* 忽略 window 访问异常（极少数环境）*/
-  }
-  return new Promise((resolve) => {
-    // 移除旧的
-    const old = document.querySelector('.outcome-overlay-fallback');
-    if (old) old.remove();
-    const ov = document.createElement('div');
-    ov.className = 'outcome-overlay-fallback';
-    ov.style.cssText =
-      'position:fixed;inset:0;z-index:9999;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.55);backdrop-filter:blur(2px);';
-    const box = document.createElement('div');
-    box.style.cssText =
-      'background:#fff;padding:1.4rem 1.6rem;max-width:340px;width:88%;border-radius:14px;box-shadow:0 6px 22px -4px rgba(0,0,0,.28);font-size:.95rem;line-height:1.55;animation:fadeScale .32s ease;';
-    const isWin = type === 'win';
-    box.innerHTML = `<h2 style="margin:0 0 .75rem;font-size:1.25rem;color:${
-      isWin ? '#e91e63' : '#3949ab'
-    };text-align:center;">${isWin ? '成功' : '失败'}</h2>
-      <p style='margin:.2rem 0 1rem;white-space:pre-line;'>${
-        isWin
-          ? '她信了你一次。（可在脚本里自定义更走心的文字）'
-          : '这次没说服她，再试试别的说法吧。'
-      }</p>
-      <button class='outcome-continue' style='display:block;margin:0 auto;padding:.55rem 1.2rem;border-radius:999px;border:none;background:${
-        isWin ? '#ff4d84' : '#5c6bc0'
-      };color:#fff;font-size:.9rem;cursor:pointer;'>继续</button>`;
-    ov.appendChild(box);
-    document.body.appendChild(ov);
-    const done = () => {
-      ov.style.opacity = '0';
-      ov.style.transition = 'opacity .22s';
-      setTimeout(() => {
-        ov.remove();
-        resolve();
-      }, 230);
-    };
-    box.querySelector('.outcome-continue').addEventListener('click', done);
-    ov.addEventListener('click', (e) => {
-      if (e.target === ov) done();
-    });
-  });
-};
-
 /**
  * Scene1Intro
  * 第一幕：纯分支视觉小说（无任何隐藏数值 / 好感度 / 进度条）
@@ -87,7 +36,7 @@ export class Scene1Intro extends BaseScene {
         <div class='phase-msg' data-phase='start'>回忆缓冲中...</div>
         <button class='bgm-btn intro-bgm' title='好听的音乐' style='margin-left:auto;'>♪</button>
       </div>
-      <div class='title-egg hidden'></div>
+      
     `;
 
     // 统一使用基类提供的文字不可选封装
@@ -95,8 +44,7 @@ export class Scene1Intro extends BaseScene {
 
     // 状态变量
     this.tags = new Set();
-    this.titleClicks = 0;
-    this._titleBonusGiven = false;
+    // 移除旧版 title 点击彩蛋逻辑残余：titleClicks/_titleBonusGiven/title-egg
 
     // 引用
     // 已移除 vnBox 直接引用（保留 DOM 结构即可）
@@ -106,7 +54,6 @@ export class Scene1Intro extends BaseScene {
     const choicesBox = el.querySelector('.dynamic-choices');
     const phaseMsg = el.querySelector('.phase-msg');
     const bgmBtn = el.querySelector('.intro-bgm');
-    const titleEgg = el.querySelector('.title-egg');
     const title = el.querySelector('.intro-title');
 
     // BGM

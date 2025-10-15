@@ -15,7 +15,6 @@ class Achievements {
     this.achievements = new Map(); // id -> {meta,predicate}
     this.unlocked = new Set();
     this.events = []; // 记录历史事件，供 predicate 使用判断条件
-    this.bus = null; // 可选的事件总线（EventBus），用于接入项目全局事件
     this._load();
     this._ensureToastContainer();
     // toast 队列，保证不会重叠显示
@@ -31,8 +30,6 @@ class Achievements {
     this._registeredAt = null;
     // 极速通关时间窗口（ms）
     this.quickFinishWindow = 10 * 60 * 1000; // 十分钟
-    // 成就描述初始可见性默认值（可通过 setDefaultDescriptionVisible 修改）
-    this._defaultDescriptionVisible = true;
   }
 
   _ensureToastContainer() {
@@ -185,7 +182,8 @@ class Achievements {
     }
     // predicate 接口： (events, recordEvent) => boolean | Promise<boolean>
     // events 为当前已记录的事件数组，recordEvent 可用于在 predicate 内部添加合成事件
-    const m = Object.assign({ descriptionVisible: this._defaultDescriptionVisible }, meta || {});
+    // 统一：未显式提供时默认隐藏描述（或根据 meta 传入）。此处固定默认 true 以保持现有成就显式配置兼容
+    const m = Object.assign({ descriptionVisible: true }, meta || {});
     this.achievements.set(id, { meta: m, predicate });
     // 注册后稍微延迟进行一次检查（以便捕获已经满足的条件）
     setTimeout(() => this._checkOne(id), 20);
@@ -262,12 +260,6 @@ class Achievements {
     for (const id of this.achievements.keys()) {
       this._checkOne(id);
     }
-    // 若已挂接到事件总线，则也向总线广播一个成就事件
-    if (this.bus && typeof this.bus.emit === 'function') {
-      try {
-        this.bus.emit('achievement:event', ev);
-      } catch (e) {}
-    }
   }
 
   // 强制解锁某个成就（可用于测试或管理员触发）
@@ -340,20 +332,6 @@ class Achievements {
     return Math.max(0, end - this._registeredAt);
   }
 
-  // 将成就管理器挂接到项目的事件总线（若有），方便自动转发全局事件
-  attachToEventBus(bus) {
-    this.bus = bus;
-    if (!bus) return;
-    if (typeof bus.on === 'function') {
-      // 示例：监听全局事件并转发到 recordEvent
-      try {
-        bus.on('app:event', (ev) => this.recordEvent(ev.name, ev.payload));
-      } catch (e) {
-        /* 尽力而为，不阻塞主流程 */
-      }
-    }
-  }
-
   // 返回所有已注册成就的列表，包含 id, meta, unlocked(boolean)
   listRegistered() {
     const out = [];
@@ -365,23 +343,6 @@ class Achievements {
       });
     }
     return out;
-  }
-
-  // 设置全局默认的 descriptionVisible 值（仅影响后续注册的成就）
-  setDefaultDescriptionVisible(flag) {
-    this._defaultDescriptionVisible = !!flag;
-  }
-
-  // 手动设置某个已注册成就的 descriptionVisible 值
-  setDescriptionVisible(id, flag) {
-    try {
-      const item = this.achievements.get(id);
-      if (!item) return false;
-      item.meta.descriptionVisible = !!flag;
-      return true;
-    } catch (e) {
-      return false;
-    }
   }
 }
 

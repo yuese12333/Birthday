@@ -13,7 +13,7 @@ export class Scene0Register extends BaseScene {
   async enter() {
     const el = document.createElement('div');
     el.className = 'scene scene-register';
-    // 已移除注册印记机制，无需 localStorage 标记
+    // 注册场景（本地纪念式验证，不建立真实账号体系）
     el.innerHTML = `
       <h1>进入之前 · 一个小小的仪式（开发版本不代表最终品质）</h1>
       <p class='desc'>这是我们专属的纪念入口。随便写一个“用户名”，然后输入那一天的日期当作密码。</p>
@@ -34,7 +34,7 @@ export class Scene0Register extends BaseScene {
         <div class='msg'></div>
       </form>
 
-      <!-- DEBUG PANEL START (开发期跳场景，成品可整块删除) -->
+  <!-- DEV: 场景跳转调试面板（发布可整体删除 details.debug-panel） -->
       <details class='debug-panel' style="margin-top:1rem; font-size:.7rem; opacity:.75;">
         <summary style="cursor:pointer;">⚙ 开发调试：快速跳转场景 (上线前删除)</summary>
         <div style="display:flex; flex-wrap:wrap; gap:.4rem; margin-top:.6rem;">
@@ -46,14 +46,12 @@ export class Scene0Register extends BaseScene {
           <button type='button' data-jump='scarf' style='background:#bbb;'>Scarf</button>
           <button type='button' data-jump='future' style='background:#bbb;'>Future</button>
           <button type='button' data-jump='final' style='background:#bbb;'>Final</button>
-          <!-- DEV-ONLY: 清空本地成就按钮，发布前可整体删除 DEV-ONLY START -->
+          <!-- DEV: 清空本地成就按钮（发布删除） -->
           <button type='button' data-clear-achievements style='background:#faa;color:#700;border:1px dashed #f55;padding:.35rem .6rem;border-radius:6px;'>清空成就</button>
-          <!-- DEV-ONLY END -->
         </div>
-        <p style='margin:.6rem 0 0; line-height:1.4;'>说明：
-          1) 按钮直接调用 sceneManager.go；2) 不做状态校验；3) 若需完全移除，删除本 details 块与下方相关监听即可。</p>
+        <p style='margin:.6rem 0 0; line-height:1.4;'>说明：按钮直接调用 sceneManager.go，不做状态校验；上线前删除本面板。</p>
       </details>
-      <!-- DEBUG PANEL END -->
+      <!-- /DEV PANEL -->
     `;
 
     // 统一使用基类提供的文字不可选封装
@@ -361,7 +359,7 @@ export class Scene0Register extends BaseScene {
               })();
             });
           }
-          // 仅保留关闭按钮，继续按钮已移除
+          // 仅保留关闭按钮
         } else {
           // 你的生日 的 彩蛋菜单（独立模板）
           eggWrap.innerHTML = `
@@ -508,7 +506,7 @@ export class Scene0Register extends BaseScene {
               })();
             });
           }
-          // 仅保留关闭按钮，继续按钮已移除
+          // 仅保留关闭按钮
         }
         return;
       }
@@ -706,18 +704,17 @@ export class Scene0Register extends BaseScene {
         btn.addEventListener('click', () => {
           const target = btn.getAttribute('data-jump');
           // 跳场景前可选择是否写入注册标记，确保后续流程不被卡住
-          if (target !== 'intro' && target !== 'resetReg') {
-          }
+          // （保留：未来可在此添加跳转前校验）
           this.ctx.go(target);
         });
       });
-      // DEV-ONLY: 清空成就按钮事件绑定（方便开发调试；上线前可整体删除） DEV-ONLY START
+      // DEV: 清空成就数据按钮绑定（发布前删除）
       const clearBtn = debugPanel.querySelector('button[data-clear-achievements]');
       if (clearBtn) {
         clearBtn.addEventListener('click', () => {
           try {
             if (!confirm('确定要清空本地成就数据吗？该操作不可恢复（仅用于开发调试）。')) return;
-            // 首选调用成就模块提供的清空接口，由它负责内存与本地存储的清理
+            // 优先调用成就模块清空接口
             try {
               if (typeof achievements?.clearAll === 'function') {
                 achievements.clearAll();

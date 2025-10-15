@@ -31,12 +31,12 @@ export class Scene3Timeline extends BaseScene {
   }
   async enter() {
     const CONFIG = {
-      puzzleSrc: 'data/scene3_puzzles.json', // 改用手动编辑器产出的新路径
-      gridSize: 9,
+      puzzleSrc: 'data/scene3_puzzles.json', // puzzles JSON 路径
+      // gridSize 已弃用：实际尺寸取决于 puzzle matrix
       showRuleHelp: true,
     };
 
-    // 将本幕“写死”为 4 关，每关一张对应图片，完成后飞向四角拼贴
+    // 写死为固定关卡数（四关）；所有循环/判定统一引用 REQUIRED_LEVELS
     const REQUIRED_LEVELS = 4;
     // 显式动画时间设定（毫秒）
     const REVEAL_FADE_MS = 900; // 图片淡入时长
@@ -246,8 +246,8 @@ export class Scene3Timeline extends BaseScene {
     // temporary image finishes animating into its slot (i.e. the "move to corner" finished).
     function startSplitForSrc(src, doneCb) {
       if (!src) return;
-      // 安全防御：仅允许前 4 关触发分裂（本幕已写死为四关）。
-      if (currentIndex < 0 || currentIndex >= 4) {
+      // 仅允许已定义范围内的关卡触发分裂动画
+      if (currentIndex < 0 || currentIndex >= REQUIRED_LEVELS) {
         hideRevealImmediate();
         return;
       }
@@ -285,7 +285,7 @@ export class Scene3Timeline extends BaseScene {
           // “写死”的四关：按当前关卡索引固定映射到四角
           // 逻辑顺序：0->左下,1->左上,2->右下,3->右上
           // DOM 2x2 顺序：0=左上,1=右上,2=左下,3=右下
-          const logical = currentIndex % 4;
+          const logical = currentIndex % REQUIRED_LEVELS;
           const logicalToDom = [2, 0, 3, 1];
           const domIdx = logicalToDom[logical];
           animateToSlot(tmp, domIdx, () => {
@@ -668,7 +668,7 @@ export class Scene3Timeline extends BaseScene {
       btnNext = root.querySelector('.btn-next');
       // 确保克隆后的按钮仍然具备无障碍属性
       ensureBtnAccessible(btnNext);
-      console.debug('[Nonogram] renderPuzzle: btnNext replaced/refreshed:', btnNext);
+      // 统一刷新按钮后的引用（调试日志已移除）
       // rowClues / colClues 已由上层传入，避免重复声明冲突
       const sizing = autoCellSize(w, h, 640, 480, 32, 14); // 计算单元格像素尺寸（受最大/最小限制）
       gridContainer.style.setProperty('--cell-size', sizing.cell + 'px');
@@ -803,7 +803,7 @@ export class Scene3Timeline extends BaseScene {
       // 统一启用进入下一幕按钮的方法，防止被克隆或属性残留导致禁用
       function enableNextButton() {
         const btn = root.querySelector('.btn-next');
-        console.debug('[Nonogram] enableNextButton called, btn found:', !!btn, btn);
+        // 设置按钮 ready 状态，等待完成动画后显示
         if (!btn) return;
         // 标记按钮已准备好（ready），但不要在此处直接将其显示。
         // 显示时机由 runCompletionAnimation 在图片淡入后统一控制。
@@ -1221,11 +1221,7 @@ export class Scene3Timeline extends BaseScene {
         // 淡出/淡入流程结束后再次显示“下一题”按钮
         // 要求：若有揭示图片，则在图片 opacity 过渡结束后再延迟 200ms 显示；否则保留原超时行为
         const btn = root.querySelector('.btn-next');
-        console.debug(
-          '[Nonogram] runCompletionAnimation timeout: scheduling btnNext show, found=',
-          !!btn,
-          btn
-        );
+        // 完成动画结束后调度显示下一题按钮
         if (!btn) return;
         // Helper：在 200ms 后显示按钮（仅当其被标记为 ready）
         const showNextButtonDelayed = () => {
