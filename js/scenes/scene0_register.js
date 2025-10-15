@@ -1,3 +1,63 @@
+/*
+<div class="checkbox-wrapper">
+  <input checked="" type="checkbox" class="check" id="check1-61">
+  <label for="check1-61" class="label">
+    <svg width="45" height="45" viewBox="0 0 95 95">
+      <rect x="30" y="20" width="50" height="50" stroke="black" fill="none"></rect>
+      <g transform="translate(0,-952.36222)">
+        <path d="m 56,963 c -102,122 6,9 7,9 17,-5 -66,69 -38,52 122,-77 -7,14 18,4 29,-11 45,-43 23,-4" stroke="black" stroke-width="3" fill="none" class="path1"></path>
+      </g>
+    </svg>
+    <span>Checkbox</span>
+  </label>
+</div>
+
+.checkbox-wrapper input[type="checkbox"] {
+  visibility: hidden;
+  display: none;
+}
+
+.checkbox-wrapper *,
+  .checkbox-wrapper ::after,
+  .checkbox-wrapper ::before {
+  box-sizing: border-box;
+  user-select: none;
+}
+
+.checkbox-wrapper {
+  position: relative;
+  display: block;
+  overflow: hidden;
+}
+
+.checkbox-wrapper .label {
+  cursor: pointer;
+}
+
+.checkbox-wrapper .check {
+  width: 50px;
+  height: 50px;
+  position: absolute;
+  opacity: 0;
+}
+
+.checkbox-wrapper .label svg {
+  vertical-align: middle;
+}
+
+.checkbox-wrapper .path1 {
+  stroke-dasharray: 400;
+  stroke-dashoffset: 400;
+  transition: .5s stroke-dashoffset;
+  opacity: 0;
+}
+
+.checkbox-wrapper .check:checked + label svg g path {
+  stroke-dashoffset: 0;
+  opacity: 1;
+}
+*/
+
 /**
  * 注册 / 纪念日验证场景
  * 目的：增加仪式感，不做真正的用户体系。
@@ -31,6 +91,20 @@ export class Scene0Register extends BaseScene {
           <button type='button' class='bgm-btn reg-bgm' title='好听的音乐' data-debounce style='background:#ffb3c4;width:46px;height:36px;font-size:.85rem;'>♪</button>
           <button type='button' class='forgot-btn' title='我忘了' data-debounce='600' style='margin-left:auto;'>我忘了</button>
         </div>
+        <div class='agreement-row'>
+          <label class='agreement-check-wrapper'>
+            <input type='checkbox' class='agreement-check' />
+            <span class='box' aria-hidden='true'>
+              <svg viewBox='0 0 95 95' class='tick-svg'>
+                <rect x='30' y='20' width='50' height='50' class='outline'/>
+                <g transform='translate(0,-952.36222)'>
+                  <path d='m 56,963 c -102,122 6,9 7,9 17,-5 -66,69 -38,52 122,-77 -7,14 18,4 29,-11 45,-43 23,-4' class='tick-path'></path>
+                </g>
+              </svg>
+            </span>
+            <span class='agreement-text'>我已阅读并同意 <button type='button' class='link-service-agreement'>服务协议</button></span>
+          </label>
+        </div>
         <div class='msg'></div>
       </form>
 
@@ -61,6 +135,143 @@ export class Scene0Register extends BaseScene {
     const msg = el.querySelector('.msg');
     const forgotBtn = form.querySelector('.forgot-btn');
     const bgmBtn = form.querySelector('.reg-bgm');
+    const agreementWrapper = el.querySelector('.agreement-check-wrapper');
+    const agreementInput = el.querySelector('.agreement-check');
+    const agreementLinkBtn = el.querySelector('.link-service-agreement');
+
+    // 注入协议复选框样式（防重复）
+    if (!document.getElementById('agreement-style')) {
+      const st = document.createElement('style');
+      st.id = 'agreement-style';
+      st.textContent = `
+      .agreement-row { margin:.85rem 0 .2rem; font-size:.75rem; line-height:1.3; color:#444; }
+      .agreement-check-wrapper { position:relative; display:inline-flex; align-items:center; gap:.55rem; cursor:pointer; user-select:none; }
+      .agreement-check-wrapper input { position:absolute; opacity:0; pointer-events:none; }
+      .agreement-check-wrapper .box { width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; }
+      .agreement-check-wrapper .tick-svg { width:32px; height:32px; }
+      .agreement-check-wrapper .outline { stroke:#ff6f90; fill:none; stroke-width:3; rx:6; }
+      .agreement-check-wrapper .tick-path { stroke:#ff6f90; stroke-width:3; fill:none; stroke-dasharray:400; stroke-dashoffset:400; opacity:0; transition:.5s stroke-dashoffset, .3s opacity; }
+      .agreement-check-wrapper input:checked + span .tick-path { stroke-dashoffset:0; opacity:1; }
+      .agreement-text { display:inline; }
+      .agreement-text .link-service-agreement { background:none; border:none; color:#ff4f7c; cursor:pointer; padding:0 2px; font-size:.75rem; text-decoration:underline; }
+      .agreement-text .link-service-agreement:hover { color:#ff2f66; }
+      .agreement-check-wrapper.agreement-error-shake { animation:pwdShake .5s; }
+      .agreement-check-wrapper.agreement-glow { box-shadow:0 0 0 3px rgba(255,111,144,.45); border-radius:8px; transition:.5s box-shadow; }
+      .agreement-check-wrapper.agreement-glow.fade { box-shadow:0 0 0 0 rgba(255,111,144,0); }
+      .agreement-overlay { position:fixed; left:0; top:0; width:100%; height:100%; background:rgba(0,0,0,.5); z-index:100000; display:flex; align-items:center; justify-content:center; animation:fadeIn .25s ease; }
+      .agreement-dialog { background:rgba(255,255,255,.98); width:min(620px,92vw); max-height:82vh; overflow:auto; border-radius:14px; padding:1.1rem 1.2rem 1.3rem; box-shadow:0 18px 50px -8px rgba(0,0,0,.35); position:relative; font-size:.78rem; line-height:1.55; color:#333; }
+      .agreement-dialog h2 { margin:0 0 .6rem; font-size:1.05rem; font-weight:600; color:#ff4f7c; }
+      .agreement-dialog .close-btn { position:absolute; right:10px; top:8px; background:#ff6f90; color:#fff; border:none; border-radius:6px; padding:.35rem .6rem; cursor:pointer; font-size:.7rem; }
+      .agreement-dialog .close-btn:hover { background:#ff537f; }
+      .agreement-dialog::-webkit-scrollbar { width:8px; }
+      .agreement-dialog::-webkit-scrollbar-thumb { background:#ff9fb4; border-radius:6px; }
+      .agreement-dialog section { margin-bottom:.85rem; }
+      .agreement-dialog section:last-child { margin-bottom:0; }
+      /* 避免被 .scene-register label {flex-direction:column} 影响：仅协议区域内 label 还原为行 */
+      .agreement-row > .agreement-check-wrapper { display:inline-flex; flex-direction:row !important; align-items:center; }
+      .agreement-row > .agreement-check-wrapper span.box { margin:0; }
+      .agreement-row .agreement-text { white-space:nowrap; }
+      `;
+      document.head.appendChild(st);
+    }
+
+    // 协议弹窗逻辑（动态加载 JSON + 缓存）
+    let _protocolCache = null; // {title,updatedAt,intro,sections[],ending}
+    async function fetchProtocol() {
+      if (_protocolCache) return _protocolCache;
+      try {
+        const res = await fetch('./data/scene0_protocol.json?_=' + Date.now());
+        if (!res.ok) throw new Error('status ' + res.status);
+        const json = await res.json();
+        _protocolCache = json;
+        return json;
+      } catch (e) {
+        throw e;
+      }
+    }
+    function buildProtocolHTML(data) {
+      try {
+        const parts = [];
+        parts.push(`<h2>${data.title || '服务协议'}</h2>`);
+        if (data.intro) parts.push(`<section><p>${escapeHTML(data.intro)}</p></section>`);
+        (data.sections || []).forEach((sec, idx) => {
+          const heading = escapeHTML(sec.heading || '节 ' + (idx + 1));
+          parts.push(
+            `<section><h3 style='margin:.5rem 0 .35rem;font-size:.85rem;color:#ff4f7c;'>${heading}</h3>`
+          );
+          (sec.paragraphs || []).forEach((p) => {
+            parts.push(`<p>${escapeHTML(p)}</p>`);
+          });
+          parts.push('</section>');
+        });
+        if (data.ending) parts.push(`<section><p>${escapeHTML(data.ending)}</p></section>`);
+        parts.push(
+          `<section><p style='margin-top:.8rem;color:#666;font-size:.7rem;'>最后更新：<span>${escapeHTML(
+            data.updatedAt || ''
+          )}</span></p></section>`
+        );
+        return parts.join('');
+      } catch (e) {
+        return `<p style='color:#b3002c;'>解析协议内容失败，请稍后再试。</p>`;
+      }
+    }
+    function escapeHTML(str) {
+      return String(str).replace(
+        /[&<>"]+/g,
+        (s) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[s] || s)
+      );
+    }
+    function openAgreementModal() {
+      if (document.querySelector('.agreement-overlay')) return; // 防重复
+      const overlay = document.createElement('div');
+      overlay.className = 'agreement-overlay';
+      const dialog = document.createElement('div');
+      dialog.className = 'agreement-dialog';
+      dialog.innerHTML = `
+        <button type='button' class='close-btn'>关闭</button>
+        <h2>加载中…</h2>
+        <section><p style='opacity:.7;'>正在获取协议内容，请稍候。</p></section>
+      `;
+      overlay.appendChild(dialog);
+      document.body.appendChild(overlay);
+
+      const close = () => {
+        try {
+          overlay.remove();
+        } catch (e) {}
+      };
+      dialog.querySelector('.close-btn').addEventListener('click', close);
+      overlay.addEventListener('click', (ev) => {
+        if (ev.target === overlay) close();
+      });
+      const esc = (ev) => {
+        if (ev.key === 'Escape') {
+          close();
+          window.removeEventListener('keydown', esc);
+        }
+      };
+      window.addEventListener('keydown', esc);
+
+      // 动态加载
+      fetchProtocol()
+        .then((data) => {
+          dialog.innerHTML =
+            `<button type='button' class='close-btn'>关闭</button>` + buildProtocolHTML(data);
+          dialog.querySelector('.close-btn').addEventListener('click', close);
+        })
+        .catch((err) => {
+          dialog.innerHTML = `<button type='button' class='close-btn'>关闭</button><h2>服务协议（占位）</h2><section><p style='color:#b3002c;'>加载失败：${escapeHTML(
+            err.message || '未知错误'
+          )}。使用临时占位内容。</p></section><section><p>本协议为占位文本，网络异常或路径错误导致正式内容未能载入。</p></section>`;
+          dialog.querySelector('.close-btn').addEventListener('click', close);
+        });
+    }
+    if (agreementLinkBtn) {
+      agreementLinkBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        openAgreementModal();
+      });
+    }
 
     // ---- BGM 自动播放逻辑 ----
     // 注意：使用 playSceneBGM 传入的是场景 id '0'，其内部以同样的 key '0' 存储。
@@ -193,6 +404,24 @@ export class Scene0Register extends BaseScene {
         span.style.cssText = 'animation:pwdShake .38s; color:#b3002c;';
         lines.appendChild(span);
         return; // 阻止继续处理
+      }
+      // 服务协议勾选校验
+      if (agreementInput && !agreementInput.checked) {
+        const { lines } = ensureErrorStructure();
+        lines.innerHTML = '';
+        const span = document.createElement('span');
+        span.textContent = '请先阅读并勾选服务协议';
+        span.style.cssText = 'animation:pwdShake .48s; color:#b3002c;';
+        lines.appendChild(span);
+        // 复选框抖动与高亮
+        if (agreementWrapper) {
+          agreementWrapper.classList.remove('agreement-error-shake');
+          void agreementWrapper.offsetWidth; // 强制重绘以重启动画
+          agreementWrapper.classList.add('agreement-error-shake', 'agreement-glow');
+          setTimeout(() => agreementWrapper.classList.add('fade'), 600);
+          setTimeout(() => agreementWrapper.classList.remove('agreement-glow', 'fade'), 1600);
+        }
+        return;
       }
       const data = new FormData(form);
       const pass = (data.get('pass') || '').trim();
@@ -564,7 +793,7 @@ export class Scene0Register extends BaseScene {
             }
           } catch (e) {}
           const bye = document.createElement('span');
-          bye.textContent = '……我不跟你玩了，退出！';
+          bye.textContent = '……我不跟你玩了，再见！';
           lines.appendChild(bye);
           // 记录成就事件：连续 6 次密码错误
           try {
@@ -680,7 +909,23 @@ export class Scene0Register extends BaseScene {
         setTimeout(() => forgotBtn.classList.remove('shake-once'), 600);
         const passInput = form.querySelector('input[name="pass"]');
         setTimeout(() => {
-          if (!passInput.value.trim()) passInput.placeholder = '快输入！';
+          if (!passInput.value.trim()) {
+            // 替换 label 的分片文本为“快输入！”保持原逐字动画延迟结构
+            const passLabel = passInput.closest('.form-control')?.querySelector('label');
+            if (passLabel) {
+              passLabel.innerHTML = '';
+              const txt = '快输入！';
+              for (let i = 0; i < txt.length; i++) {
+                const span = document.createElement('span');
+                span.textContent = txt[i];
+                span.style.transitionDelay = i * 80 + 'ms';
+                passLabel.appendChild(span);
+              }
+            } else {
+              // 兜底：仍使用 placeholder
+              passInput.placeholder = '快输入！';
+            }
+          }
         }, 2000);
         // 成就触发点：当忘记按钮达到第5次并显示哭脸时，记录事件供成就检测
         try {
