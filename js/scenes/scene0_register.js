@@ -1,69 +1,14 @@
-/*
-<div class="checkbox-wrapper">
-  <input checked="" type="checkbox" class="check" id="check1-61">
-  <label for="check1-61" class="label">
-    <svg width="45" height="45" viewBox="0 0 95 95">
-      <rect x="30" y="20" width="50" height="50" stroke="black" fill="none"></rect>
-      <g transform="translate(0,-952.36222)">
-        <path d="m 56,963 c -102,122 6,9 7,9 17,-5 -66,69 -38,52 122,-77 -7,14 18,4 29,-11 45,-43 23,-4" stroke="black" stroke-width="3" fill="none" class="path1"></path>
-      </g>
-    </svg>
-    <span>Checkbox</span>
-  </label>
-</div>
-
-.checkbox-wrapper input[type="checkbox"] {
-  visibility: hidden;
-  display: none;
-}
-
-.checkbox-wrapper *,
-  .checkbox-wrapper ::after,
-  .checkbox-wrapper ::before {
-  box-sizing: border-box;
-  user-select: none;
-}
-
-.checkbox-wrapper {
-  position: relative;
-  display: block;
-  overflow: hidden;
-}
-
-.checkbox-wrapper .label {
-  cursor: pointer;
-}
-
-.checkbox-wrapper .check {
-  width: 50px;
-  height: 50px;
-  position: absolute;
-  opacity: 0;
-}
-
-.checkbox-wrapper .label svg {
-  vertical-align: middle;
-}
-
-.checkbox-wrapper .path1 {
-  stroke-dasharray: 400;
-  stroke-dashoffset: 400;
-  transition: .5s stroke-dashoffset;
-  opacity: 0;
-}
-
-.checkbox-wrapper .check:checked + label svg g path {
-  stroke-dashoffset: 0;
-  opacity: 1;
-}
-*/
-
 /**
- * 注册 / 纪念日验证场景
- * 目的：增加仪式感，不做真正的用户体系。
+ * Scene0 — 注册/纪念日验证场景
+ *
+ * 目的：
+ * - 增加仪式感，不做真正的用户体系
+ * - 作为游戏的入口验证
+ *
  * 规则：
- *  - 用户名任意（可为空）
- *  - 密码必须为 20241007 （在一起的日子）
+ * - 用户名任意（可为空）
+ * - 密码必须为 20241007 （在一起的日子）
+ * - 必须同意服务协议才能进入
  */
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';

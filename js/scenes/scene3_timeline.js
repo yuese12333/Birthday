@@ -1,30 +1,31 @@
+/**
+ * Scene3 — 心动瞬间（数织 Nonogram）
+ *
+ * 设计要点：
+ * - 从预生成的 puzzles JSON 加载若干关（固定为 4 关）
+ * - matrix 为 0/1 二值矩阵，1 表示应涂色的格子
+ * - 矩阵尺寸可变但每项必须为相同宽度
+ *
+ * 数据契约：
+ * - 文件路径：默认从 `data/scene3_puzzles.json` 加载，期望形如 { puzzles: [ ... ] }
+ * - 每个 puzzle 必须包含 matrix 和 image（或 meta.image）
+ * - 本场景强制使用 EXACT_LEVELS = 4（REQUIRED_LEVELS），多余项会被截断，不足则报错
+ *
+ * 核心行为：
+ * - 渲染：根据 matrix 生成行/列线索（run-length），渲染线索区与交互网格
+ * - 交互：左键/触摸 = 涂色或擦除（拖拽支持）；右键/长按 = 标记
+ * - 判定：当每个格子的涂色状态严格匹配 matrix（无缺漏且无多涂）时判定为完成。
+ *
+ * Completion animation / collage
+ * - 完成时将淡入该关的原始图片（reveal image），随后图片会"分裂"并飞入四个角的槽位。
+ * - 当四个槽位均被填入图片后，overlay 将淡出并显示最终拼贴图像（由常量 FINAL_COLLAGE_SRC 指定）。
+ * - 关键常量：REVEAL_FADE_MS, SPLIT_ANIM_MS, COLLAGE_FADE_MS, FINAL_COLLAGE_FADE_MS, FINAL_COLLAGE_SRC
+ */
+
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
 import { achievements } from '../core/achievements.js';
 
-/**
- * Scene3 — 心动瞬间（数织 Nonogram）
- *
- * Purpose
- *  - 从预生成的 puzzles JSON 加载若干关（本实现写死为 4 关），每关包含：
- *      { meta: { index, title, image }, matrix: number[][] }
- *  - matrix 为 0/1 二值矩阵，1 表示应涂色的格子；矩阵尺寸可变但每项必须为相同宽度。
- *
- * Data contract / constraints
- *  - 文件路径：默认从 `data/scene3_puzzles.json` 加载，期望形如 { puzzles: [ ... ] }。
- *  - 每个 puzzle 必须包含 matrix 和 image（或 meta.image）。
- *  - 本场景强制使用 EXACT_LEVELS = 4（REQUIRED_LEVELS），多余项会被截断，不足则报错。
- *
- * Key behavior
- *  - 渲染：根据 matrix 生成行/列线索（run-length），渲染线索区与交互网格。
- *  - 交互：左键/触摸 = 涂色或擦除（拖拽支持）；右键/长按 = 标记。
- *  - 判定：当每个格子的涂色状态严格匹配 matrix（无缺漏且无多涂）时判定为完成。
- *
- * Completion animation / collage
- *  - 完成时将淡入该关的原始图片（reveal image），随后图片会"分裂"并飞入四个角的槽位。
- *  - 当四个槽位均被填入图片后，overlay 将淡出并显示最终拼贴图像（由常量 FINAL_COLLAGE_SRC 指定）。
- *  - 关键常量：REVEAL_FADE_MS, SPLIT_ANIM_MS, COLLAGE_FADE_MS, FINAL_COLLAGE_FADE_MS, FINAL_COLLAGE_SRC
- */
 export class Scene3Timeline extends BaseScene {
   async init() {
     await super.init();
@@ -32,7 +33,6 @@ export class Scene3Timeline extends BaseScene {
   async enter() {
     const CONFIG = {
       puzzleSrc: 'data/scene3_puzzles.json', // puzzles JSON 路径
-      // gridSize 已弃用：实际尺寸取决于 puzzle matrix
       showRuleHelp: true,
     };
 

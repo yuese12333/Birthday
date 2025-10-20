@@ -1,23 +1,24 @@
+/**
+ * Scene1 — 穿越回高中（分支视觉小说）
+ *
+ * 设计原则：
+ * - 脚本驱动：所有剧情行与分支按钮全部来源于外部 JSON（data/scene1_script.json）
+ * - 最小内核：只有【行播放 → 行播完显示分支 → 选择跳转阶段】三件事
+ * - 无副作用状态：不在内部累计数值；仅预留 this.tags 供未来可选扩展
+ * - 可热更新脚本：追加 Date.now() 防缓存，便于直接刷新调试脚本
+ * - 可读性优先：打字机 + 说话人徽标 + 移动端点击兼容
+ *
+ * 扩展点预留：
+ * - 标签：choice 可在未来扩展 tagsAdd 字段写入 this.tags
+ * - 语速：可在脚本行级添加 typingSpeed 覆盖全局 typingSpeed
+ * - 条件分支：未来可在渲染 choices 前过滤 requireTags / excludeTags
+ */
+
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
 import { typeSfx } from '../core/typeSfx.js';
 import { achievements } from '../core/achievements.js';
 
-/**
- * Scene1Intro
- * 第一幕：纯分支视觉小说（无任何隐藏数值 / 好感度 / 进度条）
- * 设计原则：
- *  - “脚本驱动”：所有剧情行与分支按钮全部来源于外部 JSON（data/scene1_script.json）
- *  - “最小内核”：只有【行播放 → 行播完显示分支 → 选择跳转阶段】三件事
- *  - “无副作用状态”：不在内部累计数值；仅预留 this.tags 供未来可选扩展
- *  - “可热更新脚本”：追加 Date.now() 防缓存，便于直接刷新调试脚本
- *  - “可读性优先”：打字机 + 说话人徽标 + 移动端点击兼容
- *
- * 扩展点预留：
- *  - 标签：choice 可在未来扩展 tagsAdd 字段写入 this.tags
- *  - 语速：可在脚本行级添加 typingSpeed 覆盖全局 typingSpeed
- *  - 条件分支：未来可在渲染 choices 前过滤 requireTags / excludeTags
- */
 export class Scene1Intro extends BaseScene {
   async enter() {
     const el = document.createElement('div');
@@ -44,10 +45,8 @@ export class Scene1Intro extends BaseScene {
 
     // 状态变量
     this.tags = new Set();
-    // 移除旧版 title 点击彩蛋逻辑残余：titleClicks/_titleBonusGiven/title-egg
 
     // 引用
-    // 已移除 vnBox 直接引用（保留 DOM 结构即可）
     const vnText = el.querySelector('.vn-text');
     const speakerLeft = el.querySelector('.vn-speaker.left');
     const speakerRight = el.querySelector('.vn-speaker.right');
@@ -78,7 +77,6 @@ export class Scene1Intro extends BaseScene {
     // 起始阶段不再硬编码必须存在 dialogue_0_1；若缺失则取第一条，增强脚本灵活性。
     const stageMap = new Map(script.stages.map((s) => [s.id, s]));
     const findStage = (id) => stageMap.get(id);
-    // === 精简版 dialogue_x_y & win/fail ===
     // 约定：id = dialogue_<failCount>_<seq>
     // fail 分支：跳到 dialogue_{failCount+1}_1
     const dialoguePattern = /^dialogue_(\d+)_([\w-]+)$/;
