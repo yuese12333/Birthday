@@ -1,113 +1,97 @@
 import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
+import { achievements } from '../core/achievements.js';
 
-/**
- * Scene5Date —— “第一次约会” 多关卡卡牌组合玩法
- * --------------------------------------------------------------------
- * 设计目标（本次重构核心）：
- *  1. 数据外部化：所有关卡（levels）、卡牌（cards）、协同规则（synergyRules）由
- *     ./data/scene5_levels.json 提供；代码仅做驱动与评分，不写死业务内容。
- *  2. 可塑性：不同关可以拥有完全不同的卡牌集合 / 选择数量区间 / 目标标签。
- *  3. 协同引擎抽象：统一遍历 rule 列表执行，当前内置：
- *        - type: 'set'     固定卡牌 id 全部被选中触发
- *        - type: 'tagCombo' 标签组合（all=true 需全含，否则任意命中即可）
- *     预留扩展：ratio / sequence / pairPrefer / avoidConflict ...
- *  4. 评分拆解：{ base, targetBonus, synergyBonus, total, ruleHits[] } 便于后续展示或成就统计。
- *  5. 失败兜底：若外部 JSON 加载失败，提供最小 fallback 关卡，避免流程断裂。
- *
- * 外部 JSON 约定（简化示例）：
- *  {
- *    "levels":[{
- *      "id":1,
- *      "title":"第一关 · 轻松破冰",
- *      "tip":"想要：轻松 + 温柔",
- *      "pick":[2,3],                // [min,max]
- *      "targetTags":["light","soft"],
- *      "cards":[ {"id":"show_soft","title":"…","base":2,"tags":["soft","show"],"hint":"…"} ],
- *      "synergyRules":[
- *         {"type":"set","ids":["show_soft","drink_milk"],"bonus":2,"label":"柔声与温奶"},
- *         {"type":"tagCombo","tags":["sweet","romance"],"all":false,"bonus":1,"label":"甜意点缀"}
- *      ]
- *    }]
- *  }
- *
- * 核心内部状态：
- *    this.levels[]                // 外部载入
- *    this.currentLevelIndex       // 当前关索引
- *    this.selected: Set<cardId>   // 当前关已选择卡牌
- *    this.levelScores[]           // 各关评分结果（按顺序 push）
- *    this.levelResolved:boolean   // 是否已结算本关
- *
- * 扩展指引：
- *  - 新增规则：在 calcScore rules.forEach 分支里添加新 type；或抽出独立函数映射表。
- *  - 新增卡牌属性：直接在 JSON 中添加字段；渲染时在 renderCards 补展示（不影响评分）。
- *  - 自定义评价文案：当前在 final 汇总里用比例生成，可改成读取 data.meta.evaluationTable。
- *  - 记录最优组合：保存 this.levelScores 与对应 cardId 集合到 localStorage。
- */
 export class Scene5Date extends BaseScene {
   async init() {
     await super.init();
-    const resp = await fetch('./data/scene5_levels.json');
-    if (!resp.ok) throw new Error('关卡配置加载失败: ' + resp.status);
-    const data = await resp.json();
-    if (!Array.isArray(data.levels)) throw new Error('关卡配置格式错误：levels 必须为数组');
-    this.levels = data.levels;
-    this.currentLevelIndex = 0;
-    this.levelScores = [];
-    this.selected = new Set();
+    // 从 data/scene5_levels.json 读取关卡配置（默认使用第一关），不做回退处理
+    const resp = await fetch('data/scene5_levels.json');
+    const d = await resp.json();
+    const levels = Array.isArray(d && d.levels) ? d.levels : [];
+    // 持久化到实例，供 enter 使用
+    this.levels = levels;
+    // 支持通过 URL 参数 scene5_level 指定要使用的关卡（可以是 id 或 以 1 为基准的序号）
+    const params = new URLSearchParams(window.location.search);
+    const sel = params.get('scene5_level');
+    let chosen = levels[0];
+    if (sel) {
+      const byId = levels.find((x) => String(x.id) === String(sel));
+      if (byId) chosen = byId;
+      else {
+        const asNum = Number(sel);
+        if (!Number.isNaN(asNum) && levels[asNum - 1]) chosen = levels[asNum - 1];
+      }
+    }
+    if (chosen && chosen.gridSize) this.gridSize = Number(chosen.gridSize) || this.gridSize;
+    // 记录当前关索引
+    const foundIdx = levels.findIndex(
+      (lv) => lv === chosen || (lv && chosen && String(lv.id) === String(chosen.id))
+    );
+    this.currentLevelIndex = foundIdx >= 0 ? foundIdx : 0;
+    // 支持 mineCounts 而不是固定坐标的 mines（编辑器只保存每档雷数）
+    this.mines = [];
+    if (chosen && typeof chosen.mineCounts === 'object' && chosen.mineCounts !== null) {
+      this.mineCounts = {
+        easy: Number(chosen.mineCounts.easy) || 8,
+        medium: Number(chosen.mineCounts.medium) || 12,
+        hard: Number(chosen.mineCounts.hard) || 18,
+      };
+    } else {
+      this.mineCounts = { easy: 8, medium: 12, hard: 18 };
+    }
+    // 读取 disabled（禁用格）配置
+    if (chosen && Array.isArray(chosen.disabled))
+      this.disabled = chosen.disabled.map((d) => [Number(d[0]), Number(d[1])]);
+    else this.disabled = [];
+    this.flags = new Set();
+    this.opened = new Set();
+    this.gameOver = false;
+    // 每关点击计数（用于检测首发踩雷）
+    this._levelClicks = 0;
   }
 
   async enter() {
     const el = document.createElement('div');
     el.className = 'scene scene-date';
     el.innerHTML = `
-      <h1>场景5：第一次正式约会 · 卡牌组合</h1>
-      <div style="display:flex; gap:.8rem; align-items:center; flex-wrap:wrap; margin:.3rem 0 .4rem;">
-        <div class='level-info'></div>
-        <button class='bgm-btn date-bgm' title='好听的音乐' data-debounce style='margin-left:auto;'>♪</button>
+      <h1>场景5：心跳扫雷</h1>
+      <div style="display:flex; gap:.6rem; align-items:center; margin:.3rem 0 .6rem;">
+        <div class='status'>剩余雷数: <span class='remain'></span></div>
+        <div class='level-progress' style='margin-left:.6rem;'>关卡 <span class='level-cur'></span>/<span class='level-total'></span></div>
+        <button class='bgm-btn date-bgm' title='音乐' style='margin-left:auto;'>♪</button>
       </div>
-      <div class='card-grid'></div>
-      <div class='chosen-panel'>
-        <div>已选卡牌：<span class='count'>0</span></div>
-        <div class='list'></div>
-        <div class='limit-hint'></div>
+      <div class='ms-wrapper'>
+        <div class='ms-grid'></div>
       </div>
-      <div class='actions'>
-        <button class='calc' disabled data-debounce='600'>提交本关</button>
-        <button class='reset' data-debounce='400'>重选</button>
+      <div class='ms-controls' style='margin-top:.6rem; display:flex; gap:.6rem; align-items:center;'>
+        <button class='restart' data-debounce='600'>重开本关</button>
+        <div class='msg' style='margin-left:auto; color:#333;'></div>
       </div>
-      <div class='score-box'></div>
-      <button class='next-level-btn hidden' data-debounce='700'>进入下一关 →</button>
-      <button class='final-btn hidden' data-debounce='800'>完成并继续旅程</button>
-      <div class='summary-container'></div>
-      <div class='synergy-pop'></div>
     `;
 
-    // 统一使用基类提供的文字不可选封装
     this.applyNoSelect(el);
-
-    // ---- DOM 引用缓存 ----
-    const levelInfo = el.querySelector('.level-info');
-    const grid = el.querySelector('.card-grid');
-    const chosenList = el.querySelector('.chosen-panel .list');
-    const countEl = el.querySelector('.chosen-panel .count');
-    const limitHint = el.querySelector('.chosen-panel .limit-hint');
-    const calcBtn = el.querySelector('.calc');
-    const resetBtn = el.querySelector('.reset');
-    const scoreBox = el.querySelector('.score-box');
-    const nextBtn = el.querySelector('.next-level-btn');
-    const finalBtn = el.querySelector('.final-btn');
-    const synergyPop = el.querySelector('.synergy-pop');
-    const summaryContainer = el.querySelector('.summary-container');
+    const gridEl = el.querySelector('.ms-grid');
+    const remainEl = el.querySelector('.remain');
+    const levelCurEl = el.querySelector('.level-cur');
+    const levelTotalEl = el.querySelector('.level-total');
+    const msgEl = el.querySelector('.msg');
+    const restartBtn = el.querySelector('.restart');
     const bgmBtn = el.querySelector('.date-bgm');
 
-    // 自动播放约会场景 BGM
-    // 播放场景 BGM（key 统一用数字 '5'）
-    const bgmAudio = audioManager.playSceneBGM('5', { loop: true, volume: 0.6, fadeIn: 900 });
+    // 初始化关卡进度显示
+    if (levelTotalEl)
+      levelTotalEl.textContent =
+        this.levels && this.levels.length ? this.levels.length : levels.length;
+    if (levelCurEl)
+      levelCurEl.textContent =
+        typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex + 1 : 1;
+
+    // BGM（保留原 key '5' 行为一致性）
+    const bgmAudio = audioManager.playSceneBGM('5', { loop: true, volume: 0.55, fadeIn: 700 });
     bgmBtn.addEventListener('click', () => {
       if (bgmAudio && bgmAudio.paused) {
-        const p = bgmAudio.play();
-        if (p) p.catch(() => {});
+        bgmAudio.play().catch(() => {});
         audioManager.globalMuted = false;
         bgmAudio.muted = false;
         bgmBtn.classList.remove('muted');
@@ -117,222 +101,530 @@ export class Scene5Date extends BaseScene {
       bgmBtn.classList.toggle('muted', muted);
     });
 
-    // 工具函数：获取当前关配置
-    const currentLevel = () => this.levels[this.currentLevelIndex];
+    // 网格的最小样式
+    if (!document.getElementById('ms-style')) {
+      const s = document.createElement('style');
+      s.id = 'ms-style';
+      s.textContent = `
+      .ms-grid { display:grid; grid-template-columns: repeat(${this.gridSize}, 40px); gap:6px; }
+      .ms-cell { width:40px; height:40px; background:#f2f2f2; border-radius:6px; display:flex;align-items:center;justify-content:center;cursor:pointer; user-select:none; font-weight:700; }
+      .ms-cell.opened { background:#fff; cursor:default; box-shadow:inset 0 0 0 1px #e6e6e6; }
+      .ms-cell.flagged { background:#fff3f5; color:#d33; }
+      .ms-cell.mine { background:#ffdddd; color:#900; }
+      .ms-cell.number-1 { color:#0b66ff; }
+      .ms-cell.number-2 { color:#0b9e3f; }
+      .ms-cell.number-3 { color:#ff6b6b; }
+      .ms-cell.number-4 { color:#5829b5; }
+  /* disabled 单元不显示内容且不可交互，但保留格位占位以不打乱坐标 */
+  .ms-cell.disabled { background:transparent; color:transparent; visibility:hidden; pointer-events:none; }
+  .ms-controls button.selected { outline:2px solid #0b66ff; box-shadow:0 0 0 2px rgba(11,102,255,0.08); }
+      `;
+      document.head.appendChild(s);
+    }
 
-    // 更新顶部关卡标题 & 选择限制提示
-    const updateLevelInfo = () => {
-      const lv = currentLevel();
-      levelInfo.textContent = `${lv.title} ｜ 提示：${lv.tip}`;
-      limitHint.textContent = `需要选择 ${lv.pick[0]}~${lv.pick[1]} 张卡牌`;
-    };
+    // 辅助函数
+    const idx = (r, c) => `${r},${c}`;
+    const parseIdx = (key) => key.split(',').map((n) => parseInt(n, 10));
+    let disabledSet = new Set((this.disabled || []).map(([r, c]) => idx(r, c)));
+    const mineKeys = (this.mines || [])
+      .map(([r, c]) => idx(r, c))
+      .filter((k) => !disabledSet.has(k));
+    // 注意：如果使用随机布雷，则初始 this.mines 为空；会在 startGame 时生成
+    let mineSet = new Set(mineKeys);
+    let totalMines = mineSet.size;
 
-    const renderCards = () => {
-      grid.innerHTML = '';
-      const lv = currentLevel();
-      (lv.cards || []).forEach((card) => {
-        const div = document.createElement('div');
-        div.className = 'card';
-        div.dataset.id = card.id;
-        // 先写入标题，标签区域下方再动态补齐（避免复杂模板 & 转义问题）
-        const tagsWrap = document.createElement('div');
-        tagsWrap.className = 'tags';
-        card.tags.forEach((t) => {
-          const span = document.createElement('span');
-          let cls = 'tag';
-          if (
-            t === 'show' ||
-            t === 'healing' ||
-            t === 'fun' ||
-            t === 'deep' ||
-            t === 'tear' ||
-            t === 'light'
-          )
-            cls += ' type-show';
-          if (['food', 'sweet', 'romance', 'spicy', 'stim', 'warm', 'soft'].includes(t))
-            cls += ' type-food';
-          if (['drink', 'fresh', 'citrus', 'aroma'].includes(t)) cls += ' type-drink';
-          span.className = cls;
-          span.textContent = t;
-          tagsWrap.appendChild(span);
-        });
-        const baseEl = document.createElement('div');
-        baseEl.className = 'base';
-        baseEl.textContent = `基础 ${card.base}`;
-        const hintEl = document.createElement('div');
-        hintEl.className = 'hint';
-        hintEl.textContent = card.hint;
-        div.innerHTML = `<div class='title'>${card.title}</div>`;
-        div.appendChild(tagsWrap);
-        div.appendChild(baseEl);
-        div.appendChild(hintEl);
-        div.addEventListener('click', () => {
-          if (div.classList.contains('locked')) return;
-          if (this.levelResolved) return; // 当前关已结算
-          const lv = currentLevel();
-          if (this.selected.has(card.id)) this.selected.delete(card.id);
-          else this.selected.add(card.id);
-          div.classList.toggle('selected');
-          refreshSelectionUI();
-        });
-        grid.appendChild(div);
-      });
-    };
-
-    // 刷新“已选卡牌”侧边面板 + 计算按钮可用状态
-    const refreshSelectionUI = () => {
-      chosenList.innerHTML = '';
-      const lv = currentLevel();
-      this.selected.forEach((id) => {
-        const card = (lv.cards || []).find((c) => c.id === id);
-        const pill = document.createElement('span');
-        pill.className = 'chosen-pill';
-        pill.textContent = card.title.split('·')[1]?.trim() || card.title;
-        chosenList.appendChild(pill);
-      });
-      countEl.textContent = this.selected.size;
-      const [min, max] = currentLevel().pick;
-      calcBtn.disabled = this.selected.size < min || this.selected.size > max;
-    };
-
-    const showSynergyPop = (text) => {
-      synergyPop.textContent = text;
-      synergyPop.classList.add('show');
-      setTimeout(() => synergyPop.classList.remove('show'), 1300);
-    };
-
-    // 评分引擎：执行当前关卡协同规则
-    // 评分核心：根据当前关卡配置与选中集合计算得分
-    const calcScore = () => {
-      const lv = currentLevel();
-      const picked = Array.from(this.selected)
-        .map((id) => (lv.cards || []).find((c) => c.id === id))
-        .filter(Boolean);
-      const tagSet = new Set(picked.flatMap((c) => c.tags));
-      const base = picked.reduce((a, c) => a + (c.base || 0), 0);
-      // 目标标签 bonus：命中一个 +1
-      const targetBonus = (lv.targetTags || []).reduce(
-        (acc, t) => acc + (tagSet.has(t) ? 1 : 0),
-        0
-      );
-      let synergyBonus = 0;
-      const ruleHits = [];
-      const rules = Array.isArray(lv.synergyRules) ? lv.synergyRules : [];
-      rules.forEach((rule) => {
-        if (rule.type === 'set') {
-          // 固定 id 集合全部被选中
-          const all = (rule.ids || []).every((id) => this.selected.has(id));
-          if (all) {
-            synergyBonus += rule.bonus || 0;
-            ruleHits.push(rule.label || 'set');
-            showSynergyPop(`${rule.label || '组合'} +${rule.bonus}`);
-          }
-        } else if (rule.type === 'tagCombo') {
-          // 标签组合：all=true 需全部包含；否则任意一个即可（至少一个）
-          const tags = rule.tags || [];
-          const hasAll = tags.every((t) => tagSet.has(t));
-          const hasAny = tags.some((t) => tagSet.has(t));
-          const pass = rule.all ? hasAll : hasAny;
-          if (pass) {
-            synergyBonus += rule.bonus || 0;
-            ruleHits.push(rule.label || 'tagCombo');
-            showSynergyPop(`${rule.label || '标签协同'} +${rule.bonus}`);
+    const neighbors = (r, c) => {
+      const res = [];
+      for (let dr = -1; dr <= 1; dr++)
+        for (let dc = -1; dc <= 1; dc++) {
+          if (dr === 0 && dc === 0) continue;
+          const nr = r + dr,
+            nc = c + dc;
+          if (nr >= 0 && nr < this.gridSize && nc >= 0 && nc < this.gridSize) {
+            const k = idx(nr, nc);
+            if (disabledSet.has(k)) continue;
+            res.push([nr, nc]);
           }
         }
-        // 预留：else if(rule.type==='ratio') {...}
-      });
-      const total = base + targetBonus + synergyBonus;
-      return { base, targetBonus, synergyBonus, total, ruleHits };
+      return res;
     };
 
-    // 关卡结算：锁定卡牌防止继续修改
-    const lockCards = () => {
-      this.levelResolved = true;
-      grid.querySelectorAll('.card').forEach((c) => c.classList.add('locked'));
-    };
+    const countAdjacentMines = (r, c) =>
+      neighbors(r, c).reduce((a, [nr, nc]) => a + (mineSet.has(idx(nr, nc)) ? 1 : 0), 0);
 
-    // “提交本关”点击：计算得分 & 展示下一步按钮
-    calcBtn.addEventListener('click', () => {
-      if (calcBtn.disabled) return;
-      const sc = calcScore();
-      lockCards();
-      this.levelScores.push(sc);
-      scoreBox.innerHTML = `基础 ${sc.base} + 目标匹配 ${sc.targetBonus} + 协同 ${sc.synergyBonus} = <strong>${sc.total}</strong>`;
-      const isLast = this.currentLevelIndex === this.levels.length - 1;
-      if (isLast) {
-        finalBtn.classList.remove('hidden');
-      } else {
-        nextBtn.classList.remove('hidden');
+    // 渲染网格（disabled 单元以 × 显示且不绑定事件）
+    function buildGrid() {
+      gridEl.innerHTML = '';
+      gridEl.style.gridTemplateColumns = `repeat(${this.gridSize}, 40px)`;
+      for (let r = 0; r < this.gridSize; r++) {
+        for (let c = 0; c < this.gridSize; c++) {
+          const cell = document.createElement('div');
+          cell.className = 'ms-cell';
+          cell.dataset.r = r;
+          cell.dataset.c = c;
+          const key = idx(r, c);
+          if (disabledSet.has(key)) {
+            cell.classList.add('disabled');
+          } else {
+            cell.addEventListener('click', (e) => {
+              if (!this.gameOver) onLeftClick(r, c, cell);
+            });
+            cell.addEventListener('contextmenu', (e) => {
+              e.preventDefault();
+              if (!this.gameOver) onRightClick(r, c, cell);
+            });
+          }
+          gridEl.appendChild(cell);
+        }
       }
-      const lvEnd = document.createElement('div');
-      lvEnd.className = 'level-end';
-      lvEnd.textContent = '本关完成，随时可继续。';
-      scoreBox.appendChild(lvEnd);
-    });
+      remainEl.textContent = totalMines - this.flags.size;
+    }
 
-    // 重选：仅在未结算时允许清空选择
-    resetBtn.addEventListener('click', () => {
-      if (this.levelResolved) return; // 结算后不可重置
-      this.selected.clear();
-      grid.querySelectorAll('.card').forEach((c) => c.classList.remove('selected'));
-      refreshSelectionUI();
-    });
+    // 按难度随机布雷（排除 disabled）
+    const randomPlaceMines = (count) => {
+      const available = [];
+      for (let r = 0; r < this.gridSize; r++)
+        for (let c = 0; c < this.gridSize; c++) {
+          const k = idx(r, c);
+          if (!disabledSet.has(k)) available.push(k);
+        }
+      // 如果请求的雷数超过可用格数，按最大可用数
+      const n = Math.min(count, available.length);
+      // 洗牌并取前 n
+      for (let i = available.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [available[i], available[j]] = [available[j], available[i]];
+      }
+      return new Set(available.slice(0, n));
+    };
 
-    // 进入下一关：重置临时状态
-    nextBtn.addEventListener('click', () => {
-      this.currentLevelIndex++;
-      this.selected.clear();
-      this.levelResolved = false;
-      nextBtn.classList.add('hidden');
-      scoreBox.textContent = '';
-      summaryContainer.textContent = '';
-      grid.innerHTML = '';
-      renderCards();
-      updateLevelInfo();
-      refreshSelectionUI();
-    });
+    // 启动或重置游戏（根据当前 difficulty 随机布雷）
+    this.currentDifficulty = null; // 只有用户显式选择难度后才开始
+    this.gameStarted = false;
+    const startGame = (difficulty) => {
+      // 重新计算 disabledSet（可能是在切换关卡后）
+      disabledSet = new Set((this.disabled || []).map(([r, c]) => idx(r, c)));
+      this.flags.clear();
+      this.opened.clear();
+      this.gameOver = false;
+      msgEl.textContent = '';
+      const count = Number(this.mineCounts && this.mineCounts[difficulty]) || 0;
+      mineSet = randomPlaceMines(count);
+      totalMines = mineSet.size;
+      // 更新全局 this.mines 为随机布雷的数组（仅用于调试或保存需要）
+      this.mines = Array.from(mineSet).map((k) => parseIdx(k));
+      this.gameStarted = true;
+      // 重置本关点击计数
+      this._levelClicks = 0;
+      // 确保上一关留下的下一步按钮区域被清除
+      try {
+        const controls = el.querySelector('.ms-controls');
+        const existingNext = controls && controls.querySelector('.next-area');
+        if (existingNext) existingNext.innerHTML = '';
+      } catch (e) {}
+      buildGrid.call(this);
+      remainEl.textContent = totalMines - this.flags.size;
+      // 更新关卡进度显示（1-based）
+      if (levelCurEl)
+        levelCurEl.textContent =
+          typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex + 1 : 1;
+      if (levelTotalEl)
+        levelTotalEl.textContent =
+          this.levels && this.levels.length ? this.levels.length : levels.length;
+    };
 
-    // 最终汇总：估算理论最大（粗略）并给出评价
-    finalBtn.addEventListener('click', () => {
-      const total = this.levelScores.reduce((a, s) => a + s.total, 0);
-      // 动态粗略最大值估算：每关取其 cards 基础分 top N + targetTags 数量 + 所有规则 bonus
-      const maxPerLevel = this.levels.map((lv) => {
-        const pickMax = lv.pick ? lv.pick[1] : (lv.cards || []).length;
-        const sorted = [...(lv.cards || [])]
-          .sort((a, b) => (b.base || 0) - (a.base || 0))
-          .slice(0, pickMax);
-        const baseMax = sorted.reduce((a, c) => a + (c.base || 0), 0);
-        const tagMax = (lv.targetTags || []).length; // 理论命中全部
-        const ruleBonus = (lv.synergyRules || []).reduce((a, r) => a + (r.bonus || 0), 0); // 理论全部触发
-        return baseMax + tagMax + ruleBonus;
+    // 递归打开单元格（空白格自动展开）
+    const openCell = (row, col) => {
+      const key = idx(row, col);
+      // 终止条件：已打开、已标记或被禁用
+      if (this.opened.has(key) || this.flags.has(key) || disabledSet.has(key)) return;
+      // 标记为已打开并更新视觉
+      this.opened.add(key);
+      const cell = gridEl.querySelector(`.ms-cell[data-r='${row}'][data-c='${col}']`);
+      if (!cell) return;
+      cell.classList.add('opened');
+      cell.classList.remove('flagged');
+      const adj = countAdjacentMines(row, col);
+      if (adj > 0) {
+        cell.textContent = String(adj);
+        cell.classList.add('number-' + Math.min(adj, 4));
+        return;
+      }
+      // 若为 0，则递归打开周围8个格子（neighbors 已排除 disabled）
+      for (let i = -1; i <= 1; i++) {
+        for (let j = -1; j <= 1; j++) {
+          if (i === 0 && j === 0) continue;
+          const r = row + i;
+          const c = col + j;
+          if (r >= 0 && r < this.gridSize && c >= 0 && c < this.gridSize) {
+            const nkey = idx(r, c);
+            // 如果邻居被标记（flagged）或被禁用，则不展开
+            if (this.flags.has(nkey) || disabledSet.has(nkey)) continue;
+            openCell(r, c);
+          }
+        }
+      }
+    };
+
+    const revealAllMines = (lost) => {
+      mineSet.forEach((k) => {
+        const [r, c] = parseIdx(k);
+        const cell = gridEl.querySelector(`.ms-cell[data-r='${r}'][data-c='${c}']`);
+        if (!cell) return;
+        cell.classList.add('opened', 'mine');
+        if (!lost) cell.textContent = '💣';
+        else cell.textContent = '💥';
       });
-      const maxTheoretical = maxPerLevel.reduce((a, b) => a + b, 0) || 1;
-      let ratio = total / maxTheoretical;
-      let evalText =
-        ratio >= 0.8
-          ? '我们简直是氛围导演！'
-          : ratio >= 0.6
-          ? '默契在线，随手就是对味组合~'
-          : '组合独特，可爱即正义。';
-      summaryContainer.innerHTML = `
-        <div class='summary-card'>
-          <h3>组合旅程总结</h3>
-          <p>关卡数：${this.levels.length}</p>
-          <p>总得分：${total} / 理论约 ${maxTheoretical}</p>
-          <p>${evalText}</p>
-        </div>`;
-      finalBtn.disabled = true;
-      setTimeout(() => this.ctx.go('scarf'), 900);
-    });
+    };
 
-    // 初始渲染
-    // 初始渲染入口
-    renderCards();
-    updateLevelInfo();
-    refreshSelectionUI();
+    const checkWin = () => {
+      // 胜利条件：已打开的格子数等于（总可用格子 - 雷数）
+      const totalCells = this.gridSize * this.gridSize - disabledSet.size;
+      if (totalMines <= 0) return false; // 如果未布雷则不判定为胜利
+      if (this.opened.size === totalCells - totalMines) return true;
+      return false;
+    };
+
+    const onLeftClick = (r, c, cell) => {
+      const key = idx(r, c);
+      // 仅在有效点击（未打开、未标记、未禁用）时计数
+      if (this.opened.has(key) || this.flags.has(key) || disabledSet.has(key)) return;
+      try {
+        this._levelClicks = (this._levelClicks || 0) + 1;
+      } catch (e) {
+        this._levelClicks = 1;
+      }
+      if (mineSet.has(key)) {
+        // 触雷
+        cell.classList.add('opened', 'mine');
+        cell.textContent = '💥';
+        this.gameOver = true;
+        revealAllMines(true);
+        msgEl.textContent = '踩到雷了……（失败）';
+        // 如果这是本关的第一次点击则上报“一发入魂”事件
+        try {
+          if (this._levelClicks === 1) {
+            const currentLevelIndex =
+              typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+            achievements.recordEvent('scene5:first_click_mine', {
+              level: currentLevelIndex,
+              difficulty: this.currentDifficulty,
+            });
+          }
+        } catch (e) {
+          console.warn('ach record first_click err', e);
+        }
+        return;
+      }
+      // open
+      const adj = countAdjacentMines(r, c);
+      if (adj > 0) {
+        // 直接打开显示数字
+        this.opened.add(key);
+        cell.classList.add('opened');
+        cell.textContent = String(adj);
+        cell.classList.add('number-' + Math.min(adj, 4));
+      } else {
+        // 对于 0 邻居，使用递归统一处理（openCell 会标记并展开）
+        openCell(r, c);
+      }
+      if (checkWin()) {
+        this.gameOver = true;
+        revealAllMines(false);
+        msgEl.textContent = '恭喜，扫雷成功！';
+        // 对每一关完成都上报事件，payload 中包含 final 字段（仅最后一关为 true）
+        try {
+          const currentLevelIndex =
+            typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+          const lvList = this.levels && this.levels.length ? this.levels : levels;
+          const isLast = currentLevelIndex >= lvList.length - 1;
+          achievements.recordEvent('scene5:completed', {
+            level: currentLevelIndex,
+            difficulty: this.currentDifficulty,
+            final: Boolean(isLast),
+          });
+        } catch (e) {
+          console.warn('ach record err', e);
+        }
+        // 成功后显示下一关或进入下一幕按钮
+        const controls = el.querySelector('.ms-controls');
+        // 清除已有的下一步按钮区域（避免重复）
+        let nextArea = controls.querySelector('.next-area');
+        if (!nextArea) {
+          nextArea = document.createElement('div');
+          nextArea.className = 'next-area';
+          nextArea.style.marginLeft = '0.6rem';
+          controls.appendChild(nextArea);
+        }
+        nextArea.innerHTML = '';
+        const currentLevelIndex =
+          typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+        const lvList = this.levels && this.levels.length ? this.levels : levels;
+        const isLast = currentLevelIndex >= lvList.length - 1;
+        if (!isLast) {
+          const nxt = document.createElement('button');
+          nxt.textContent = '下一关';
+          nxt.addEventListener('click', () => {
+            const nextIdx = currentLevelIndex + 1;
+            const nextLv = lvList[nextIdx];
+            if (nextLv) {
+              // 切换到下一关的配置
+              this.currentLevelIndex = nextIdx;
+              this.gridSize = Number(nextLv.gridSize) || this.gridSize;
+              this.mineCounts = nextLv.mineCounts || this.mineCounts;
+              this.disabled = Array.isArray(nextLv.disabled)
+                ? nextLv.disabled.map((d) => [Number(d[0]), Number(d[1])])
+                : [];
+              // 更新关卡进度显示
+              if (levelCurEl) levelCurEl.textContent = this.currentLevelIndex + 1;
+              if (levelTotalEl)
+                levelTotalEl.textContent =
+                  this.levels && this.levels.length ? this.levels.length : levels.length;
+              // 更新样式列数（替换样式节点内容以使用新的 gridSize）
+              const sEl = document.getElementById('ms-style');
+              if (sEl) {
+                sEl.textContent = sEl.textContent.replace(
+                  /repeat\(\d+, 40px\)/,
+                  `repeat(${this.gridSize}, 40px)`
+                );
+              }
+              // 隐藏/清除下一步区域，避免切换后仍显示
+              try {
+                const controls = el.querySelector('.ms-controls');
+                const na = controls && controls.querySelector('.next-area');
+                if (na) na.innerHTML = '';
+              } catch (e) {}
+              startGame(this.currentDifficulty);
+            }
+          });
+          nextArea.appendChild(nxt);
+        } else {
+          const nxt = document.createElement('button');
+          nxt.textContent = '进入下一幕';
+          nxt.addEventListener('click', () => {
+            if (this.ctx && typeof this.ctx.go === 'function') {
+              // 使用项目常见的转场调用，跳转到 scene6（如果需要改名再调整）
+              this.ctx.go('transition', { next: 'scene6', style: 'flash12' });
+            }
+          });
+          nextArea.appendChild(nxt);
+        }
+      }
+    };
+
+    const onRightClick = (r, c, cell) => {
+      const key = idx(r, c);
+      if (disabledSet.has(key) || this.opened.has(key)) return;
+      if (this.flags.has(key)) {
+        this.flags.delete(key);
+        cell.classList.remove('flagged');
+        cell.textContent = '';
+      } else {
+        this.flags.add(key);
+        cell.classList.add('flagged');
+        cell.textContent = '⚑';
+      }
+      remainEl.textContent = totalMines - this.flags.size;
+    };
+
+    const resetGame = () => {
+      if (!this.currentDifficulty) {
+        msgEl.textContent = '请先选择难度再开始游戏。';
+        return;
+      }
+      startGame(this.currentDifficulty);
+    };
+
+    // 在界面中添加难度选择按钮
+    const controlsEl = el.querySelector('.ms-controls');
+    const diffContainer = document.createElement('div');
+    diffContainer.style.display = 'flex';
+    diffContainer.style.gap = '6px';
+    diffContainer.style.marginRight = '1rem';
+    ['easy', 'medium', 'hard'].forEach((d) => {
+      const b = document.createElement('button');
+      b.textContent = { easy: '简单', medium: '普通', hard: '困难' }[d];
+      b.dataset.diff = d;
+      b.addEventListener('click', () => {
+        // 设为当前难度并高亮
+        this.currentDifficulty = d;
+        // 高亮样式
+        Array.from(diffContainer.children).forEach((btn) =>
+          btn.classList.toggle('selected', btn.dataset.diff === d)
+        );
+        // 开始游戏
+        startGame(d);
+      });
+      diffContainer.appendChild(b);
+    });
+    controlsEl.insertBefore(diffContainer, controlsEl.firstChild);
+
+    // --- 作弊提示按钮（通过键盘序列解锁） ---
+    // 键序：上 上 下 下 左 右 左 右
+    const cheatSeq = [
+      'ArrowUp',
+      'ArrowUp',
+      'ArrowDown',
+      'ArrowDown',
+      'ArrowLeft',
+      'ArrowRight',
+      'ArrowLeft',
+      'ArrowRight',
+    ];
+    let cheatProgress = 0;
+    this._hintUnlocked = false;
+    let hintBtn = null;
+    const keyHandler = (ev) => {
+      if (this._hintUnlocked) return;
+      if (ev && ev.key === cheatSeq[cheatProgress]) {
+        cheatProgress++;
+        if (cheatProgress >= cheatSeq.length) {
+          this._hintUnlocked = true;
+          cheatProgress = 0;
+          // 显示提示按钮
+          hintBtn = document.createElement('button');
+          hintBtn.textContent = '提示';
+          hintBtn.className = 'hint-btn';
+          hintBtn.style.marginLeft = '0.6rem';
+          // 上报作弊解锁事件，包含当前关和当前难度信息
+          try {
+            const currentLevelIndex =
+              typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+            achievements.recordEvent('scene5:cheat_unlocked', {
+              level: currentLevelIndex,
+              difficulty: this.currentDifficulty,
+            });
+          } catch (e) {
+            console.warn('ach record cheat_unlocked err', e);
+          }
+          hintBtn.addEventListener('click', () => {
+            try {
+              // 找出所有非雷、未打开、未禁用的格子
+              const available = [];
+              for (let r = 0; r < this.gridSize; r++) {
+                for (let c = 0; c < this.gridSize; c++) {
+                  const k = idx(r, c);
+                  if (disabledSet.has(k)) continue;
+                  if (this.opened.has(k)) continue;
+                  if (mineSet.has(k)) continue;
+                  available.push([r, c]);
+                }
+              }
+              if (available.length === 0) {
+                msgEl.textContent = '没有可提示的格子了。';
+                return;
+              }
+              const pick = available[Math.floor(Math.random() * available.length)];
+              const [pr, pc] = pick;
+              // 打开该格子（使用 openCell 保持行为一致）
+              openCell(pr, pc);
+              // 更新剩余显示
+              remainEl.textContent = totalMines - this.flags.size;
+              // 检查胜利
+              if (checkWin()) {
+                this.gameOver = true;
+                revealAllMines(false);
+                msgEl.textContent = '恭喜，扫雷成功！';
+                try {
+                  const currentLevelIndex =
+                    typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+                  const lvList = this.levels && this.levels.length ? this.levels : levels;
+                  const isLast = currentLevelIndex >= lvList.length - 1;
+                  achievements.recordEvent('scene5:completed', {
+                    level: currentLevelIndex,
+                    difficulty: this.currentDifficulty,
+                    final: Boolean(isLast),
+                  });
+                } catch (e) {
+                  console.warn('ach record err', e);
+                }
+                // 显示下一步按钮区域（复用已有逻辑）
+                const controls = el.querySelector('.ms-controls');
+                let nextArea = controls.querySelector('.next-area');
+                if (!nextArea) {
+                  nextArea = document.createElement('div');
+                  nextArea.className = 'next-area';
+                  nextArea.style.marginLeft = '0.6rem';
+                  controls.appendChild(nextArea);
+                }
+                nextArea.innerHTML = '';
+                const currentLevelIndex =
+                  typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+                const lvList = this.levels && this.levels.length ? this.levels : levels;
+                const isLast = currentLevelIndex >= lvList.length - 1;
+                if (!isLast) {
+                  const nxt = document.createElement('button');
+                  nxt.textContent = '下一关';
+                  nxt.addEventListener('click', () => {
+                    const nextIdx = currentLevelIndex + 1;
+                    const nextLv = lvList[nextIdx];
+                    if (nextLv) {
+                      this.currentLevelIndex = nextIdx;
+                      this.gridSize = Number(nextLv.gridSize) || this.gridSize;
+                      this.mineCounts = nextLv.mineCounts || this.mineCounts;
+                      this.disabled = Array.isArray(nextLv.disabled)
+                        ? nextLv.disabled.map((d) => [Number(d[0]), Number(d[1])])
+                        : [];
+                      if (levelCurEl) levelCurEl.textContent = this.currentLevelIndex + 1;
+                      if (levelTotalEl)
+                        levelTotalEl.textContent =
+                          this.levels && this.levels.length ? this.levels.length : levels.length;
+                      const sEl = document.getElementById('ms-style');
+                      if (sEl) {
+                        sEl.textContent = sEl.textContent.replace(
+                          /repeat\(\d+, 40px\)/,
+                          `repeat(${this.gridSize}, 40px)`
+                        );
+                      }
+                      // 隐藏/清除下一步区域，避免切换后仍显示
+                      try {
+                        const controls = el.querySelector('.ms-controls');
+                        const na = controls && controls.querySelector('.next-area');
+                        if (na) na.innerHTML = '';
+                      } catch (e) {}
+                      startGame(this.currentDifficulty);
+                    }
+                  });
+                  nextArea.appendChild(nxt);
+                } else {
+                  const nxt = document.createElement('button');
+                  nxt.textContent = '进入下一幕';
+                  nxt.addEventListener('click', () => {
+                    if (this.ctx && typeof this.ctx.go === 'function') {
+                      this.ctx.go('scarf');
+                    }
+                  });
+                  nextArea.appendChild(nxt);
+                }
+              }
+            } catch (e) {
+              console.warn('hint err', e);
+            }
+          });
+          controlsEl.appendChild(hintBtn);
+        }
+      } else {
+        // mismatch -> 重置进度
+        cheatProgress = 0;
+      }
+    };
+    // 保存引用以便在 exit 时移除
+    this.keyHandler = keyHandler;
+    document.addEventListener('keydown', this.keyHandler);
+
+    restartBtn.addEventListener('click', resetGame);
+
+    // 初始构建：等待玩家选择难度后启动
+    remainEl.textContent = totalMines - this.flags.size;
     this.ctx.rootEl.appendChild(el);
   }
+
   async exit() {
+    // stop bgm for key '5' consistent with other scenes
     audioManager.stopBGM('5', { fadeOut: 650 });
+    // 清理键盘监听，避免泄露
+    try {
+      document.removeEventListener('keydown', this.keyHandler);
+    } catch (e) {}
   }
 }

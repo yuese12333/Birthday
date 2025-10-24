@@ -602,6 +602,106 @@ achievements.register(
   }
 );
 
+// 成就 5-0：完成第五幕——完成第 5 幕并进入下一段记忆
+achievements.register(
+  '5-0',
+  {
+    title: '通关第五幕',
+    desc: '完成第五幕，进入下一段记忆。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 仅在上报的 scene5:completed 带有 final=true 时视为本幕完成
+      return events.some(
+        (ev) => ev && ev.name === 'scene5:completed' && ev.payload && ev.payload.final === true
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 5-1：扫雷高手——以最高难度（hard）完成第五幕的所有关卡
+achievements.register(
+  '5-1',
+  {
+    title: '扫雷高手',
+    desc: '以最高难度完成第五幕的所有关卡。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 若用户触发了作弊提示，则禁止后续触发本成就（前提：尚未解锁）
+      if (events.some((ev) => ev && ev.name === 'scene5:cheat_unlocked')) return false;
+      // 先寻找是否存在标记为 final 的完成事件，从中获取最终关卡 index
+      const finalEv = events.find(
+        (ev) =>
+          ev &&
+          ev.name === 'scene5:completed' &&
+          ev.payload &&
+          ev.payload.final === true &&
+          typeof ev.payload.level === 'number'
+      );
+      if (!finalEv) return false;
+      const finalLevel = finalEv.payload.level;
+      if (typeof finalLevel !== 'number' || finalLevel < 0) return false;
+      // 检查对于每一关 0..finalLevel 是否存在一次 difficulty === 'hard' 的完成记录
+      for (let i = 0; i <= finalLevel; i++) {
+        const ok = events.some(
+          (ev) =>
+            ev &&
+            ev.name === 'scene5:completed' &&
+            ev.payload &&
+            typeof ev.payload.level === 'number' &&
+            ev.payload.level === i &&
+            ev.payload.difficulty === 'hard'
+        );
+        if (!ok) return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 5-2：一发入魂——在任意关的第一次点击就踩到雷
+achievements.register(
+  '5-2',
+  {
+    title: '一发入魂',
+    desc: '好惨啊。',
+    descriptionVisible: false,
+  },
+  (events) => {
+    try {
+      // 若用户触发了作弊提示，则禁止后续触发本成就（前提：尚未解锁）
+      if (events.some((ev) => ev && ev.name === 'scene5:cheat_unlocked')) return false;
+      return events.some((ev) => ev && ev.name === 'scene5:first_click_mine');
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 5-3：上上下下左右左右（解锁作弊提示按钮）
+achievements.register(
+  '5-3',
+  {
+    title: '上上下下左右左右',
+    desc: '这不是魂斗罗!',
+    descriptionVisible: false,
+  },
+  (events) => {
+    try {
+      return events.some((ev) => ev && ev.name === 'scene5:cheat_unlocked');
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
 // 成就 8-0：进入第八幕（终章）——完成游戏
 achievements.register(
   '8-0',

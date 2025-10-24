@@ -1,151 +1,46 @@
 {
-  "meta": { "version": 1, "desc": "Scene5 date levels external config" },
   "levels": [
     {
       "id": 1,
-      "title": "第一关 · 轻松破冰",
-      "tip": "想要：轻松 + 温柔",
-      "pick": [2, 3],
-      "targetTags": ["light", "soft"],
-      "cards": [
-        {
-          "id": "show_soft",
-          "title": "话剧 · 治愈系对白",
-          "base": 2,
-          "tags": ["soft", "healing", "show"],
-          "hint": "温柔对白"
-        },
-        {
-          "id": "show_comedy",
-          "title": "话剧 · 轻喜剧笑点",
-          "base": 1,
-          "tags": ["fun", "light", "show"],
-          "hint": "欢笑舒缓"
-        },
-        {
-          "id": "drink_orange",
-          "title": "饮品 · 橙子气泡",
-          "base": 1,
-          "tags": ["fresh", "citrus", "drink"],
-          "hint": "清爽提神"
-        },
-        {
-          "id": "drink_milk",
-          "title": "饮品 · 温牛奶",
-          "base": 2,
-          "tags": ["warm", "soft", "drink"],
-          "hint": "安抚柔和"
-        }
+      "title": "入门",
+      "tip": "熟悉操作",
+      "gridSize": 10,
+      "mineCounts": {
+        "easy": 6,
+        "medium": 10,
+        "hard": 14
+      },
+      "disabled": [
+        [5, 4],
+        [4, 4],
+        [2, 4],
+        [3, 4],
+        [2, 5],
+        [3, 5],
+        [4, 5],
+        [5, 5],
+        [6, 6],
+        [6, 5],
+        [6, 4],
+        [6, 3],
+        [7, 3],
+        [7, 4],
+        [7, 5],
+        [7, 6]
       ],
-      "synergyRules": [
-        { "type": "set", "ids": ["show_soft", "drink_milk"], "bonus": 1, "label": "柔声与温奶" },
-        {
-          "type": "tagCombo",
-          "tags": ["light", "fresh"],
-          "all": false,
-          "bonus": 1,
-          "label": "轻盈清爽"
-        }
-      ]
+      "mines": []
     },
     {
       "id": 2,
-      "title": "第二关 · 甜甜升温",
-      "tip": "想要：甜感 + 仪式感",
-      "pick": [2, 3],
-      "targetTags": ["sweet", "romance"],
-      "cards": [
-        {
-          "id": "show_deep",
-          "title": "话剧 · 情绪共鸣本",
-          "base": 3,
-          "tags": ["deep", "tear", "show"],
-          "hint": "容易代入"
-        },
-        {
-          "id": "food_dessert",
-          "title": "餐点 · 心形慕斯",
-          "base": 3,
-          "tags": ["sweet", "romance", "food"],
-          "hint": "仪式甜感"
-        },
-        {
-          "id": "drink_rose",
-          "title": "饮品 · 玫瑰花茶",
-          "base": 2,
-          "tags": ["aroma", "romance", "drink"],
-          "hint": "淡香浪漫"
-        },
-        {
-          "id": "drink_milk",
-          "title": "饮品 · 温牛奶",
-          "base": 2,
-          "tags": ["warm", "soft", "drink"],
-          "hint": "安抚柔和"
-        }
-      ],
-      "synergyRules": [
-        { "type": "set", "ids": ["food_dessert", "drink_rose"], "bonus": 2, "label": "玫瑰甜梦" },
-        {
-          "type": "tagCombo",
-          "tags": ["romance", "sweet"],
-          "all": true,
-          "bonus": 1,
-          "label": "甜蜜氛围"
-        }
-      ]
-    },
-    {
-      "id": 3,
-      "title": "第三关 · 暖心陪伴",
-      "tip": "想要：治愈 + 温暖",
-      "pick": [3, 4],
-      "targetTags": ["healing", "warm", "soft"],
-      "cards": [
-        {
-          "id": "show_soft",
-          "title": "话剧 · 治愈系对白",
-          "base": 2,
-          "tags": ["soft", "healing", "show"],
-          "hint": "温柔对白"
-        },
-        {
-          "id": "food_pasta",
-          "title": "餐点 · 奶油意面",
-          "base": 2,
-          "tags": ["soft", "warm", "food"],
-          "hint": "顺滑柔软"
-        },
-        {
-          "id": "drink_milk",
-          "title": "饮品 · 温牛奶",
-          "base": 2,
-          "tags": ["warm", "soft", "drink"],
-          "hint": "安抚柔和"
-        },
-        {
-          "id": "drink_rose",
-          "title": "饮品 · 玫瑰花茶",
-          "base": 2,
-          "tags": ["aroma", "romance", "drink"],
-          "hint": "淡香浪漫"
-        }
-      ],
-      "synergyRules": [
-        {
-          "type": "set",
-          "ids": ["show_soft", "food_pasta", "drink_milk"],
-          "bonus": 2,
-          "label": "抱抱疗愈局"
-        },
-        {
-          "type": "tagCombo",
-          "tags": ["healing", "warm"],
-          "all": false,
-          "bonus": 1,
-          "label": "暖心治愈"
-        }
-      ]
+      "title": "进阶",
+      "tip": "有点挑战",
+      "gridSize": 10,
+      "mineCounts": {
+        "easy": 10,
+        "medium": 16,
+        "hard": 24
+      },
+      "disabled": []
     }
   ]
 }
