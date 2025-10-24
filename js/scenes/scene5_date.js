@@ -303,9 +303,15 @@ export class Scene5Date extends BaseScene {
         msgEl.textContent = '踩到雷了……（失败）';
         // 如果这是本关的第一次点击则上报“一发入魂”事件
         try {
+          const currentLevelIndex =
+            typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+          // 记录踩雷事件（用于拆弹专家成就），payload 包含是否为本关第一次点击
+          achievements.recordEvent('scene5:stepped_mine', {
+            level: currentLevelIndex,
+            difficulty: this.currentDifficulty,
+            first: this._levelClicks === 1,
+          });
           if (this._levelClicks === 1) {
-            const currentLevelIndex =
-              typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
             achievements.recordEvent('scene5:first_click_mine', {
               level: currentLevelIndex,
               difficulty: this.currentDifficulty,
@@ -357,6 +363,24 @@ export class Scene5Date extends BaseScene {
           controls.appendChild(nextArea);
         }
         nextArea.innerHTML = '';
+        // 完成关卡后禁用难度选择和重开本关按钮，直到进入下一关时再启用
+        try {
+          // 更可靠地从 controlsEl 查询难度按钮（避免闭包 / 变量声明时序问题）
+          const diffBtns =
+            controlsEl && Array.from(controlsEl.querySelectorAll('button[data-diff]'));
+          if (diffBtns) {
+            diffBtns.forEach((b) => {
+              b.disabled = true;
+              b.setAttribute('aria-disabled', 'true');
+              b.classList.add('disabled');
+            });
+          }
+          if (restartBtn) {
+            restartBtn.disabled = true;
+            restartBtn.setAttribute('aria-disabled', 'true');
+            restartBtn.classList.add('disabled');
+          }
+        } catch (e) {}
         const currentLevelIndex =
           typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
         const lvList = this.levels && this.levels.length ? this.levels : levels;
@@ -548,6 +572,23 @@ export class Scene5Date extends BaseScene {
                   controls.appendChild(nextArea);
                 }
                 nextArea.innerHTML = '';
+                // 通过提示胜利时也需要禁用难度与重开按钮（与主分支一致）
+                try {
+                  const diffBtns =
+                    controlsEl && Array.from(controlsEl.querySelectorAll('button[data-diff]'));
+                  if (diffBtns) {
+                    diffBtns.forEach((b) => {
+                      b.disabled = true;
+                      b.setAttribute('aria-disabled', 'true');
+                      b.classList.add('disabled');
+                    });
+                  }
+                  if (restartBtn) {
+                    restartBtn.disabled = true;
+                    restartBtn.setAttribute('aria-disabled', 'true');
+                    restartBtn.classList.add('disabled');
+                  }
+                } catch (e) {}
                 const currentLevelIndex =
                   typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
                 const lvList = this.levels && this.levels.length ? this.levels : levels;
@@ -581,6 +622,24 @@ export class Scene5Date extends BaseScene {
                         const controls = el.querySelector('.ms-controls');
                         const na = controls && controls.querySelector('.next-area');
                         if (na) na.innerHTML = '';
+                      } catch (e) {}
+                      // 进入下一关时重新启用难度与重开按钮
+                      try {
+                        const diffBtns =
+                          controlsEl &&
+                          Array.from(controlsEl.querySelectorAll('button[data-diff]'));
+                        if (diffBtns) {
+                          diffBtns.forEach((b) => {
+                            b.disabled = false;
+                            b.removeAttribute('aria-disabled');
+                            b.classList.remove('disabled');
+                          });
+                        }
+                        if (restartBtn) {
+                          restartBtn.disabled = false;
+                          restartBtn.removeAttribute('aria-disabled');
+                          restartBtn.classList.remove('disabled');
+                        }
                       } catch (e) {}
                       startGame(this.currentDifficulty);
                     }

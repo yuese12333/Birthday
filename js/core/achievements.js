@@ -666,9 +666,54 @@ achievements.register(
   }
 );
 
-// 成就 5-2：一发入魂——在任意关的第一次点击就踩到雷
+// 成就 5-2：拆弹专家——在未触发过任何踩雷的情况下完成第五幕的所有关卡
 achievements.register(
   '5-2',
+  {
+    title: '拆弹专家',
+    desc: '从从容容游刃有余。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 若用户触发了作弊提示，则禁止后续触发本成就
+      if (events.some((ev) => ev && ev.name === 'scene5:cheat_unlocked')) return false;
+      // 若存在任何踩雷事件，则不满足（事件名 scene5:stepped_mine）
+      if (events.some((ev) => ev && ev.name === 'scene5:stepped_mine')) return false;
+      // 与 5-1 类似：需要存在 final=true 的完成事件以确定最终关卡索引
+      const finalEv = events.find(
+        (ev) =>
+          ev &&
+          ev.name === 'scene5:completed' &&
+          ev.payload &&
+          ev.payload.final === true &&
+          typeof ev.payload.level === 'number'
+      );
+      if (!finalEv) return false;
+      const finalLevel = finalEv.payload.level;
+      if (typeof finalLevel !== 'number' || finalLevel < 0) return false;
+      // 检查对于每一关 0..finalLevel 是否存在一次完成记录（任何 difficulty 都可）
+      for (let i = 0; i <= finalLevel; i++) {
+        const ok = events.some(
+          (ev) =>
+            ev &&
+            ev.name === 'scene5:completed' &&
+            ev.payload &&
+            typeof ev.payload.level === 'number' &&
+            ev.payload.level === i
+        );
+        if (!ok) return false;
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 5-3：一发入魂——在任意关的第一次点击就踩到雷
+achievements.register(
+  '5-3',
   {
     title: '一发入魂',
     desc: '好惨啊。',
@@ -685,9 +730,9 @@ achievements.register(
   }
 );
 
-// 成就 5-3：上上下下左右左右（解锁作弊提示按钮）
+// 成就 5-4：上上下下左右左右（解锁作弊提示按钮）
 achievements.register(
-  '5-3',
+  '5-4',
   {
     title: '上上下下左右左右',
     desc: '这不是魂斗罗!',
