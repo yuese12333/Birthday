@@ -23,7 +23,9 @@ export class Scene5Date extends BaseScene {
         if (!Number.isNaN(asNum) && levels[asNum - 1]) chosen = levels[asNum - 1];
       }
     }
-    if (chosen && chosen.gridSize) this.gridSize = Number(chosen.gridSize) || this.gridSize;
+    // 支持矩形网格 rows x cols（JSON 中使用 rows, cols）
+    this.rows = chosen && typeof chosen.rows !== 'undefined' ? Number(chosen.rows) : this.rows || 8;
+    this.cols = chosen && typeof chosen.cols !== 'undefined' ? Number(chosen.cols) : this.cols || 8;
     // 记录当前关索引
     const foundIdx = levels.findIndex(
       (lv) => lv === chosen || (lv && chosen && String(lv.id) === String(chosen.id))
@@ -47,6 +49,10 @@ export class Scene5Date extends BaseScene {
     this.flags = new Set();
     this.opened = new Set();
     this.gameOver = false;
+    // 感染计数：每局最多被传染的格子数
+    this._infectedCount = 0;
+    // 连续传染计数（用于成就 5-5）
+    this._consecutiveInfects = 0;
     // 每关点击计数（用于检测首发踩雷）
     this._levelClicks = 0;
   }
@@ -106,7 +112,7 @@ export class Scene5Date extends BaseScene {
       const s = document.createElement('style');
       s.id = 'ms-style';
       s.textContent = `
-      .ms-grid { display:grid; grid-template-columns: repeat(${this.gridSize}, 40px); gap:6px; }
+  .ms-grid { display:grid; grid-template-columns: repeat(${this.cols}, 40px); gap:6px; }
       .ms-cell { width:40px; height:40px; background:#f2f2f2; border-radius:6px; display:flex;align-items:center;justify-content:center;cursor:pointer; user-select:none; font-weight:700; }
       .ms-cell.opened { background:#fff; cursor:default; box-shadow:inset 0 0 0 1px #e6e6e6; }
       .ms-cell.flagged { background:#fff3f5; color:#d33; }
@@ -140,7 +146,7 @@ export class Scene5Date extends BaseScene {
           if (dr === 0 && dc === 0) continue;
           const nr = r + dr,
             nc = c + dc;
-          if (nr >= 0 && nr < this.gridSize && nc >= 0 && nc < this.gridSize) {
+          if (nr >= 0 && nr < this.rows && nc >= 0 && nc < this.cols) {
             const k = idx(nr, nc);
             if (disabledSet.has(k)) continue;
             res.push([nr, nc]);
@@ -155,9 +161,9 @@ export class Scene5Date extends BaseScene {
     // 渲染网格（disabled 单元以 × 显示且不绑定事件）
     function buildGrid() {
       gridEl.innerHTML = '';
-      gridEl.style.gridTemplateColumns = `repeat(${this.gridSize}, 40px)`;
-      for (let r = 0; r < this.gridSize; r++) {
-        for (let c = 0; c < this.gridSize; c++) {
+      gridEl.style.gridTemplateColumns = `repeat(${this.cols}, 40px)`;
+      for (let r = 0; r < this.rows; r++) {
+        for (let c = 0; c < this.cols; c++) {
           const cell = document.createElement('div');
           cell.className = 'ms-cell';
           cell.dataset.r = r;
@@ -183,8 +189,8 @@ export class Scene5Date extends BaseScene {
     // 按难度随机布雷（排除 disabled）
     const randomPlaceMines = (count) => {
       const available = [];
-      for (let r = 0; r < this.gridSize; r++)
-        for (let c = 0; c < this.gridSize; c++) {
+      for (let r = 0; r < this.rows; r++)
+        for (let c = 0; c < this.cols; c++) {
           const k = idx(r, c);
           if (!disabledSet.has(k)) available.push(k);
         }
@@ -204,6 +210,8 @@ export class Scene5Date extends BaseScene {
     const startGame = (difficulty) => {
       // 重新计算 disabledSet（可能是在切换关卡后）
       disabledSet = new Set((this.disabled || []).map(([r, c]) => idx(r, c)));
+      // 重置本局感染计数
+      this._infectedCount = 0;
       this.flags.clear();
       this.opened.clear();
       this.gameOver = false;
@@ -233,6 +241,128 @@ export class Scene5Date extends BaseScene {
           this.levels && this.levels.length ? this.levels.length : levels.length;
     };
 
+    // 小型 toast 系统：在屏幕左下角显示短暂提示
+    if (!document.getElementById('ms-toast-style')) {
+      const ts = document.createElement('style');
+      ts.id = 'ms-toast-style';
+      ts.textContent = `
+      .ms-toast-container{position:fixed;left:12px;bottom:12px;z-index:10000;display:flex;flex-direction:column;gap:8px;}
+      .ms-toast{background:rgba(0,0,0,.78);color:#fff;padding:8px 12px;border-radius:6px;box-shadow:0 6px 18px rgba(0,0,0,.18);opacity:0;transform:translateY(6px);transition:opacity .18s ease,transform .18s ease;font-size:13px;}
+      .ms-toast.show{opacity:1;transform:translateY(0);}
+      `;
+      document.head.appendChild(ts);
+    }
+    const getToastContainer = () => {
+      let c = document.querySelector('.ms-toast-container');
+      if (!c) {
+        c = document.createElement('div');
+        c.className = 'ms-toast-container';
+        document.body.appendChild(c);
+      }
+      return c;
+    };
+    const showToast = (text, ms = 3000) => {
+      try {
+        const c = getToastContainer();
+        const t = document.createElement('div');
+        t.className = 'ms-toast';
+        t.textContent = text;
+        c.appendChild(t);
+        // 强制回流以便 transition 生效
+        void t.offsetWidth;
+        t.classList.add('show');
+        setTimeout(() => {
+          t.classList.remove('show');
+          setTimeout(() => {
+            try {
+              t.remove();
+            } catch (e) {}
+            try {
+              if (c.children.length === 0) c.remove();
+            } catch (e) {}
+          }, 220);
+        }, ms);
+      } catch (e) {
+        console.warn('toast err', e);
+      }
+    };
+
+    // 传染判定：在点击一个格子时，有一定几率（10%）将其 3x3 区域内的一个合法格子变成雷
+    // 规则：每次点击最多传染一个格子；每局最多传染 3 个格子；传染不作用于 disabled / 已是雷 / 已打开 / 已标记 的格子
+    const tryInfect = (clickR, clickC) => {
+      try {
+        if (this._infectedCount >= 3) return false;
+        if (Math.random() >= 0.1) return false; // 90% 无效
+        const candidates = [];
+        for (let dr = -1; dr <= 1; dr++) {
+          for (let dc = -1; dc <= 1; dc++) {
+            const nr = clickR + dr;
+            const nc = clickC + dc;
+            if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue;
+            // 跳过中心格，确保不会把当前点击的格子变为雷
+            if (dr === 0 && dc === 0) continue;
+            const k = idx(nr, nc);
+            if (disabledSet.has(k)) continue;
+            if (mineSet.has(k)) continue;
+            if (this.opened.has(k)) continue;
+            if (this.flags.has(k)) continue;
+            candidates.push([nr, nc]);
+          }
+        }
+        if (candidates.length === 0) return false;
+        const pick = candidates[Math.floor(Math.random() * candidates.length)];
+        const [ir, ic] = pick;
+        const ik = idx(ir, ic);
+        // 将该格加入地雷集合
+        mineSet.add(ik);
+        this._infectedCount += 1;
+        // 更新总雷数与辅助数组
+        totalMines = mineSet.size;
+        this.mines = Array.from(mineSet).map((k) => parseIdx(k));
+        // 更新显示
+        if (remainEl) remainEl.textContent = totalMines - this.flags.size;
+        // 可选：短暂提示玩家（改为左下角 toast）并上报感染事件
+        try {
+          showToast('附近出现了新的雷……小心！');
+        } catch (e) {
+          if (msgEl) msgEl.textContent = '附近出现了新的雷……小心！';
+        }
+        // 成功传染：（注意）连续计数逻辑由 onLeftClick 根据 tryInfect 返回值维护
+        // 更新新出现的雷周围已打开格子的数字（局部刷新）
+        try {
+          for (let dr = -1; dr <= 1; dr++) {
+            for (let dc = -1; dc <= 1; dc++) {
+              const nr = ir + dr;
+              const nc = ic + dc;
+              if (nr < 0 || nr >= this.rows || nc < 0 || nc >= this.cols) continue;
+              const nk = idx(nr, nc);
+              if (disabledSet.has(nk)) continue;
+              const ncell = gridEl.querySelector(`.ms-cell[data-r='${nr}'][data-c='${nc}']`);
+              if (!ncell) continue;
+              // 仅更新已打开且不是地雷的格子的数字显示
+              if (ncell.classList.contains('opened') && !ncell.classList.contains('mine')) {
+                const adj = countAdjacentMines(nr, nc);
+                if (adj > 0) {
+                  ncell.textContent = String(adj);
+                  ncell.classList.remove('number-1', 'number-2', 'number-3', 'number-4');
+                  ncell.classList.add('number-' + Math.min(adj, 4));
+                } else {
+                  ncell.textContent = '';
+                  ncell.classList.remove('number-1', 'number-2', 'number-3', 'number-4');
+                }
+              }
+            }
+          }
+        } catch (e) {
+          console.warn('refresh nums err', e);
+        }
+        return true;
+      } catch (e) {
+        console.warn('infect err', e);
+        return false;
+      }
+    };
+
     // 递归打开单元格（空白格自动展开）
     const openCell = (row, col) => {
       const key = idx(row, col);
@@ -256,7 +386,7 @@ export class Scene5Date extends BaseScene {
           if (i === 0 && j === 0) continue;
           const r = row + i;
           const c = col + j;
-          if (r >= 0 && r < this.gridSize && c >= 0 && c < this.gridSize) {
+          if (r >= 0 && r < this.rows && c >= 0 && c < this.cols) {
             const nkey = idx(r, c);
             // 如果邻居被标记（flagged）或被禁用，则不展开
             if (this.flags.has(nkey) || disabledSet.has(nkey)) continue;
@@ -279,7 +409,7 @@ export class Scene5Date extends BaseScene {
 
     const checkWin = () => {
       // 胜利条件：已打开的格子数等于（总可用格子 - 雷数）
-      const totalCells = this.gridSize * this.gridSize - disabledSet.size;
+      const totalCells = this.rows * this.cols - disabledSet.size;
       if (totalMines <= 0) return false; // 如果未布雷则不判定为胜利
       if (this.opened.size === totalCells - totalMines) return true;
       return false;
@@ -289,6 +419,32 @@ export class Scene5Date extends BaseScene {
       const key = idx(r, c);
       // 仅在有效点击（未打开、未标记、未禁用）时计数
       if (this.opened.has(key) || this.flags.has(key) || disabledSet.has(key)) return;
+      // 传染判定：在打开前有概率使周围某格变为雷（可能是当前格）
+      const infected = tryInfect(r, c);
+      // 维护“连续两次有效点击触发传染”的计数（成就是基于连续两次点击都触发传染）
+      try {
+        if (infected) {
+          this._consecutiveInfects = (this._consecutiveInfects || 0) + 1;
+          if (this._consecutiveInfects >= 2) {
+            try {
+              const currentLevelIndex =
+                typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
+              achievements.recordEvent('scene5:infected_double', {
+                level: currentLevelIndex,
+                difficulty: this.currentDifficulty,
+              });
+            } catch (e) {
+              console.warn('record infected_double err', e);
+            }
+            this._consecutiveInfects = 0;
+          }
+        } else {
+          // 非感染点击则重置连续计数
+          this._consecutiveInfects = 0;
+        }
+      } catch (e) {
+        this._consecutiveInfects = 0;
+      }
       try {
         this._levelClicks = (this._levelClicks || 0) + 1;
       } catch (e) {
@@ -320,6 +476,23 @@ export class Scene5Date extends BaseScene {
         } catch (e) {
           console.warn('ach record first_click err', e);
         }
+        // 触雷后确保难度按钮与重开按钮可用（有时界面可能处于 disabled 状态）
+        try {
+          const diffBtns =
+            controlsEl && Array.from(controlsEl.querySelectorAll('button[data-diff]'));
+          if (diffBtns) {
+            diffBtns.forEach((b) => {
+              b.disabled = false;
+              b.removeAttribute('aria-disabled');
+              b.classList.remove('disabled');
+            });
+          }
+          if (restartBtn) {
+            restartBtn.disabled = false;
+            restartBtn.removeAttribute('aria-disabled');
+            restartBtn.classList.remove('disabled');
+          }
+        } catch (e) {}
         return;
       }
       // open
@@ -394,7 +567,9 @@ export class Scene5Date extends BaseScene {
             if (nextLv) {
               // 切换到下一关的配置
               this.currentLevelIndex = nextIdx;
-              this.gridSize = Number(nextLv.gridSize) || this.gridSize;
+              // 支持 rows/cols
+              this.rows = Number(nextLv.rows) || this.rows;
+              this.cols = Number(nextLv.cols) || this.cols;
               this.mineCounts = nextLv.mineCounts || this.mineCounts;
               this.disabled = Array.isArray(nextLv.disabled)
                 ? nextLv.disabled.map((d) => [Number(d[0]), Number(d[1])])
@@ -409,7 +584,7 @@ export class Scene5Date extends BaseScene {
               if (sEl) {
                 sEl.textContent = sEl.textContent.replace(
                   /repeat\(\d+, 40px\)/,
-                  `repeat(${this.gridSize}, 40px)`
+                  `repeat(${this.cols}, 40px)`
                 );
               }
               // 隐藏/清除下一步区域，避免切换后仍显示
@@ -427,8 +602,8 @@ export class Scene5Date extends BaseScene {
           nxt.textContent = '进入下一幕';
           nxt.addEventListener('click', () => {
             if (this.ctx && typeof this.ctx.go === 'function') {
-              // 使用项目常见的转场调用，跳转到 scene6（如果需要改名再调整）
-              this.ctx.go('transition', { next: 'scene6', style: 'flash12' });
+              // 使用项目常见的转场调用，跳转到 scarf 场景（如果需要改名再调整）
+              this.ctx.go('scarf');
             }
           });
           nextArea.appendChild(nxt);
@@ -525,8 +700,8 @@ export class Scene5Date extends BaseScene {
             try {
               // 找出所有非雷、未打开、未禁用的格子
               const available = [];
-              for (let r = 0; r < this.gridSize; r++) {
-                for (let c = 0; c < this.gridSize; c++) {
+              for (let r = 0; r < this.rows; r++) {
+                for (let c = 0; c < this.cols; c++) {
                   const k = idx(r, c);
                   if (disabledSet.has(k)) continue;
                   if (this.opened.has(k)) continue;
@@ -601,7 +776,9 @@ export class Scene5Date extends BaseScene {
                     const nextLv = lvList[nextIdx];
                     if (nextLv) {
                       this.currentLevelIndex = nextIdx;
-                      this.gridSize = Number(nextLv.gridSize) || this.gridSize;
+                      // 支持 rows/cols
+                      this.rows = Number(nextLv.rows) || this.rows;
+                      this.cols = Number(nextLv.cols) || this.cols;
                       this.mineCounts = nextLv.mineCounts || this.mineCounts;
                       this.disabled = Array.isArray(nextLv.disabled)
                         ? nextLv.disabled.map((d) => [Number(d[0]), Number(d[1])])
@@ -614,7 +791,7 @@ export class Scene5Date extends BaseScene {
                       if (sEl) {
                         sEl.textContent = sEl.textContent.replace(
                           /repeat\(\d+, 40px\)/,
-                          `repeat(${this.gridSize}, 40px)`
+                          `repeat(${this.cols}, 40px)`
                         );
                       }
                       // 隐藏/清除下一步区域，避免切换后仍显示
