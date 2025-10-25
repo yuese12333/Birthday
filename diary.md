@@ -116,3 +116,4 @@ node server\emailServer.js
 
 ### 今日成果：
 
+1. 添加了第五幕扫雷游戏的传染机制。
