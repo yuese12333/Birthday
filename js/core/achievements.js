@@ -747,24 +747,6 @@ achievements.register(
   }
 );
 
-// 成就 5-5：病原体 —— 连续两次有效点击触发传染
-achievements.register(
-  '5-5',
-  {
-    title: '病原体',
-    desc: '鼠标上有毒！',
-    descriptionVisible: false,
-  },
-  (events) => {
-    try {
-      // 只要存在一次上报的合成事件 scene5:infected_double 即视为达成
-      return events.some((ev) => ev && ev.name === 'scene5:infected_double');
-    } catch (e) {
-      return false;
-    }
-  }
-);
-
 // 成就 8-0：进入第八幕（终章）——完成游戏
 achievements.register(
   '8-0',
@@ -800,4 +782,3 @@ achievements.register(
     }
   }
 );
-

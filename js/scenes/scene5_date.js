@@ -51,8 +51,6 @@ export class Scene5Date extends BaseScene {
     this.gameOver = false;
     // 感染计数：每局最多被传染的格子数
     this._infectedCount = 0;
-    // 连续传染计数（用于成就 5-5）
-    this._consecutiveInfects = 0;
     // 每关点击计数（用于检测首发踩雷）
     this._levelClicks = 0;
   }
@@ -67,12 +65,14 @@ export class Scene5Date extends BaseScene {
         <div class='level-progress' style='margin-left:.6rem;'>关卡 <span class='level-cur'></span>/<span class='level-total'></span></div>
         <button class='bgm-btn date-bgm' title='音乐' style='margin-left:auto;'>♪</button>
       </div>
+      <div class='ms-controls' style='margin-bottom:.6rem; display:flex; gap:.6rem; align-items:center;'>
+        <div class='controls-left' style='display:flex; gap:.6rem; align-items:center;'>
+          <button class='restart' data-debounce='600'>重开本关</button>
+        </div>
+        <div class='msg' style='margin-left:auto; color:#333;'></div>
+      </div>
       <div class='ms-wrapper'>
         <div class='ms-grid'></div>
-      </div>
-      <div class='ms-controls' style='margin-top:.6rem; display:flex; gap:.6rem; align-items:center;'>
-        <button class='restart' data-debounce='600'>重开本关</button>
-        <div class='msg' style='margin-left:auto; color:#333;'></div>
       </div>
     `;
 
@@ -124,6 +124,14 @@ export class Scene5Date extends BaseScene {
   /* disabled 单元不显示内容且不可交互，但保留格位占位以不打乱坐标 */
   .ms-cell.disabled { background:transparent; color:transparent; visibility:hidden; pointer-events:none; }
   .ms-controls button.selected { outline:2px solid #0b66ff; box-shadow:0 0 0 2px rgba(11,102,255,0.08); }
+  /* 数学化渲染样式 */
+  .ms-cell sup { font-size:70%; vertical-align:super; margin-left:2px; }
+  .ms-cell .sqrt { display:inline-flex; align-items:center; gap:3px; font-family: inherit; }
+  .ms-cell .sqrt .rad { display:inline-block; transform:translateY(-2px); }
+  .ms-cell .fraction { font-size:90%; display:inline-flex; align-items:center; gap:4px; }
+  .ms-cell .fraction { font-size:90%; display:inline-flex; flex-direction:column; align-items:center; gap:2px; line-height:1; }
+  .ms-cell .fraction .num, .ms-cell .fraction .den { display:block; }
+  .ms-cell .fraction .bar { width:100%; height:1px; background:currentColor; display:block; }
       `;
       document.head.appendChild(s);
     }
@@ -157,6 +165,75 @@ export class Scene5Date extends BaseScene {
 
     const countAdjacentMines = (r, c) =>
       neighbors(r, c).reduce((a, [nr, nc]) => a + (mineSet.has(idx(nr, nc)) ? 1 : 0), 0);
+
+    // 将数字格式化为多种呈现形式（每个数字除了 1 外有多个变体，随机选择用于显示）
+    const numberVariants = {
+      2: ['2', '5-3', '4/2', '3-1'],
+      3: ['3', '√9', '6/2', '1+2'],
+      4: ['4', '2^2', '√16', '8/2', '5-1'],
+      5: ['5', '10/2', '2+3', '7-2', '∛125'],
+      6: ['6', '3*2', '12/2', '√36', '7-1'],
+      7: ['7', '10-3', '14/2', '3+4'],
+      8: ['8', '2^3', '16/2', '4*2', '9-1'],
+    };
+
+    const formatNumber = (n) => {
+      if (typeof n !== 'number' || n <= 0) return '';
+      if (n === 1) return '1';
+      const opts = numberVariants[n] || [String(n)];
+      return opts[Math.floor(Math.random() * opts.length)];
+    };
+
+    const escapeHtml = (str) =>
+      String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+
+    // 将变体文本渲染为简单的数学化 HTML：支持 ^ 为上标（如 2^2），√ 前缀渲染为根号，a/b 渲染为分数
+    const renderVariant = (variant) => {
+      if (!variant) return '';
+      const v = String(variant).trim();
+      // 上标形式 2^2
+      if (/\^/.test(v)) {
+        const parts = v.split('^');
+        return `${escapeHtml(parts[0])}<sup>${escapeHtml(parts[1])}</sup>`;
+      }
+      // 带根次的根号支持：Unicode 形式（例如 ∛125 表示 125 的三次根）
+      if (v.startsWith('∛')) {
+        const inside = v.slice(1).replace(/^\(|\)$/g, '');
+        return `<span class='sqrt nth'><span class='rad'><span class='index'>3</span>√</span><span>${escapeHtml(
+          inside
+        )}</span></span>`;
+      }
+      // 形式如 3√125（根次在前），例如 '3√125'
+      const nthMatch = v.match(/^(\d+)√(.*)$/);
+      if (nthMatch) {
+        const n = nthMatch[1];
+        const inside = nthMatch[2].replace(/^\(|\)$/g, '');
+        return `<span class='sqrt nth'><span class='rad'><span class='index'>${escapeHtml(
+          n
+        )}</span>√</span><span>${escapeHtml(inside)}</span></span>`;
+      }
+      // 根号形式 √9 或 √(9)
+      if (v.startsWith('√')) {
+        const inside = v.slice(1).replace(/^\(|\)$/g, '');
+        return `<span class='sqrt'><span class='rad'>√</span><span>${escapeHtml(
+          inside
+        )}</span></span>`;
+      }
+      // 分数形式 a/b
+      if (v.includes('/')) {
+        const [num, den] = v.split('/');
+        return `<span class='fraction'><span class='num'>${escapeHtml(
+          num
+        )}</span><span class='bar'></span><span class='den'>${escapeHtml(den)}</span></span>`;
+      }
+      // 默认直接文本
+      return escapeHtml(v);
+    };
 
     // 渲染网格（disabled 单元以 × 显示且不绑定事件）
     function buildGrid() {
@@ -343,7 +420,7 @@ export class Scene5Date extends BaseScene {
               if (ncell.classList.contains('opened') && !ncell.classList.contains('mine')) {
                 const adj = countAdjacentMines(nr, nc);
                 if (adj > 0) {
-                  ncell.textContent = String(adj);
+                  ncell.innerHTML = renderVariant(formatNumber(adj));
                   ncell.classList.remove('number-1', 'number-2', 'number-3', 'number-4');
                   ncell.classList.add('number-' + Math.min(adj, 4));
                 } else {
@@ -376,7 +453,7 @@ export class Scene5Date extends BaseScene {
       cell.classList.remove('flagged');
       const adj = countAdjacentMines(row, col);
       if (adj > 0) {
-        cell.textContent = String(adj);
+        cell.innerHTML = renderVariant(formatNumber(adj));
         cell.classList.add('number-' + Math.min(adj, 4));
         return;
       }
@@ -419,32 +496,8 @@ export class Scene5Date extends BaseScene {
       const key = idx(r, c);
       // 仅在有效点击（未打开、未标记、未禁用）时计数
       if (this.opened.has(key) || this.flags.has(key) || disabledSet.has(key)) return;
-      // 传染判定：在打开前有概率使周围某格变为雷（可能是当前格）
+      // 传染判定（不再维护连续传染计数或上报 infected_double 成就事件）
       const infected = tryInfect(r, c);
-      // 维护“连续两次有效点击触发传染”的计数（成就是基于连续两次点击都触发传染）
-      try {
-        if (infected) {
-          this._consecutiveInfects = (this._consecutiveInfects || 0) + 1;
-          if (this._consecutiveInfects >= 2) {
-            try {
-              const currentLevelIndex =
-                typeof this.currentLevelIndex === 'number' ? this.currentLevelIndex : 0;
-              achievements.recordEvent('scene5:infected_double', {
-                level: currentLevelIndex,
-                difficulty: this.currentDifficulty,
-              });
-            } catch (e) {
-              console.warn('record infected_double err', e);
-            }
-            this._consecutiveInfects = 0;
-          }
-        } else {
-          // 非感染点击则重置连续计数
-          this._consecutiveInfects = 0;
-        }
-      } catch (e) {
-        this._consecutiveInfects = 0;
-      }
       try {
         this._levelClicks = (this._levelClicks || 0) + 1;
       } catch (e) {
@@ -501,7 +554,7 @@ export class Scene5Date extends BaseScene {
         // 直接打开显示数字
         this.opened.add(key);
         cell.classList.add('opened');
-        cell.textContent = String(adj);
+        cell.innerHTML = renderVariant(formatNumber(adj));
         cell.classList.add('number-' + Math.min(adj, 4));
       } else {
         // 对于 0 邻居，使用递归统一处理（openCell 会标记并展开）
@@ -856,7 +909,7 @@ export class Scene5Date extends BaseScene {
   }
 
   async exit() {
-    // stop bgm for key '5' consistent with other scenes
+    // 停止 BGM
     audioManager.stopBGM('5', { fadeOut: 650 });
     // 清理键盘监听，避免泄露
     try {
