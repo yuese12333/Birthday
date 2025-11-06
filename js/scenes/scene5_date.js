@@ -400,7 +400,7 @@ export class Scene5Date extends BaseScene {
         if (remainEl) remainEl.textContent = totalMines - this.flags.size;
         // 可选：短暂提示玩家（改为左下角 toast）并上报感染事件
         try {
-          showToast('附近出现了新的雷……小心！');
+          showToast('附近出现了新的雷……小心！', 1000);
         } catch (e) {
           if (msgEl) msgEl.textContent = '附近出现了新的雷……小心！';
         }
@@ -646,6 +646,23 @@ export class Scene5Date extends BaseScene {
                 const na = controls && controls.querySelector('.next-area');
                 if (na) na.innerHTML = '';
               } catch (e) {}
+              // 在进入下一关前重新启用难度选择和重开按钮（可能在通关时被禁用）
+              try {
+                const diffBtns =
+                  controlsEl && Array.from(controlsEl.querySelectorAll('button[data-diff]'));
+                if (diffBtns) {
+                  diffBtns.forEach((b) => {
+                    b.disabled = false;
+                    b.removeAttribute('aria-disabled');
+                    b.classList.remove('disabled');
+                  });
+                }
+                if (restartBtn) {
+                  restartBtn.disabled = false;
+                  restartBtn.removeAttribute('aria-disabled');
+                  restartBtn.classList.remove('disabled');
+                }
+              } catch (e) {}
               startGame(this.currentDifficulty);
             }
           });
@@ -710,6 +727,18 @@ export class Scene5Date extends BaseScene {
       diffContainer.appendChild(b);
     });
     controlsEl.insertBefore(diffContainer, controlsEl.firstChild);
+
+    // 默认启动：选择简单难度并开始第一关
+    try {
+      this.currentDifficulty = 'easy';
+      Array.from(diffContainer.children).forEach((btn) =>
+        btn.classList.toggle('selected', btn.dataset.diff === 'easy')
+      );
+      // 直接开始游戏，显示第一关简单难度
+      startGame('easy');
+    } catch (e) {
+      console.warn('auto-start easy failed', e);
+    }
 
     // --- 作弊提示按钮（通过键盘序列解锁） ---
     // 键序：上 上 下 下 左 右 左 右

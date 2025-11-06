@@ -314,7 +314,7 @@ export class Scene2Exam extends BaseScene {
     // Styles for Scene 2 have been moved to the central stylesheet: css/styles.css
     // Please ensure <link rel="stylesheet" href="./css/styles.css"> is included in the host HTML.
     el.innerHTML = `
-      <h1>场景2：高考小考站</h1>
+      <h1>场景2：高考小考站（当前题目为占位示例）</h1>
       <div class='exam-top'>
         <div class='tabs'></div>
         <div class='meta'>分数 <span class='score'>0</span> | 计时 <span class='timer'>05:00</span> | <button class='bgm-btn' data-debounce title='好听的音乐'>♪</button></div>

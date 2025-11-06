@@ -602,12 +602,53 @@ achievements.register(
   }
 );
 
+// 成就 4-0：通关第四幕（完成第四幕最后一关）
+achievements.register(
+  '4-0',
+  {
+    title: '通关第四幕',
+    desc: '完成第四幕的推箱子，进入下一段记忆。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 监听 scene4:finished 事件上报
+      return events.some((ev) => ev && ev.name === 'scene4:finished');
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 4-1：空间主宰——在未使用重开本关按钮和未使用 R 键重开的情况下通关第四幕
+achievements.register(
+  '4-1',
+  {
+    title: '空间主宰',
+    desc: '未经任何重开，完成了第四幕。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 必须有 scene4:finished
+      const finished = events.some((ev) => ev && ev.name === 'scene4:finished');
+      if (!finished) return false;
+      // 整个事件历史中不得出现重置事件（按钮或按键）
+      const usedResetButton = events.some((ev) => ev && ev.name === 'scene4:reset_button');
+      const usedResetKey = events.some((ev) => ev && ev.name === 'scene4:reset_key');
+      return !usedResetButton && !usedResetKey;
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
 // 成就 5-0：完成第五幕——完成第 5 幕并进入下一段记忆
 achievements.register(
   '5-0',
   {
     title: '通关第五幕',
-    desc: '完成第五幕，进入下一段记忆。',
+    desc: '完成第五幕的扫雷，进入下一段记忆。',
     descriptionVisible: true,
   },
   (events) => {
@@ -777,6 +818,32 @@ achievements.register(
       const e = events.find((ev) => ev && ev.name === 'scene8:entered');
       if (!e) return false;
       return e.ts - start <= achievements.quickFinishWindow;
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 9-0：全成就 - 当除自身外所有已注册成就均已解锁时触发
+achievements.register(
+  '9-0',
+  {
+    title: '集大成者',
+    desc: '收集了所有的回忆与成就。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 取得所有已注册成就 id，排除自身
+      const allIds = [...achievements.achievements.keys()].map((id) => String(id));
+      const target = String('9-0');
+      const others = allIds.filter((id) => id !== target);
+      if (others.length === 0) return false; // 若没有其它成就则不自动解锁
+      // 检查是否所有其他成就都已解锁
+      for (const id of others) {
+        if (!achievements.unlocked.has(String(id))) return false;
+      }
+      return true;
     } catch (e) {
       return false;
     }
