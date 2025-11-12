@@ -1,116 +1,96 @@
-import { BaseScene } from '../core/baseScene.js';
+﻿import { BaseScene } from '../core/baseScene.js';
 import { audioManager } from '../core/audioManager.js';
+import { achievements } from '../core/achievements.js';
 
 /**
  * Scene6Scarf -> 华容道玩法
  * 两关：
  * 1. 传统华容道：不同尺寸方块，核心目标块移动到出口位置。
  * 2. 数字华容道：4x4 数字滑块排列成 1..15 + 空白。
- *
- * 设计目标：最小可玩版本，提供基本拖/点移动，胜利后显示继续按钮。
  */
 export class Scene6Scarf extends BaseScene {
   async init() {
     await super.init();
+    // 加载传统华容道关卡配置
+    await this._loadClassicLevels();
+    // 构建数字关
+    this.numericLevel = {
+      type: 'numeric',
+      size: 4,
+      tiles: this._shuffleNumeric(4),
+    };
+  }
+
+  /**
+   * 从外部 JSON 文件加载经典华容道关卡配置
+   */
+  async _loadClassicLevels() {
+    const response = await fetch('./data/scene6_huarong.json');
+    const data = await response.json();
+    this.classicLevels = data.classicLevels.map((level) => ({
+      ...level,
+      type: 'classic',
+    }));
   }
 
   constructor(ctx) {
     super(ctx);
-    this.levelIndex = 0; // 0: 经典 1: 数字
-    this.levels = this._buildLevels();
-    this.current = null; // 当前关数据运行时状态
+    // === 关卡数据 ===
+    this.classicLevelIndex = 0; // 当前经典关卡索引（0-based）
+    this.classicLevels = []; // 从 JSON 加载的经典关卡数组
+    this.numericLevel = null; // 数字关配置
+    this.current = null; // 当前关卡运行时状态
+
+    // === UI 元素 ===
     this.rootEl = null;
-    // 数字关计时挑战相关
-    this._numericFirstCleared = false; // 是否已经第一次通关过数字关
-    this._timingActive = false;
-    this._timingStart = null;
-    this._timerRaf = null;
-    this._timerEl = null;
+    this.selectedBlock = null; // 当前选中的方块 ID
+
+    // === 数字关计时挑战 ===
+    this._numericFirstCleared = false; // 是否已首次通关数字关
+    this._numericLocked = false; // 完成后锁定棋盘,直到重开或计时挑战
+    this._timingActive = false; // 计时器是否运行中
+    this._timingStart = null; // 计时开始时间戳
+    this._timerRaf = null; // requestAnimationFrame ID
+    this._timerEl = null; // 计时器 DOM 元素
+
+    // === 交互状态 ===
+    this._keyBound = false; // 键盘事件是否已绑定
+    this._dragState = null; // 拖动状态
   }
 
-  _buildLevels() {
-    // 经典华容道：使用 5x4 布局（列x行），出口在底部中间。
-    // blocks: {id,w,h,x,y,type,target?}
-    const classic = {
-      type: 'classic',
-      cols: 6,
-      rows: 6,
-      // 明确指定禁止行（0-based）：指初始布局中某行（例如 G2 下面一行）
-      forbiddenRow: 5,
-      // 将出口下移一格（y 从 4 -> 5）以便目标块需要再下移一格才能胜利
-      // 注意：cols 改为 6，但 exit.x 保持原位置（可按需调整）
-      exit: { x: 1, y: 5, w: 2, h: 1 }, // 目标块需覆盖此区域并“下移出”判定胜利
-      // 所有滑块都为 1x2（竖）或 2x1（横）——使用布尔字段 horizontal 表示横向（true）或竖向（false）
-      blocks: [
-        { id: 'A', horizontal: true, x: 1, y: 1, type: 'target' }, // 目标块（红色）
-        { id: 'B', horizontal: false, x: 0, y: 0 },
-        { id: 'C', horizontal: false, x: 3, y: 0 },
-        { id: 'E', horizontal: true, x: 1, y: 0 },
-        { id: 'F', horizontal: false, x: 0, y: 2 },
-        { id: 'G', horizontal: false, x: 3, y: 2 },
-        { id: 'D', horizontal: true, x: 1, y: 3 },
-        { id: 'H', horizontal: true, x: 1, y: 4 },
-      ],
-    };
-    // 数字华容道：4x4，空白用 0。
-    const numeric = {
-      type: 'numeric',
-      size: 4,
-      tiles: this._shuffleNumeric(4), // 初始随机，确保可解（简单：如果不可解则交换除0外任意两数）
-    };
-    return [classic, numeric];
-  }
-
+  /**
+   * 生成随机的数字华容道布局（15-puzzle）
+   * 保证空白格在右下角且布局可解
+   * @param {number} n - 棋盘大小（4 表示 4×4）
+   * @returns {number[]} 打乱后的数字数组（0 代表空格）
+   */
   _shuffleNumeric(n) {
-    // 我们希望空白（0）始终位于右下角（最后一个位置）。
-    // 生成 1..(n*n-1) 的随机排列并保证可解性（当空白在最后一行且宽度为偶数时，
-    // 可解性条件等价于逆序数为偶数）。为简单起见：生成随机排列，若逆序为奇数则交换前两项以修正为偶数。
     const count = n * n - 1;
-    const arr = Array.from({ length: count }, (_, i) => i + 1); // 1..15
-    // Fisher-Yates 洗牌
+    const arr = Array.from({ length: count }, (_, i) => i + 1); // 生成 1..15
+
+    // Fisher-Yates 洗牌算法
     for (let i = arr.length - 1; i > 0; i--) {
       const j = Math.floor(Math.random() * (i + 1));
       [arr[i], arr[j]] = [arr[j], arr[i]];
     }
-    // 计算逆序数（仅对非零元素）
-    let inv = 0;
+
+    // 计算逆序数
+    let inversions = 0;
     for (let i = 0; i < arr.length; i++) {
       for (let j = i + 1; j < arr.length; j++) {
-        if (arr[i] > arr[j]) inv++;
+        if (arr[i] > arr[j]) inversions++;
       }
     }
-    // 当空白位于最后一格（右下）并且 n 为偶数时，可解性需要逆序数为偶数
-    if (n % 2 === 0 && inv % 2 === 1) {
-      // 调整为偶数逆序：简单交换前两项
-      if (arr.length >= 2) [arr[0], arr[1]] = [arr[1], arr[0]];
-      else {
-        // 极端情况（n=1 或 0），不太可能，但确保返回初始状态
-      }
+
+    // 当空白位于右下角且棋盘为偶数大小时,逆序数必须为偶数才可解
+    if (n % 2 === 0 && inversions % 2 === 1) {
+      // 交换前两项调整为偶数逆序
+      [arr[0], arr[1]] = [arr[1], arr[0]];
     }
-    // 最后将 0 放到末尾
+
+    // 将空白格（0）放到最后
     arr.push(0);
     return arr;
-  }
-
-  _isSolvable15(a) {
-    const size = Math.sqrt(a.length);
-    let inv = 0;
-    for (let i = 0; i < a.length; i++) {
-      if (a[i] === 0) continue;
-      for (let j = i + 1; j < a.length; j++) {
-        if (a[j] === 0) continue;
-        if (a[i] > a[j]) inv++;
-      }
-    }
-    const blankRowFromBottom = size - Math.floor(a.indexOf(0) / size); // 1-based
-    if (size % 2 === 1) {
-      return inv % 2 === 0; // 奇数宽度：逆序偶数可解
-    } else {
-      // 偶数宽度： (空行从底数奇 && 逆序偶) 或 (空行从底数偶 && 逆序奇)
-      const oddBlank = blankRowFromBottom % 2 === 1;
-      const evenInv = inv % 2 === 0;
-      return (oddBlank && evenInv) || (!oddBlank && !evenInv);
-    }
   }
 
   async enter() {
@@ -122,39 +102,47 @@ export class Scene6Scarf extends BaseScene {
       audioManager.playSceneBGM('6', { loop: true, volume: 0.6, fadeIn: 600 });
     } catch (e) {}
     this.ctx.rootEl.appendChild(this.rootEl);
-    this.loadLevel(this.levelIndex);
+    // 进入场景时加载第一个经典关卡
+    this.loadLevel('classic', this.classicLevelIndex);
   }
 
-  loadLevel(idx) {
-    this.levelIndex = idx;
-    const def = this.levels[idx];
+  /**
+   * 加载指定关卡
+   * @param {string} type - 关卡类型: 'classic' 或 'numeric'
+   * @param {number} idx - 关卡索引(仅对 classic 类型有效)
+   */
+  loadLevel(type, idx = 0) {
+    let def;
+    if (type === 'classic') {
+      if (!this.classicLevels || idx >= this.classicLevels.length) return;
+      this.classicLevelIndex = idx;
+      def = this.classicLevels[idx];
+    } else {
+      def = this.numericLevel;
+    }
+
     if (def.type === 'classic') {
       this.current = JSON.parse(JSON.stringify(def)); // 深拷贝
-      // 如果关卡定义内显式给出 forbiddenRow，则使用之（使规则与具体方块 id 解耦）
-      if (typeof this.current.forbiddenRow === 'number') {
-        this.current._forbiddenRow = this.current.forbiddenRow;
-      }
-      // 将 blocks 中的 horizontal 字段转换为运行时的 w/h（兼容旧字段）
+      // 将 horizontal 字段转换为 w/h 字段(兼容 1/0 和 true/false 两种格式)
       this.current.blocks = this.current.blocks.map((b) => {
         const nb = Object.assign({}, b);
-        if (typeof nb.horizontal === 'boolean') {
-          if (nb.horizontal) {
-            nb.w = 2;
-            nb.h = 1;
-          } else {
-            nb.w = 1;
-            nb.h = 2;
-          }
-          delete nb.horizontal;
+        const h = typeof nb.horizontal === 'number' ? nb.horizontal === 1 : !!nb.horizontal;
+        if (h) {
+          nb.w = 2;
+          nb.h = 1;
         } else {
-          // 保持已有 w/h
+          nb.w = 1;
+          nb.h = 2;
         }
+        delete nb.horizontal;
         return nb;
       });
       this._renderClassic();
     } else if (def.type === 'numeric') {
       // 每次进入/重开数字关都重新洗牌以保证随机性
       def.tiles = this._shuffleNumeric(def.size);
+      // 解锁数字棋盘(每次加载新关或重开都应可操作)
+      this._numericLocked = false;
       this.current = JSON.parse(JSON.stringify(def));
       this._renderNumeric();
     }
@@ -173,46 +161,102 @@ export class Scene6Scarf extends BaseScene {
         <button data-act='restart'>重开关卡</button>
       </div>
     `;
-    bar
-      .querySelector('[data-act=restart]')
-      .addEventListener('click', () => this.loadLevel(this.levelIndex));
+    bar.querySelector('[data-act=restart]').addEventListener('click', () => {
+      // 如果当前在数字关，并且处于计时挑战（计时进行中）或页面已有“计时挑战”按钮，
+      // 则将重开视为重新开始计时挑战：停止当前计时（若在运行），再执行三秒倒计时流程
+      if (this.current && this.current.type === 'numeric') {
+        const controls = this.rootEl.querySelector('.hrd-top-bar .hrd-controls');
+        const hasTimingBtn = controls && controls.querySelector('[data-act=timing]');
+        if (this._timingActive || hasTimingBtn) {
+          if (this._timingActive) this._stopTiming();
+          this._startNumericChallengeCountdown();
+          return;
+        }
+      }
+      // 默认行为：重开当前关卡
+      if (this.current && this.current.type === 'classic') {
+        this.loadLevel('classic', this.classicLevelIndex);
+      } else {
+        this.loadLevel('numeric');
+      }
+    });
     this.rootEl.appendChild(bar);
   }
 
+  /**
+   * 渲染经典华容道关卡
+   */
   _renderClassic() {
     this._clearRoot();
-    this._renderHeader('经典布局');
+
+    // 动态生成标题
+    const totalClassic = this.classicLevels ? this.classicLevels.length : 0;
+    const currentIdx = this.classicLevelIndex + 1;
+    const levelName = this.current.name || '经典布局';
+    const headerTitle = `${levelName} - 第${currentIdx}关/共${totalClassic}关`;
+
+    this._renderHeader(headerTitle);
     const { cols, rows, blocks, exit } = this.current;
     const wrap = document.createElement('div');
     wrap.className = 'hrd-board classic';
-    // 可视上左右各扩展一列，但逻辑移动仍使用 this.current.cols
-    const visualOffset = 1;
-    const visualCols = cols + visualOffset * 2;
+    // 如果出口在右侧且需要在棋盘外显示，则扩展视觉列数
+    const exitOrientation = exit.orientation || 'bottom';
+    const visualCols = exitOrientation === 'right' ? cols + (exit.w || 1) : cols;
     wrap.style.setProperty('--cols', visualCols);
     wrap.style.setProperty('--rows', rows);
 
     const grid = document.createElement('div');
     grid.className = 'hrd-grid';
-    // 添加一个可视边框，围绕逻辑的 cols x (rows-1) 或指定的滑块初始区域
-    // visualOffset 用于将边框位置与可视化网格对齐
+
+    // 添加可视边框,围绕逻辑棋盘区域
     const playAreaBorder = document.createElement('div');
     playAreaBorder.className = 'play-area-border';
-    // 边框使用 grid-area 放置：覆盖逻辑列范围并垂直覆盖前 (rows - 1) 行（通常顶端活动区域）
-    // visualOffset 用于将边框位置与可视化网格对齐
-    const borderTop = 1; // y = 0 -> row 1
-    const borderLeft = 1 + visualOffset; // x = 0 -> col (visualOffset + 1)
-    // 覆盖到逻辑上前 (rows - 1) 行的底部：因为 exit 可能在最后一行
-    const borderBottom = rows - 1 + 1 + 1; // (rows-1) 0-based -> +1 for grid -> +1 exclusive
-    const borderRight = visualOffset + cols + 1; // 视觉上覆盖到右侧对应列（包含所有逻辑列）
-    playAreaBorder.style.gridArea = `${borderTop} / ${borderLeft} / ${borderBottom} / ${borderRight}`;
+    // 覆盖整个棋盘区域：从 (1,1) 到 (rows+1, cols+1)
+    playAreaBorder.style.gridArea = `1 / 1 / ${rows + 1} / ${cols + 1}`;
     grid.appendChild(playAreaBorder);
-    // 经典关取消背景空格子，仅显示出口与方块
-    // 出口标记
+
+    // 若为右侧外置出口，制造边框缺口遮罩
+    if (exitOrientation === 'right') {
+      // 计算单元尺寸与缺口定位
+      // 优先通过已渲染样式推断 cellHeight；若无块，使用基准 80px
+      const baseCellSize = parseInt(
+        getComputedStyle(grid)
+          .getPropertyValue('grid-template-rows')
+          .match(/(\d+)px/)?.[1] || '80'
+      );
+      // 自适应媒体查询后实际 cell 高度可能变化，尝试测量一个暂时创建的占位节点
+      let measuredCell = baseCellSize;
+      const probe = document.createElement('div');
+      probe.style.gridArea = '1 / 1 / 2 / 2';
+      probe.style.visibility = 'hidden';
+      grid.appendChild(probe);
+      measuredCell = probe.getBoundingClientRect().height || baseCellSize;
+      probe.remove();
+      const gap = 4; // 与CSS中gap一致
+      const notchTop = exit.y * (measuredCell + gap);
+      const notchHeight = exit.h * measuredCell + (exit.h - 1) * gap;
+      const notch = document.createElement('div');
+      notch.className = 'exit-notch';
+      notch.style.top = notchTop + 'px';
+      notch.style.height = notchHeight + 'px';
+      // 位置：在内部棋盘右侧（playAreaBorder 内部右边缘）绝对定位
+      notch.style.right = '0';
+      grid.appendChild(notch);
+    }
+
+    // 出口标记：若为右侧出口则放在棋盘外（忽略 JSON 中的 x）
     const exitEl = document.createElement('div');
-    exitEl.className = 'exit';
-    exitEl.style.gridArea = `${exit.y + 1} / ${exit.x + visualOffset + 1} / ${
-      exit.y + exit.h + 1
-    } / ${exit.x + visualOffset + exit.w + 1}`;
+    if (exitOrientation === 'right') {
+      exitEl.className = 'exit outside right';
+      const startCol = cols + 1; // 外部第一列
+      const endCol = cols + (exit.w || 1) + 1;
+      exitEl.style.gridArea = `${exit.y + 1} / ${startCol} / ${exit.y + exit.h + 1} / ${endCol}`;
+    } else {
+      exitEl.className = 'exit';
+      exitEl.style.gridArea = `${exit.y + 1} / ${exit.x + 1} / ${exit.y + exit.h + 1} / ${
+        exit.x + exit.w + 1
+      }`;
+    }
     grid.appendChild(exitEl);
 
     // 方块元素
@@ -220,10 +264,9 @@ export class Scene6Scarf extends BaseScene {
       const blockEl = document.createElement('div');
       blockEl.className = 'block' + (b.type === 'target' ? ' target' : '');
       blockEl.dataset.id = b.id;
-      blockEl.style.gridArea = `${b.y + 1} / ${b.x + visualOffset + 1} / ${b.y + b.h + 1} / ${
-        b.x + visualOffset + b.w + 1
-      }`;
-      blockEl.textContent = b.id;
+      blockEl.style.gridArea = `${b.y + 1} / ${b.x + 1} / ${b.y + b.h + 1} / ${b.x + b.w + 1}`;
+      // 不显示字母标识
+      blockEl.textContent = '';
       // 点击选中
       blockEl.addEventListener('click', () => this._selectBlock(b.id));
       // pointerdown 用于开始拖动（支持鼠标与触控）
@@ -234,7 +277,7 @@ export class Scene6Scarf extends BaseScene {
     wrap.appendChild(grid);
     const hint = document.createElement('p');
     hint.className = 'hrd-hint';
-    hint.textContent = '点击一个方块然后使用方向键移动（若可行），目标块移出底部出口即胜利。';
+    hint.textContent = '点击方块并使用方向键移动，目标块从出口滑出即胜利。';
     wrap.appendChild(hint);
     this.rootEl.appendChild(wrap);
     this.selectedBlock = null;
@@ -325,6 +368,9 @@ export class Scene6Scarf extends BaseScene {
       b.y += mv.dy;
       this._updateClassicBlockEl(b);
       this._checkClassicWin();
+    } else {
+      // 非法拖动尝试，沿尝试方向抖动
+      this._shakeBlock(b, mv.dx, mv.dy);
     }
     this._dragState = null;
   }
@@ -360,44 +406,50 @@ export class Scene6Scarf extends BaseScene {
       b.y += dy;
       this._updateClassicBlockEl(b);
       this._checkClassicWin();
+    } else {
+      // 非法移动尝试抖动反馈(按碰撞方向)
+      this._shakeBlock(b, dx, dy);
     }
   }
 
+  /**
+   * 检查方块是否可以移动到指定位置
+   * @param {Object} b - 要移动的方块对象
+   * @param {number} dx - x 方向移动增量
+   * @param {number} dy - y 方向移动增量
+   * @returns {boolean} 是否可以移动
+   */
   _canMoveBlock(b, dx, dy) {
     const { cols, rows, blocks } = this.current;
     const nx = b.x + dx;
     const ny = b.y + dy;
+
+    // 边界检查(目标块可以向下"出界"到出口位置)
     if (nx < 0 || ny < 0 || nx + b.w > cols || ny + b.h > rows) {
-      // 允许目标块向下“出界”作为胜利判定前一步：ny + h == rows 且 dy >0 && b.type==='target'
-      if (
-        !(
-          b.type === 'target' &&
-          dy > 0 &&
-          b.x === this.current.exit.x &&
-          b.w === this.current.exit.w &&
-          b.y + b.h === rows
-        )
-      )
-        return false;
-    }
-    // 规则：G2 下面的那一行（G2.y + G2.h）不允许除了 A 以外的方块占据任何格子
-    // 优先使用载入时记录的固定 forbidden row（如果存在），否则动态从当前 G2 计算
-    const forbiddenRow =
-      this.current && typeof this.current._forbiddenRow === 'number'
-        ? this.current._forbiddenRow
-        : blocks.find((x) => x.id === 'G2')
-        ? blocks.find((x) => x.id === 'G2').y + blocks.find((x) => x.id === 'G2').h
-        : null;
-    if (forbiddenRow !== null && forbiddenRow !== undefined) {
-      if (b.id !== 'A') {
-        const top = ny;
-        const bottom = ny + b.h - 1;
-        if (top <= forbiddenRow && bottom >= forbiddenRow) return false;
+      const exit = this.current.exit;
+      const ori = exit.orientation || 'bottom';
+      // 目标块允许进入外部出口区域（逐步滑出），其他块禁止越界
+      if (b.type === 'target') {
+        if (ori === 'right') {
+          // 进入右侧出口：保持行匹配，向右移动，且越界不超过出口宽度
+          const maxRight = cols + (exit.w || 1); // 目标块右侧边界允许值 (exclusive line index)
+          const afterRightEdge = b.y === exit.y && b.h === exit.h && dx > 0 && nx + b.w <= maxRight;
+          if (!afterRightEdge) return false;
+        } else if (ori === 'bottom') {
+          const maxBottom = rows + (exit.h || 1);
+          const afterBottomEdge =
+            b.x === exit.x && b.w === exit.w && dy > 0 && ny + b.h <= maxBottom;
+          if (!afterBottomEdge) return false;
+        } else {
+          return false; // 未定义的出口方向
+        }
+      } else {
+        return false; // 非目标块禁止越界
       }
     }
-    // 碰撞检测（忽略自身）
+
+    // 碰撞检测(忽略自身)
     return blocks.every((other) => {
-      // 忽略自身比较：使用 id 比较以防对象引用不一致
       if (other.id === b.id) return true;
       const ox = other.x,
         oy = other.y,
@@ -413,33 +465,66 @@ export class Scene6Scarf extends BaseScene {
   _updateClassicBlockEl(b) {
     const el = this.rootEl.querySelector(`.block[data-id='${b.id}']`);
     if (el) {
-      const visualOffset = 1;
-      el.style.gridArea = `${b.y + 1} / ${b.x + visualOffset + 1} / ${b.y + b.h + 1} / ${
-        b.x + visualOffset + b.w + 1
-      }`;
+      // 视觉与逻辑统一：直接使用真实坐标
+      el.style.gridArea = `${b.y + 1} / ${b.x + 1} / ${b.y + b.h + 1} / ${b.x + b.w + 1}`;
     }
   }
 
+  /**
+   * 非法移动时抖动方块，按照玩家尝试的碰撞方向抖动
+   * @param {Object} b 方块对象
+   * @param {number} dx 本次尝试移动的 x 增量(-1/0/1)
+   * @param {number} dy 本次尝试移动的 y 增量(-1/0/1)
+   */
+  _shakeBlock(b, dx, dy) {
+    const el = this.rootEl.querySelector(`.block[data-id='${b.id}']`);
+    if (!el) return;
+    // 判断尝试方向：有水平位移则水平抖动，否则垂直抖动
+    const cls = Math.abs(dx) !== 0 ? 'shake-h' : 'shake-v';
+    el.classList.remove('shake-h', 'shake-v');
+    void el.offsetWidth; // 强制重排以重启动画
+    el.classList.add(cls);
+    setTimeout(() => el.classList.remove(cls), 400);
+  }
+
+  /**
+   * 检查经典华容道是否胜利
+   * 胜利条件: 目标块(type='target')到达出口位置
+   */
   _checkClassicWin() {
     const target = this.current.blocks.find((x) => x.type === 'target');
     const { exit, rows } = this.current;
-    // 胜利：目标块底边位于最后一行且下一步可向下移动出界（或已经下移出界）
-    if (target.y + target.h === rows && target.x === exit.x && target.w === exit.w) {
-      this._showWin(() => this._afterAllWin());
+    const cols = this.current.cols;
+    const ori = exit.orientation || 'bottom';
+    const bottomWin =
+      ori === 'bottom' &&
+      target.x === exit.x &&
+      target.w === exit.w &&
+      target.y + target.h >= rows + (exit.h || 1); // 完全滑出
+    const rightWin =
+      ori === 'right' &&
+      target.y === exit.y &&
+      target.h === exit.h &&
+      target.x + target.w >= cols + (exit.w || 1); // 完全滑出
+    if (bottomWin || rightWin) {
+      this._showWin(() => {
+        // 检查是否还有更多经典关卡
+        const nextClassicIdx = this.classicLevelIndex + 1;
+        if (nextClassicIdx < this.classicLevels.length) {
+          // 进入下一个经典关卡
+          this.loadLevel('classic', nextClassicIdx);
+        } else {
+          // 所有经典关卡完成,进入数字关
+          this.loadLevel('numeric');
+        }
+      });
     }
   }
 
-  _afterAllWin() {
-    // 如果是第一关胜利，进入第二关；如果第二关胜利，进入下一场景
-    if (this.levelIndex === 0) {
-      this.loadLevel(1);
-    } else {
-      this.ctx.go('future');
-    }
-  }
-
+  /**
+   * 渲染数字华容道关卡
+   */
   _renderNumeric() {
-    
     this._clearRoot();
     this._renderHeader('数字滑块');
     const { size, tiles } = this.current;
@@ -449,9 +534,10 @@ export class Scene6Scarf extends BaseScene {
     wrap.style.setProperty('--rows', size);
     const grid = document.createElement('div');
     grid.className = 'hrd-grid';
-    // 数字关不再渲染背景空格子，只展示数字块，减少视觉冗余
+
+    // 渲染数字块(不渲染背景空格,只显示数字)
     tiles.forEach((val, i) => {
-      if (val === 0) return; // 空白
+      if (val === 0) return; // 跳过空白格
       const tileEl = document.createElement('div');
       tileEl.className = 'num-tile';
       const r = Math.floor(i / size);
@@ -477,16 +563,17 @@ export class Scene6Scarf extends BaseScene {
     let tr = blank.r,
       tc = blank.c;
     // 支持 Arrow 与 WASD（W 上, S 下, A 左, D 右）
-    if (key === 'ArrowUp' || key === 'w' || key === 'W')
-      tr = blank.r + 1; // 空白向上移动 = 与下方块交换
-    else if (key === 'ArrowDown' || key === 's' || key === 'S') tr = blank.r - 1;
-    else if (key === 'ArrowLeft' || key === 'a' || key === 'A') tc = blank.c + 1;
-    else if (key === 'ArrowRight' || key === 'd' || key === 'D') tc = blank.c - 1;
+    if (key === 'ArrowUp' || key === 'w' || key === 'W') tr = blank.r - 1;
+    else if (key === 'ArrowDown' || key === 's' || key === 'S') tr = blank.r + 1;
+    else if (key === 'ArrowLeft' || key === 'a' || key === 'A') tc = blank.c - 1;
+    else if (key === 'ArrowRight' || key === 'd' || key === 'D') tc = blank.c + 1;
     else return;
     this._tryMoveNumeric(tr, tc);
   }
 
   _tryMoveNumeric(r, c) {
+    // 若数字关已被锁定（已完成），不允许再移动，直到重开或进入计时挑战
+    if (this._numericLocked) return;
     const { size, tiles } = this.current;
     if (r < 0 || c < 0 || r >= size || c >= size) return;
     const blank = this._findNumericBlank();
@@ -528,18 +615,29 @@ export class Scene6Scarf extends BaseScene {
     if (this._timingActive) {
       const elapsed = this._stopTiming();
       if (elapsed !== null) {
+        // 计时挑战完成事件（用于成就 6-1 判定）
+        try {
+          achievements.recordEvent('scene6:timed_finish', { elapsed });
+        } catch (e) {}
         this._showTimedWin(elapsed);
         return;
       }
     }
-    // 首次通过数字关：弹窗仅“确认”，不直接跳转；确认后在页面出现“计时挑战”和“跳转下一幕”按钮
-    if (this.levelIndex === 1 && !this._numericFirstCleared) {
+    // 首次通过数字关:仅显示确认按钮,确认后显示"计时挑战"和"跳转下一幕"按钮
+    if (!this._numericFirstCleared) {
       this._numericFirstCleared = true;
+      // 上报第六幕完成成就事件（首次完成数字华容道）
+      try {
+        achievements.recordEvent('scene6:completed', { firstNumeric: true });
+      } catch (e) {}
       this._showNumericFirstWin();
-    } else {
-      this._showWin(() => this._afterAllWin());
+      // 锁定棋盘,直到用户选择计时挑战或重开
+      this._numericLocked = true;
     }
   }
+  /**
+   * 显示首次完成数字关的胜利弹窗
+   */
   _showNumericFirstWin() {
     const box = document.createElement('div');
     box.className = 'hrd-win';
@@ -551,8 +649,11 @@ export class Scene6Scarf extends BaseScene {
     });
   }
 
+  /**
+   * 在顶部注入"计时挑战"和"跳转下一幕"按钮
+   */
   _injectPostNumericWinButtons() {
-    // 在顶部控制区添加“计时挑战”和“跳转下一幕”按钮，若已存在则先清理旧的
+    // 在顶部控制区添加"计时挑战"和"跳转下一幕"按钮，若已存在则先清理旧的
     const controls = this.rootEl.querySelector('.hrd-top-bar .hrd-controls');
     if (!controls) return;
     // 避免重复添加
@@ -570,11 +671,25 @@ export class Scene6Scarf extends BaseScene {
       this._startNumericChallengeCountdown();
     });
     nextBtn.addEventListener('click', () => {
-      // 直接跳转下一幕（不再弹出确认弹窗）
-      this._afterAllWin();
+      // 直接跳转下一幕(不再弹出确认弹窗)
+      this._gotoNextScene();
     });
   }
 
+  /**
+   * 跳转到下一场景
+   */
+  _gotoNextScene() {
+    // 跳转到下一场景
+    if (this.ctx && this.ctx.go) {
+      this.ctx.go('future');
+    }
+  }
+
+  /**
+   * 开始数字关计时挑战的倒计时
+   * 显示 3...2...1...Go! 后重新开始数字关并启动计时器
+   */
   _startNumericChallengeCountdown() {
     // 显示 3 秒倒计时在屏幕中央，然后重开数字关并开始计时器
     const box = document.createElement('div');
@@ -589,14 +704,17 @@ export class Scene6Scarf extends BaseScene {
       if (count <= 0) {
         clearInterval(iv);
         box.remove();
-        // 重新开始数字关（洗牌并渲染）并开始计时
-        this.loadLevel(1);
+        // 重新开始数字关(洗牌并渲染)并开始计时
+        this.loadLevel('numeric');
         // 允许一帧后开始计时以保证 UI 渲染
         requestAnimationFrame(() => this._startTiming());
       }
     }, 1000);
   }
 
+  /**
+   * 启动计时器
+   */
   _startTiming() {
     if (this._timingActive) return;
     this._timingActive = true;
@@ -619,6 +737,10 @@ export class Scene6Scarf extends BaseScene {
     this._timerRaf = requestAnimationFrame(update);
   }
 
+  /**
+   * 停止计时器并返回经过的时间(秒)
+   * @returns {number|null} 经过的时间(秒),如果计时器未运行则返回 null
+   */
   _stopTiming() {
     if (!this._timingActive) return null;
     this._timingActive = false;
@@ -633,6 +755,10 @@ export class Scene6Scarf extends BaseScene {
     return elapsed;
   }
 
+  /**
+   * 显示计时挑战胜利弹窗
+   * @param {number} elapsed - 完成时间(秒)
+   */
   _showTimedWin(elapsed) {
     // 在弹窗中显示胜利与用时，并比较 localStorage 最佳成绩
     const bestKey = 'hrd_numeric_best';
@@ -660,6 +786,10 @@ export class Scene6Scarf extends BaseScene {
     });
   }
 
+  /**
+   * 显示通用胜利弹窗
+   * @param {Function} cb - 点击"继续"按钮后的回调函数
+   */
   _showWin(cb) {
     const box = document.createElement('div');
     box.className = 'hrd-win';
@@ -671,6 +801,9 @@ export class Scene6Scarf extends BaseScene {
     });
   }
 
+  /**
+   * 注入全局样式表
+   */
   _injectStyle() {
     if (document.getElementById('hrd-style')) return;
     const style = document.createElement('style');
@@ -683,11 +816,23 @@ export class Scene6Scarf extends BaseScene {
       .hrd-board { max-width:500px;margin:0 auto; }
       .hrd-grid { display:grid;grid-template-columns:repeat(var(--cols), 80px);grid-template-rows:repeat(var(--rows), 80px);gap:4px;position:relative; }
       .hrd-grid .cell { width:80px;height:80px;background:#f3f3f3;border-radius:6px;box-shadow:inset 0 0 2px #bbb; }
-  .play-area-border { box-shadow: 0 0 0 4px rgba(43,140,255,0.12) inset, 0 0 0 2px rgba(43,140,255,0.22); border-radius:10px; pointer-events:none; }
+      .play-area-border { box-shadow: 0 0 0 4px rgba(43,140,255,0.12) inset, 0 0 0 2px rgba(43,140,255,0.22); border-radius:10px; pointer-events:none; }
       .hrd-grid .exit { background: repeating-linear-gradient(45deg,#ffe0e0,#ffe0e0 6px,#ffcaca 6px,#ffcaca 12px);opacity:0.9;border:2px dashed #ff5252;border-radius:6px; }
+      .hrd-grid .exit.right { background: linear-gradient(90deg, #ffe8d1 0%, #ffbe9e 70%); position:relative; border:2px solid #ff8a47; }
+      .hrd-grid .exit.right::after { content:'→'; position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); font-size:32px; color:#d84315; animation: exitPulse 1.2s infinite; }
+      /* 外部右侧出口增加分离感 */
+      .hrd-grid .exit.outside.right { box-shadow:0 0 0 3px rgba(255,138,71,0.35), inset 0 0 6px rgba(255,138,71,0.5); margin-left:4px; }
+      /* 缺口遮罩：覆盖原右侧边框以形成开口 */
+      .exit-notch { position:absolute; width:6px; background: #fff; box-shadow:none; pointer-events:none; border-radius:3px; }
+      @keyframes exitPulse { 0%{ transform:translate(-50%,-50%) scale(1); opacity:.75;} 50%{ transform:translate(-50%,-50%) scale(1.15); opacity:1;} 100%{ transform:translate(-50%,-50%) scale(1); opacity:.75;} }
       .block { background:#87c5ff;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;color:#124e7a;box-shadow:0 2px 4px rgba(0,0,0,.25);cursor:pointer;user-select:none; }
       .block.selected { outline:3px solid #2b8cff; transform: translateY(-2px); }
-  .block.target { background:#e53935;color:#fff;border:2px solid rgba(0,0,0,0.08); }
+      .block.target { background:#e53935;color:#fff;border:2px solid rgba(0,0,0,0.08); }
+      /* 抖动动画 */
+      .block.shake-h { animation: shakeH 0.35s ease; }
+      .block.shake-v { animation: shakeV 0.35s ease; }
+      @keyframes shakeH { 0%{ transform:translateX(0);} 20%{ transform:translateX(-5px);} 40%{ transform:translateX(5px);} 60%{ transform:translateX(-4px);} 80%{ transform:translateX(4px);} 100%{ transform:translateX(0);} }
+      @keyframes shakeV { 0%{ transform:translateY(0);} 20%{ transform:translateY(-5px);} 40%{ transform:translateY(5px);} 60%{ transform:translateY(-4px);} 80%{ transform:translateY(4px);} 100%{ transform:translateY(0);} }
       .hrd-hint { text-align:center;margin-top:8px;font-size:12px;color:#666; }
       .num-tile { background:#ffe08a;border-radius:8px;display:flex;align-items:center;justify-content:center;font-weight:bold;font-size:22px;color:#7a4e12;box-shadow:0 2px 4px rgba(0,0,0,.25);cursor:pointer;user-select:none; }
       .hrd-win { position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:rgba(0,0,0,.45); }

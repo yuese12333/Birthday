@@ -788,6 +788,48 @@ achievements.register(
   }
 );
 
+// 成就 6-0：完成第六幕——首次完成数字华容道
+achievements.register(
+  '6-0',
+  {
+    title: '通关第六幕',
+    desc: '完成第六幕的华容道挑战。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      // 监听首次完成数字华容道的事件 scene6:completed
+      return events.some((ev) => ev && ev.name === 'scene6:completed');
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
+// 成就 6-1：华容道大师 —— 计时挑战中 45s 内完成数字华容道
+achievements.register(
+  '6-1',
+  {
+    title: '华容道大师',
+    desc: '计时挑战 45 秒内完成数字华容道。',
+    descriptionVisible: true,
+  },
+  (events) => {
+    try {
+      return events.some(
+        (ev) =>
+          ev &&
+          ev.name === 'scene6:timed_finish' &&
+          ev.payload &&
+          typeof ev.payload.elapsed === 'number' &&
+          ev.payload.elapsed <= 45
+      );
+    } catch (e) {
+      return false;
+    }
+  }
+);
+
 // 成就 8-0：进入第八幕（终章）——完成游戏
 achievements.register(
   '8-0',

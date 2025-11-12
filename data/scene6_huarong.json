@@ -1,0 +1,56 @@
+{
+  "classicLevels": [
+    {
+      "id": 1,
+      "name": "经典布局",
+      "cols": 6,
+      "rows": 6,
+      "exit": { "x": 4, "y": 2, "w": 2, "h": 1, "orientation": "right" },
+      "blocks": [
+        { "id": "A", "horizontal": 1, "x": 1, "y": 1, "type": "target" },
+        { "id": "B", "horizontal": 0, "x": 0, "y": 0 },
+        { "id": "C", "horizontal": 0, "x": 3, "y": 0 },
+        { "id": "E", "horizontal": 1, "x": 1, "y": 0 },
+        { "id": "F", "horizontal": 0, "x": 0, "y": 2 },
+        { "id": "G", "horizontal": 0, "x": 3, "y": 2 },
+        { "id": "D", "horizontal": 1, "x": 1, "y": 3 },
+        { "id": "H", "horizontal": 1, "x": 1, "y": 4 }
+      ]
+    },
+    {
+      "id": 2,
+      "name": "进阶挑战",
+      "cols": 6,
+      "rows": 6,
+      "exit": { "x": 4, "y": 0, "w": 2, "h": 1, "orientation": "right" },
+      "blocks": [
+        { "id": "A", "horizontal": 1, "x": 2, "y": 0, "type": "target" },
+        { "id": "B", "horizontal": 0, "x": 0, "y": 0 },
+        { "id": "C", "horizontal": 0, "x": 5, "y": 0 },
+        { "id": "D", "horizontal": 1, "x": 1, "y": 2 },
+        { "id": "E", "horizontal": 1, "x": 3, "y": 2 },
+        { "id": "F", "horizontal": 0, "x": 0, "y": 2 },
+        { "id": "G", "horizontal": 0, "x": 5, "y": 2 },
+        { "id": "H", "horizontal": 1, "x": 2, "y": 4 }
+      ]
+    },
+    {
+      "id": 3,
+      "name": "高级迷阵",
+      "cols": 6,
+      "rows": 6,
+      "exit": { "x": 4, "y": 4, "w": 2, "h": 1, "orientation": "right" },
+      "blocks": [
+        { "id": "A", "horizontal": 1, "x": 0, "y": 2, "type": "target" },
+        { "id": "B", "horizontal": 0, "x": 2, "y": 0 },
+        { "id": "C", "horizontal": 0, "x": 3, "y": 0 },
+        { "id": "D", "horizontal": 1, "x": 0, "y": 0 },
+        { "id": "E", "horizontal": 1, "x": 4, "y": 0 },
+        { "id": "F", "horizontal": 0, "x": 2, "y": 2 },
+        { "id": "G", "horizontal": 0, "x": 5, "y": 2 },
+        { "id": "H", "horizontal": 1, "x": 3, "y": 3 },
+        { "id": "I", "horizontal": 1, "x": 0, "y": 4 }
+      ]
+    }
+  ]
+}
